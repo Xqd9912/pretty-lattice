@@ -89,10 +89,12 @@ Tools:
 - Vite
 - TypeScript
 - React
+- Tailwind CSS
+- shadcn/ui
+- Radix UI primitives
+- lucide-react
 - Three.js
 - React Three Fiber
-
-Vite is a developer/build-time tool only. It should not become a runtime requirement for normal users.
 
 ## Project Boundary
 

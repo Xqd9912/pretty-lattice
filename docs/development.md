@@ -70,6 +70,15 @@ bun run typecheck
 bun run build
 ```
 
+Add shadcn/ui components as needed:
+
+```bash
+bunx shadcn@latest add button
+```
+
+Keep shadcn/ui focused on application controls. Figure rendering style, materials, and camera
+behavior should stay in the Three.js scene layer.
+
 ## Current Development Flow
 
 For now, run the Python server and Vite server separately:

@@ -1,20 +1,16 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  The user is not that familiar with JS/TS ecosystem. Use less jargons, explain more.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+
+rules:
+  proposal:
+    - Stay concise, and keep the focus clear.
+    - Describe goals, behavior, and boundaries more than implementation details.
+    - Focus on what should be done; do not dwell on what will not be done.
+  design:
+    - For non-goals, include only what is necessary or easy to confuse; omit the obvious.
+  tasks:
+    - Keep each task at a moderate granularity; do not split tasks too finely.
+    - Do not prescribe incidental implementation details unless they were explicitly discussed and decided. Leave room for judgment within the boundaries.
