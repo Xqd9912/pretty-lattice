@@ -3,10 +3,10 @@
   <desc id="desc">A geometric hexagon logo traced from a Physical Review Letters cover motif.</desc>
   <defs>
     <style>
-      .lavender { fill: #a5a8c2; }
-      .green { fill: #abd29b; }
-      .peach { fill: #e0b7a2; }
-      .cyan { fill: #aedad6; }
+      .lavender { fill: #a4a7c8; }
+      .green { fill: #a4d590; }
+      .peach { fill: #e7b49a; }
+      .cyan { fill: #a5dcd8; }
       .line {
         fill: none;
         stroke: #040503;
