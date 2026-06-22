@@ -1,4 +1,4 @@
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, PanelRightClose, SlidersHorizontal } from "lucide-react";
 import {
   type CSSProperties,
   type ChangeEvent,
@@ -10,26 +10,31 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 import { uploadStructurePreview, type SceneSpec } from "../api/scene";
 import { LatticeScene, type PreviewSafeArea } from "../scene/LatticeScene";
+import {
+  hasPeriodicImageAtoms,
+  previewSafeAreaForSettings,
+  visibleSceneForBoundaryAtoms,
+} from "./settings";
 import { deriveElementLegendEntries, type ElementLegendEntry } from "./elementLegend";
 import { summarizeScene, type PreviewStatus } from "./previewState";
+import { renderHermannMauguin } from "./symmetryNotation";
 
-const PREVIEW_SAFE_AREA: PreviewSafeArea = {
-  bottom: 132,
-  left: 380,
-  right: 32,
-  top: 24,
-};
+const GLASS_SURFACE_CLASS =
+  "border-foreground/10 bg-card/72 backdrop-blur-2xl backdrop-saturate-150";
 
 export function App() {
   const [scene, setScene] = useState<SceneSpec | null>(null);
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("idle");
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showBoundaryAtoms, setShowBoundaryAtoms] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -43,13 +48,17 @@ export function App() {
     setPreviewStatus("loading");
     setErrorMessage(null);
     setScene(null);
+    setIsSettingsOpen(false);
+    setShowBoundaryAtoms(false);
 
     try {
       const nextScene = await uploadStructurePreview(file);
       setScene(nextScene);
+      setShowBoundaryAtoms(hasPeriodicImageAtoms(nextScene));
       setPreviewStatus("ready");
     } catch (error) {
       setScene(null);
+      setIsSettingsOpen(false);
       setPreviewStatus("error");
       setErrorMessage(error instanceof Error ? error.message : "Could not parse structure.");
     }
@@ -57,12 +66,17 @@ export function App() {
 
   const summary = useMemo(() => summarizeScene(scene), [scene]);
   const legendEntries = useMemo(() => deriveElementLegendEntries(scene), [scene]);
+  const visibleScene = useMemo(
+    () => visibleSceneForBoundaryAtoms(scene, showBoundaryAtoms),
+    [scene, showBoundaryAtoms],
+  );
+  const previewSafeArea = previewSafeAreaForSettings();
 
   return (
     <main className="relative h-dvh min-w-80 overflow-hidden bg-background text-foreground">
       <section className="scene-stage absolute inset-0" aria-label="Crystal structure preview">
-        {scene ? (
-          <LatticeScene scene={scene} safeArea={PREVIEW_SAFE_AREA} />
+        {visibleScene ? (
+          <LatticeScene scene={visibleScene} safeArea={previewSafeArea} />
         ) : (
           <div
             className="grid h-full w-full place-items-center bg-background text-sm text-muted-foreground"
@@ -74,11 +88,15 @@ export function App() {
       </section>
 
       {legendEntries.length > 0 ? (
-        <ElementLegend entries={legendEntries} safeArea={PREVIEW_SAFE_AREA} />
+        <ElementLegend entries={legendEntries} safeArea={previewSafeArea} />
       ) : null}
 
       <aside
-        className="absolute left-4 top-4 w-[332px] max-w-[calc(100vw-2rem)] rounded-lg border bg-card/92 p-3 shadow-xl shadow-foreground/10 backdrop-blur-md"
+        className={cn(
+          "absolute left-4 top-4 w-[312px] max-w-[calc(100vw-2rem)] rounded-lg border p-3 shadow-xl shadow-foreground/10",
+          GLASS_SURFACE_CLASS,
+          isSettingsOpen ? "max-[760px]:hidden" : null,
+        )}
         aria-label="Current structure"
       >
         <div className="flex items-center justify-between gap-2">
@@ -93,23 +111,16 @@ export function App() {
             </div>
           </div>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  aria-label="Open structure"
-                  className="h-7 gap-1.5 rounded-full px-2.5 text-xs [&_svg]:size-3.5"
-                  disabled={previewStatus === "loading"}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <FolderOpen data-icon="inline-start" aria-hidden="true" />
-                  <span>Open</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Open structure</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            size="sm"
+            aria-label="Open structure"
+            className="h-7 gap-1.5 rounded-full px-2.5 text-xs transition-[background-color,color,box-shadow,translate] duration-200 ease-out hover:-translate-y-px hover:shadow-md active:translate-y-0 disabled:translate-y-0 [&_svg]:size-3.5"
+            disabled={previewStatus === "loading"}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <FolderOpen data-icon="inline-start" aria-hidden="true" />
+            <span>Open</span>
+          </Button>
         </div>
 
         <Separator className="my-2" />
@@ -197,7 +208,7 @@ export function App() {
                   <span className="block text-xs font-bold text-muted-foreground">
                     Lattice Parameters
                   </span>
-                  <dl className="mt-1 grid grid-cols-3 gap-x-3 gap-y-1 font-mono text-[0.8125rem]">
+                  <dl className="mt-1 grid grid-cols-3 gap-x-3 gap-y-1 font-mono text-sm">
                     <CellMetric label="a" value={summary.cell.a} unit="Å" />
                     <CellMetric label="b" value={summary.cell.b} unit="Å" />
                     <CellMetric label="c" value={summary.cell.c} unit="Å" />
@@ -211,7 +222,138 @@ export function App() {
           </div>
         ) : null}
       </aside>
+
+      {scene ? (
+        <>
+          <SettingsTrigger
+            isOpen={isSettingsOpen}
+            onOpenChange={setIsSettingsOpen}
+          />
+
+          <SettingsDrawer
+            isOpen={isSettingsOpen}
+            showBoundaryAtoms={showBoundaryAtoms}
+            onOpenChange={setIsSettingsOpen}
+            onShowBoundaryAtomsChange={setShowBoundaryAtoms}
+          />
+        </>
+      ) : null}
     </main>
+  );
+}
+
+function SettingsTrigger({
+  isOpen,
+  onOpenChange,
+}: {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+}) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-controls="settings-drawer"
+            aria-expanded={isOpen}
+            aria-label="Open settings"
+            className={cn(
+              "absolute right-4 top-4 rounded-full shadow-xl shadow-foreground/10 transition-[opacity,translate] duration-200 ease-out hover:-translate-x-0.5",
+              GLASS_SURFACE_CLASS,
+              isOpen ? "pointer-events-none translate-x-1 opacity-0" : "opacity-100",
+            )}
+            onClick={() => onOpenChange(true)}
+          >
+            <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="left">Settings</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function SettingsDrawer({
+  isOpen,
+  onOpenChange,
+  onShowBoundaryAtomsChange,
+  showBoundaryAtoms,
+}: {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  onShowBoundaryAtomsChange: (showBoundaryAtoms: boolean) => void;
+  showBoundaryAtoms: boolean;
+}) {
+  return (
+    <>
+      <aside
+        id="settings-drawer"
+        aria-labelledby="settings-drawer-title"
+        aria-hidden={!isOpen}
+        className={cn(
+          "absolute inset-y-0 right-0 flex w-[320px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden border-l shadow-2xl shadow-foreground/10",
+          GLASS_SURFACE_CLASS,
+          "transition-transform duration-200 ease-out motion-reduce:transition-none",
+          isOpen ? "translate-x-0" : "pointer-events-none translate-x-full",
+        )}
+      >
+        <div className="flex h-16 shrink-0 items-center px-4 pr-16">
+          <h2 id="settings-drawer-title" className="text-[0.95rem] font-semibold leading-tight">
+            Settings
+          </h2>
+        </div>
+
+        <Separator />
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div
+            className={cn(
+              "flex items-center justify-between gap-3 rounded-md border px-3 py-2.5",
+              GLASS_SURFACE_CLASS,
+            )}
+          >
+            <label
+              htmlFor="boundary-atoms-switch"
+              className="min-w-0 truncate text-sm font-medium leading-tight"
+            >
+              Show boundary atom images
+            </label>
+            <Switch
+              id="boundary-atoms-switch"
+              checked={showBoundaryAtoms}
+              disabled={!isOpen}
+              onCheckedChange={onShowBoundaryAtomsChange}
+            />
+          </div>
+        </div>
+      </aside>
+
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-controls="settings-drawer"
+              aria-expanded={isOpen}
+              aria-label="Collapse settings"
+              className={cn(
+                "absolute right-4 top-4 rounded-full shadow-xl shadow-foreground/10 transition-[opacity,translate] duration-200 ease-out hover:-translate-x-0.5",
+                GLASS_SURFACE_CLASS,
+                isOpen ? "opacity-100" : "pointer-events-none translate-x-1 opacity-0",
+              )}
+              tabIndex={isOpen ? undefined : -1}
+              onClick={() => onOpenChange(false)}
+            >
+              <PanelRightClose data-icon="inline-start" aria-hidden="true" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="left">Collapse</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </>
   );
 }
 
@@ -225,7 +367,10 @@ function ElementLegend({
   return (
     <nav
       aria-label="Element legend"
-      className="pointer-events-none absolute bottom-7 -translate-x-1/2 rounded-full border bg-card/88 px-4 py-2.5 shadow-lg shadow-foreground/10 backdrop-blur-md"
+      className={cn(
+        "pointer-events-none absolute bottom-7 -translate-x-1/2 rounded-full border px-4 py-2 shadow-lg shadow-foreground/10",
+        GLASS_SURFACE_CLASS,
+      )}
       style={legendContainerStyle(safeArea)}
     >
       <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
@@ -233,7 +378,7 @@ function ElementLegend({
           <li key={entry.element} className="flex min-w-0 items-center gap-2">
             <span
               aria-hidden="true"
-              className="size-[22px] shrink-0 rounded-full border border-foreground/10 shadow-sm"
+              className="size-[18px] shrink-0 rounded-full border border-foreground/10 shadow-sm"
               style={legendSphereStyle(entry.color)}
             />
             <span className="font-sans text-[0.95rem] font-normal leading-none text-foreground">
@@ -279,7 +424,7 @@ function SummaryRow({
         <span
           className={cn(
             "block truncate font-normal leading-snug tabular-nums",
-            mono ? "font-mono text-[0.8125rem]" : "font-sans",
+            mono ? "font-mono" : "font-sans",
             valueClassName,
           )}
         >
@@ -307,7 +452,7 @@ function SymmetryMetric({
       <dd
         className={cn(
           "min-w-0 truncate font-normal leading-snug tabular-nums",
-          mono ? "font-mono text-[0.8125rem]" : "font-sans",
+          mono ? "font-mono" : "font-sans",
         )}
         title={title}
       >
@@ -315,64 +460,6 @@ function SymmetryMetric({
       </dd>
     </div>
   );
-}
-
-function renderHermannMauguin(symbol: string) {
-  const nodes: ReactNode[] = [];
-  let plainStart = 0;
-  let index = 0;
-
-  while (index < symbol.length) {
-    const current = symbol[index] ?? "";
-    const next = symbol[index + 1] ?? "";
-    if (current === "-" && /\d/.test(next)) {
-      if (plainStart < index) {
-        nodes.push(symbol.slice(plainStart, index));
-      }
-      nodes.push(
-        <span
-          key={`overline-${index}`}
-          className="hm-overline-digit"
-          aria-label={`overline ${next}`}
-        >
-          {next}
-        </span>,
-      );
-      index += 2;
-      plainStart = index;
-      continue;
-    }
-
-    if (current === "_" && /\d/.test(next)) {
-      let subscriptEnd = index + 1;
-      while (subscriptEnd < symbol.length && /\d/.test(symbol[subscriptEnd] ?? "")) {
-        subscriptEnd += 1;
-      }
-
-      if (plainStart < index) {
-        nodes.push(symbol.slice(plainStart, index));
-      }
-      nodes.push(
-        <sub key={`subscript-${index}`} className="text-[0.68em] leading-none">
-          {symbol.slice(index + 1, subscriptEnd)}
-        </sub>,
-      );
-      index = subscriptEnd;
-      plainStart = index;
-      continue;
-    }
-
-    index += 1;
-  }
-
-  if (nodes.length === 0) {
-    return symbol;
-  }
-  if (plainStart < symbol.length) {
-    nodes.push(symbol.slice(plainStart));
-  }
-
-  return nodes;
 }
 
 function renderSpaceGroup(spaceGroup: string | null, spaceGroupNumber: number | null) {

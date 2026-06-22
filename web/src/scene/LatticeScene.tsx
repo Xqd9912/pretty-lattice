@@ -19,6 +19,7 @@ const EMPTY_SAFE_AREA: PreviewSafeArea = {
   right: 0,
   top: 0,
 };
+const SCENE_ROTATION: VectorTuple = [-0.18, 0.48, 0.0];
 
 export function LatticeScene({
   safeArea = EMPTY_SAFE_AREA,
@@ -63,13 +64,9 @@ function SceneContent({
     () => computeCameraZoom(layout.span, size.width, size.height, safeArea),
     [layout.span, safeArea, size.height, size.width],
   );
-  const groupPosition = useMemo(
-    () =>
-      addVectorTuples(
-        layout.groupPosition,
-        computeSafeAreaWorldOffset(layout.cameraPosition, zoom, safeArea),
-      ),
-    [layout.cameraPosition, layout.groupPosition, safeArea, zoom],
+  const safeAreaWorldOffset = useMemo(
+    () => computeSafeAreaWorldOffset(layout.cameraPosition, zoom, safeArea),
+    [layout.cameraPosition, safeArea, zoom],
   );
 
   useEffect(() => {
@@ -83,11 +80,13 @@ function SceneContent({
   }, [camera, layout.cameraPosition, zoom]);
 
   return (
-    <group position={groupPosition} rotation={[-0.18, 0.48, 0.0]}>
-      <CellFrame vectors={scene.cell.vectors} />
-      {scene.atoms.map((atom) => (
-        <Atom key={atom.id} atom={atom} />
-      ))}
+    <group position={safeAreaWorldOffset} rotation={SCENE_ROTATION}>
+      <group position={layout.groupPosition}>
+        <CellFrame vectors={scene.cell.vectors} />
+        {scene.atoms.map((atom) => (
+          <Atom key={atom.id} atom={atom} />
+        ))}
+      </group>
     </group>
   );
 }
@@ -167,7 +166,7 @@ interface SceneLayout {
   span: number;
 }
 
-function computeSceneLayout(scene: SceneSpec): SceneLayout {
+export function computeSceneLayout(scene: SceneSpec): SceneLayout {
   const points = [
     ...cellCorners(scene.cell.vectors),
     ...scene.atoms.map((atom) => new Vector3(...atom.position)),
@@ -175,7 +174,7 @@ function computeSceneLayout(scene: SceneSpec): SceneLayout {
   const box = new Box3().setFromPoints(points);
   const maxRadius = Math.max(0, ...scene.atoms.map((atom) => atom.radius));
   box.expandByScalar(maxRadius);
-  const center = box.getCenter(new Vector3());
+  const center = cellCenter(scene.cell.vectors);
   const size = box.getSize(new Vector3());
   const span = Math.max(1, size.x, size.y, size.z);
 
@@ -184,6 +183,15 @@ function computeSceneLayout(scene: SceneSpec): SceneLayout {
     groupPosition: [-center.x, -center.y, -center.z],
     span,
   };
+}
+
+function cellCenter(vectors: VectorTuple[]): Vector3 {
+  const [vectorA = [3.2, 0, 0], vectorB = [0, 3.2, 0], vectorC = [0, 0, 3.2]] = vectors;
+
+  return new Vector3(...vectorA)
+    .add(new Vector3(...vectorB))
+    .add(new Vector3(...vectorC))
+    .multiplyScalar(0.5);
 }
 
 function computeCameraZoom(
@@ -221,10 +229,6 @@ function computeSafeAreaWorldOffset(
     .add(up.multiplyScalar(screenOffsetY / zoom));
 
   return [offset.x, offset.y, offset.z];
-}
-
-function addVectorTuples(a: VectorTuple, b: VectorTuple): VectorTuple {
-  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 }
 
 function cellCorners(vectors: VectorTuple[]): Vector3[] {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
+from itertools import product
 from typing import Any, TypedDict
 
 import spglib
@@ -9,6 +10,9 @@ from ase import Atoms
 
 from pretty_lattice.structures.colormaps import Colormap, load_colormap
 from pretty_lattice.structures.elements import ElementRegistry, load_element_registry
+
+_BOUNDARY_TOLERANCE = 1e-6
+_CANONICAL_IMAGE_OFFSET = (0, 0, 0)
 
 
 class CellSpec(TypedDict):
@@ -43,8 +47,12 @@ class StructureSummarySpec(TypedDict):
 
 class AtomSpec(TypedDict):
     id: str
+    siteId: str
     element: str
     position: list[float]
+    fractionalPosition: list[float]
+    imageOffset: list[int]
+    isPeriodicImage: bool
     radius: float
     color: str
 
@@ -63,24 +71,49 @@ def build_scene_response(
 ) -> SceneSpec:
     elements = element_registry or load_element_registry()
     colors = colormap or load_colormap()
+    cell_vectors = [_vector3(vector) for vector in atoms.cell.array]
+    can_generate_periodic_images = _has_valid_3d_periodic_cell(atoms)
+    fractional_positions = _fractional_positions_for_metadata(atoms)
 
     scene_atoms: list[AtomSpec] = []
-    for index, (symbol, position) in enumerate(
-        zip(atoms.get_chemical_symbols(), atoms.positions, strict=True)
+    for index, (symbol, position, fractional_position) in enumerate(
+        zip(atoms.get_chemical_symbols(), atoms.positions, fractional_positions, strict=True)
     ):
         element = elements.resolve(symbol)
+        site_id = f"{element.symbol}-{index}"
+        color = colors.resolve(element.symbol)
+
+        if can_generate_periodic_images:
+            canonical_fractional_position, boundary_axes = _canonicalize_fractional_position(
+                fractional_position
+            )
+            for image_offset in _periodic_image_offsets(boundary_axes):
+                scene_atoms.append(
+                    _atom_instance(
+                        cell_vectors=cell_vectors,
+                        color=color,
+                        element_symbol=element.symbol,
+                        fractional_position=canonical_fractional_position,
+                        image_offset=image_offset,
+                        radius=element.uniform_radius,
+                        site_id=site_id,
+                    )
+                )
+            continue
+
         scene_atoms.append(
-            {
-                "id": f"{element.symbol}-{index}",
-                "element": element.symbol,
-                "position": _vector3(position),
-                "radius": element.atomic_radius,
-                "color": colors.resolve(element.symbol),
-            }
+            _non_periodic_atom_instance(
+                color=color,
+                element_symbol=element.symbol,
+                fractional_position=fractional_position,
+                position=_vector3(position),
+                radius=element.uniform_radius,
+                site_id=site_id,
+            )
         )
 
     return {
-        "cell": {"vectors": [_vector3(vector) for vector in atoms.cell.array]},
+        "cell": {"vectors": cell_vectors},
         "atoms": scene_atoms,
         "summary": _build_structure_summary(atoms),
     }
@@ -88,6 +121,114 @@ def build_scene_response(
 
 def _vector3(values: Sequence[float]) -> list[float]:
     return [float(values[0]), float(values[1]), float(values[2])]
+
+
+def _atom_instance(
+    *,
+    cell_vectors: list[list[float]],
+    color: str,
+    element_symbol: str,
+    fractional_position: list[float],
+    image_offset: tuple[int, int, int],
+    radius: float,
+    site_id: str,
+) -> AtomSpec:
+    shifted_fractional_position = [
+        fractional_position[axis] + image_offset[axis] for axis in range(3)
+    ]
+    return {
+        "id": _atom_instance_id(site_id, image_offset),
+        "siteId": site_id,
+        "element": element_symbol,
+        "position": _fractional_to_cartesian(shifted_fractional_position, cell_vectors),
+        "fractionalPosition": shifted_fractional_position,
+        "imageOffset": [int(value) for value in image_offset],
+        "isPeriodicImage": image_offset != _CANONICAL_IMAGE_OFFSET,
+        "radius": radius,
+        "color": color,
+    }
+
+
+def _non_periodic_atom_instance(
+    *,
+    color: str,
+    element_symbol: str,
+    fractional_position: list[float],
+    position: list[float],
+    radius: float,
+    site_id: str,
+) -> AtomSpec:
+    return {
+        "id": site_id,
+        "siteId": site_id,
+        "element": element_symbol,
+        "position": position,
+        "fractionalPosition": fractional_position,
+        "imageOffset": [0, 0, 0],
+        "isPeriodicImage": False,
+        "radius": radius,
+        "color": color,
+    }
+
+
+def _atom_instance_id(site_id: str, image_offset: tuple[int, int, int]) -> str:
+    if image_offset == _CANONICAL_IMAGE_OFFSET:
+        return site_id
+    return f"{site_id}-image-{image_offset[0]}-{image_offset[1]}-{image_offset[2]}"
+
+
+def _fractional_positions_for_metadata(atoms: Atoms) -> list[list[float]]:
+    if _has_valid_3d_cell(atoms):
+        try:
+            return [_vector3(position) for position in atoms.get_scaled_positions(wrap=False)]
+        except Exception:
+            pass
+
+    return [[0.0, 0.0, 0.0] for _ in atoms]
+
+
+def _canonicalize_fractional_position(
+    fractional_position: Sequence[float],
+) -> tuple[list[float], tuple[int, ...]]:
+    canonical_position: list[float] = []
+    boundary_axes: list[int] = []
+
+    for axis, value in enumerate(fractional_position):
+        wrapped_value = float(value) % 1.0
+        if math.isclose(wrapped_value, 0.0, abs_tol=_BOUNDARY_TOLERANCE) or math.isclose(
+            wrapped_value, 1.0, abs_tol=_BOUNDARY_TOLERANCE
+        ):
+            canonical_position.append(0.0)
+            boundary_axes.append(axis)
+            continue
+
+        canonical_position.append(wrapped_value)
+
+    return canonical_position, tuple(boundary_axes)
+
+
+def _periodic_image_offsets(boundary_axes: tuple[int, ...]) -> list[tuple[int, int, int]]:
+    if not boundary_axes:
+        return [_CANONICAL_IMAGE_OFFSET]
+
+    image_offsets: list[tuple[int, int, int]] = []
+    for choices in product((0, 1), repeat=len(boundary_axes)):
+        image_offset = [0, 0, 0]
+        for axis, choice in zip(boundary_axes, choices, strict=True):
+            image_offset[axis] = choice
+        image_offsets.append((image_offset[0], image_offset[1], image_offset[2]))
+
+    return image_offsets
+
+
+def _fractional_to_cartesian(
+    fractional_position: Sequence[float],
+    cell_vectors: Sequence[Sequence[float]],
+) -> list[float]:
+    return [
+        sum(fractional_position[axis] * cell_vectors[axis][component] for axis in range(3))
+        for component in range(3)
+    ]
 
 
 def _build_structure_summary(atoms: Atoms) -> StructureSummarySpec:
@@ -148,9 +289,12 @@ def _build_symmetry_summary(atoms: Atoms) -> SymmetrySummarySpec:
 
 
 def _has_valid_3d_periodic_cell(atoms: Atoms) -> bool:
+    return _has_valid_3d_cell(atoms) and all(bool(periodic) for periodic in atoms.pbc)
+
+
+def _has_valid_3d_cell(atoms: Atoms) -> bool:
     return (
         len(atoms) > 0
-        and all(bool(periodic) for periodic in atoms.pbc)
         and atoms.cell.rank == 3
         and math.isfinite(float(atoms.cell.volume))
         and not math.isclose(float(atoms.cell.volume), 0.0, abs_tol=1e-12)

@@ -84,7 +84,7 @@ data, or user-facing visual-control settings.
 
 The system SHALL resolve atom radius from an internal element registry and atom
 color from a separate internal colormap registry. The first preview SHALL use
-`atomic_radius` for atom size and the bundled VESTA-compatible colormap as an
+`uniform_radius` for atom size and the bundled VESTA-compatible colormap as an
 internal default.
 
 #### Scenario: Resolve atom radius and color

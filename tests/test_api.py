@@ -39,7 +39,14 @@ async def test_structure_preview_upload_endpoint_returns_scene() -> None:
             [0.0, 5.64, 0.0],
             [0.0, 0.0, 5.64],
         ]
-        assert [atom["element"] for atom in payload["atoms"]] == ["Na", "Cl"]
+        canonical_atoms = [atom for atom in payload["atoms"] if not atom["isPeriodicImage"]]
+        periodic_image_atoms = [atom for atom in payload["atoms"] if atom["isPeriodicImage"]]
+        assert [atom["element"] for atom in canonical_atoms] == ["Na", "Cl"]
+        assert canonical_atoms[0]["siteId"] == "Na-0"
+        assert canonical_atoms[0]["fractionalPosition"] == [0.0, 0.0, 0.0]
+        assert canonical_atoms[0]["imageOffset"] == [0, 0, 0]
+        assert len(periodic_image_atoms) == 7
+        assert {atom["siteId"] for atom in periodic_image_atoms} == {"Na-0"}
         assert payload["summary"] == {
             "formula": "NaCl",
             "atomCount": 2,

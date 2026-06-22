@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from ase import Atoms
 
 from pretty_lattice.structures.colormaps import load_colormap
 from pretty_lattice.structures.elements import load_element_registry
@@ -53,6 +54,7 @@ def test_element_radius_and_colormap_resolution() -> None:
 
     assert oxygen.atomic_radius == pytest.approx(0.74)
     assert oxygen.vdw_radius == pytest.approx(1.52)
+    assert oxygen.uniform_radius == pytest.approx(0.50)
     assert colormap.resolve("O") == "#ff0300"
 
 
@@ -60,16 +62,21 @@ def test_scene_response_shape_uses_radius_and_color_defaults() -> None:
     atoms = read_structure(FIXTURE_DIR / "binary_nacl.poscar")
 
     scene = build_scene_response(atoms)
+    canonical_atoms = [atom for atom in scene["atoms"] if not atom["isPeriodicImage"]]
 
     assert scene["cell"]["vectors"][0] == [5.64, 0.0, 0.0]
-    assert scene["atoms"][0] == {
+    assert canonical_atoms[0] == {
         "id": "Na-0",
+        "siteId": "Na-0",
         "element": "Na",
         "position": [0.0, 0.0, 0.0],
-        "radius": pytest.approx(1.91),
+        "fractionalPosition": [0.0, 0.0, 0.0],
+        "imageOffset": [0, 0, 0],
+        "isPeriodicImage": False,
+        "radius": pytest.approx(0.50),
         "color": "#fadd3d",
     }
-    assert scene["atoms"][1]["element"] == "Cl"
+    assert canonical_atoms[1]["element"] == "Cl"
     assert scene["summary"] == {
         "formula": "NaCl",
         "atomCount": 2,
@@ -92,6 +99,82 @@ def test_scene_response_shape_uses_radius_and_color_defaults() -> None:
         },
     }
     assert scene.keys() == {"cell", "atoms", "summary"}
+
+
+@pytest.mark.parametrize(
+    ("fractional_position", "expected_offsets"),
+    [
+        ([0.0, 0.5, 0.5], {(0, 0, 0), (1, 0, 0)}),
+        ([0.0, 0.0, 0.5], {(0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0)}),
+        (
+            [0.0, 0.0, 0.0],
+            {
+                (0, 0, 0),
+                (0, 0, 1),
+                (0, 1, 0),
+                (0, 1, 1),
+                (1, 0, 0),
+                (1, 0, 1),
+                (1, 1, 0),
+                (1, 1, 1),
+            },
+        ),
+    ],
+)
+def test_periodic_boundary_images_close_faces_edges_and_corners(
+    fractional_position: list[float],
+    expected_offsets: set[tuple[int, int, int]],
+) -> None:
+    atoms = Atoms(
+        symbols=["He"],
+        scaled_positions=[fractional_position],
+        cell=[1.0, 1.0, 1.0],
+        pbc=True,
+    )
+
+    scene = build_scene_response(atoms)
+
+    assert {tuple(atom["imageOffset"]) for atom in scene["atoms"]} == expected_offsets
+    assert {atom["siteId"] for atom in scene["atoms"]} == {"He-0"}
+    assert sum(atom["isPeriodicImage"] for atom in scene["atoms"]) == len(expected_offsets) - 1
+    assert scene["summary"]["atomCount"] == 1
+
+
+def test_near_upper_boundary_canonicalizes_to_half_open_cell() -> None:
+    atoms = Atoms(
+        symbols=["He"],
+        scaled_positions=[[1.0 - 1e-8, 0.5, 0.5]],
+        cell=[1.0, 1.0, 1.0],
+        pbc=True,
+    )
+
+    scene = build_scene_response(atoms)
+
+    canonical_atom = next(atom for atom in scene["atoms"] if not atom["isPeriodicImage"])
+    image_atom = next(atom for atom in scene["atoms"] if atom["isPeriodicImage"])
+
+    assert canonical_atom["fractionalPosition"] == [0.0, 0.5, 0.5]
+    assert canonical_atom["position"] == [0.0, 0.5, 0.5]
+    assert image_atom["imageOffset"] == [1, 0, 0]
+    assert image_atom["fractionalPosition"] == [1.0, 0.5, 0.5]
+    assert image_atom["position"] == [1.0, 0.5, 0.5]
+
+
+def test_non_periodic_structure_keeps_only_canonical_atom_instances() -> None:
+    atoms = Atoms(
+        symbols=["He"],
+        positions=[[0.25, 0.25, 0.25]],
+        cell=[1.0, 1.0, 1.0],
+        pbc=False,
+    )
+
+    scene = build_scene_response(atoms)
+
+    assert len(scene["atoms"]) == 1
+    assert scene["atoms"][0]["siteId"] == "He-0"
+    assert scene["atoms"][0]["imageOffset"] == [0, 0, 0]
+    assert scene["atoms"][0]["isPeriodicImage"] is False
+    assert scene["summary"]["atomCount"] == 1
 
 
 def test_scene_summary_marks_non_periodic_symmetry_unavailable() -> None:

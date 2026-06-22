@@ -8,10 +8,10 @@ describe("deriveElementLegendEntries", () => {
     expect(
       deriveElementLegendEntries(
         sceneWithAtoms([
-          ["Na", "#fadd3d"],
-          ["Cl", "#1ff01f"],
-          ["Na", "#000000"],
-          ["O", "#ff0300"],
+          { element: "Na", color: "#fadd3d" },
+          { element: "Cl", color: "#1ff01f" },
+          { element: "Na", color: "#000000" },
+          { element: "O", color: "#ff0300" },
         ]),
       ),
     ).toEqual([
@@ -28,15 +28,41 @@ describe("deriveElementLegendEntries", () => {
   test("returns no legend entries for a scene without atoms", () => {
     expect(deriveElementLegendEntries(sceneWithAtoms([]))).toEqual([]);
   });
+
+  test("derives entries from canonical atoms instead of periodic images", () => {
+    expect(
+      deriveElementLegendEntries(
+        sceneWithAtoms([
+          { element: "Na", color: "#000000", isPeriodicImage: true },
+          { element: "Na", color: "#fadd3d" },
+          { element: "Cl", color: "#1ff01f", isPeriodicImage: true },
+          { element: "Cl", color: "#7aff7a" },
+        ]),
+      ),
+    ).toEqual([
+      { color: "#fadd3d", element: "Na" },
+      { color: "#7aff7a", element: "Cl" },
+    ]);
+  });
 });
 
-function sceneWithAtoms(atoms: Array<[string, string]>): SceneSpec {
+interface TestAtom {
+  color: string;
+  element: string;
+  isPeriodicImage?: boolean;
+}
+
+function sceneWithAtoms(atoms: TestAtom[]): SceneSpec {
   return {
-    atoms: atoms.map(([element, color], index) => ({
+    atoms: atoms.map(({ color, element, isPeriodicImage = false }, index) => ({
       color,
       element,
       id: `${element}-${index}`,
+      siteId: `${element}-${index}`,
       position: [index, 0, 0],
+      fractionalPosition: [index, 0, 0],
+      imageOffset: isPeriodicImage ? [1, 0, 0] : [0, 0, 0],
+      isPeriodicImage,
       radius: 1,
     })),
     cell: {

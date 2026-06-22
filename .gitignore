@@ -34,6 +34,7 @@ bun.lockb
 # Local QA artifacts
 .playwright-cli/
 output/playwright/
+tmp/visual-renders/
 
 # Local configuration
 .env

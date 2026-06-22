@@ -18,6 +18,7 @@ class ElementRecord:
     atomic_radius: float
     vdw_radius: float
     ionic_radius: float
+    uniform_radius: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +72,7 @@ def _parse_record(symbol: str, raw_record: dict[str, Any]) -> ElementRecord:
         atomic_radius = float(raw_record["atomic_radius"])
         vdw_radius = float(raw_record["vdw_radius"])
         ionic_radius = float(raw_record["ionic_radius"])
+        uniform_radius = float(raw_record["uniform_radius"])
     except KeyError as exc:
         raise ElementRegistryError(
             f"Element registry record for {symbol} is missing {exc.args[0]}."
@@ -79,7 +81,7 @@ def _parse_record(symbol: str, raw_record: dict[str, Any]) -> ElementRecord:
     if {"hex", "rgb", "oklch", "color"}.intersection(raw_record):
         raise ElementRegistryError(f"Element registry record for {symbol} must not define colors.")
 
-    if atomic_radius <= 0 or vdw_radius <= 0 or ionic_radius <= 0:
+    if atomic_radius <= 0 or vdw_radius <= 0 or ionic_radius <= 0 or uniform_radius <= 0:
         raise ElementRegistryError(f"Element radii for {symbol} must be positive.")
 
     return ElementRecord(
@@ -87,4 +89,5 @@ def _parse_record(symbol: str, raw_record: dict[str, Any]) -> ElementRecord:
         atomic_radius=atomic_radius,
         vdw_radius=vdw_radius,
         ionic_radius=ionic_radius,
+        uniform_radius=uniform_radius,
     )

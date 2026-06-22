@@ -13,6 +13,9 @@ export function deriveElementLegendEntries(scene: SceneSpec | null): ElementLege
   const entries: ElementLegendEntry[] = [];
   const seenElements = new Set<string>();
   for (const atom of scene.atoms) {
+    if (atom.isPeriodicImage) {
+      continue;
+    }
     if (seenElements.has(atom.element)) {
       continue;
     }

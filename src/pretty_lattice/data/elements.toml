@@ -1,490 +1,588 @@
 # Pretty Lattice bundled element radius data.
 #
 # Values are copied from VESTA elements.ini. Radius units are Angstrom.
-# Columns retained here: atomic radius, van der Waals radius, ionic radius.
+# Columns retained here: atomic radius, van der Waals radius, ionic radius,
+# and a uniform visual radius.
 # Ionic radius is VESTA-compatible visual data, not an oxidation-state-aware model.
 
 [elements.H]
 atomic_radius = 0.46
 vdw_radius = 1.20
 ionic_radius = 0.200
+uniform_radius = 0.50
 
 [elements.D]
 atomic_radius = 0.46
 vdw_radius = 1.20
 ionic_radius = 0.200
+uniform_radius = 0.50
 
 [elements.He]
 atomic_radius = 1.22
 vdw_radius = 1.40
 ionic_radius = 1.220
+uniform_radius = 0.50
 
 [elements.Li]
 atomic_radius = 1.57
 vdw_radius = 1.40
 ionic_radius = 0.590
+uniform_radius = 0.50
 
 [elements.Be]
 atomic_radius = 1.12
 vdw_radius = 1.40
 ionic_radius = 0.270
+uniform_radius = 0.50
 
 [elements.B]
 atomic_radius = 0.81
 vdw_radius = 1.40
 ionic_radius = 0.110
+uniform_radius = 0.50
 
 [elements.C]
 atomic_radius = 0.77
 vdw_radius = 1.70
 ionic_radius = 0.150
+uniform_radius = 0.50
 
 [elements.N]
 atomic_radius = 0.74
 vdw_radius = 1.55
 ionic_radius = 1.460
+uniform_radius = 0.50
 
 [elements.O]
 atomic_radius = 0.74
 vdw_radius = 1.52
 ionic_radius = 1.400
+uniform_radius = 0.50
 
 [elements.F]
 atomic_radius = 0.72
 vdw_radius = 1.47
 ionic_radius = 1.330
+uniform_radius = 0.50
 
 [elements.Ne]
 atomic_radius = 1.60
 vdw_radius = 1.54
 ionic_radius = 1.600
+uniform_radius = 0.50
 
 [elements.Na]
 atomic_radius = 1.91
 vdw_radius = 1.54
 ionic_radius = 1.020
+uniform_radius = 0.50
 
 [elements.Mg]
 atomic_radius = 1.60
 vdw_radius = 1.54
 ionic_radius = 0.720
+uniform_radius = 0.50
 
 [elements.Al]
 atomic_radius = 1.43
 vdw_radius = 1.54
 ionic_radius = 0.390
+uniform_radius = 0.50
 
 [elements.Si]
 atomic_radius = 1.18
 vdw_radius = 2.10
 ionic_radius = 0.260
+uniform_radius = 0.50
 
 [elements.P]
 atomic_radius = 1.10
 vdw_radius = 1.80
 ionic_radius = 0.170
+uniform_radius = 0.50
 
 [elements.S]
 atomic_radius = 1.04
 vdw_radius = 1.80
 ionic_radius = 1.840
+uniform_radius = 0.50
 
 [elements.Cl]
 atomic_radius = 0.99
 vdw_radius = 1.75
 ionic_radius = 1.810
+uniform_radius = 0.50
 
 [elements.Ar]
 atomic_radius = 1.92
 vdw_radius = 1.88
 ionic_radius = 1.920
+uniform_radius = 0.50
 
 [elements.K]
 atomic_radius = 2.35
 vdw_radius = 1.88
 ionic_radius = 1.510
+uniform_radius = 0.50
 
 [elements.Ca]
 atomic_radius = 1.97
 vdw_radius = 1.88
 ionic_radius = 1.120
+uniform_radius = 0.50
 
 [elements.Sc]
 atomic_radius = 1.64
 vdw_radius = 1.88
 ionic_radius = 0.745
+uniform_radius = 0.50
 
 [elements.Ti]
 atomic_radius = 1.47
 vdw_radius = 1.88
 ionic_radius = 0.605
+uniform_radius = 0.50
 
 [elements.V]
 atomic_radius = 1.35
 vdw_radius = 1.88
 ionic_radius = 0.580
+uniform_radius = 0.50
 
 [elements.Cr]
 atomic_radius = 1.29
 vdw_radius = 1.88
 ionic_radius = 0.615
+uniform_radius = 0.50
 
 [elements.Mn]
 atomic_radius = 1.37
 vdw_radius = 1.88
 ionic_radius = 0.830
+uniform_radius = 0.50
 
 [elements.Fe]
 atomic_radius = 1.26
 vdw_radius = 1.88
 ionic_radius = 0.780
+uniform_radius = 0.50
 
 [elements.Co]
 atomic_radius = 1.25
 vdw_radius = 1.88
 ionic_radius = 0.745
+uniform_radius = 0.50
 
 [elements.Ni]
 atomic_radius = 1.25
 vdw_radius = 1.88
 ionic_radius = 0.690
+uniform_radius = 0.50
 
 [elements.Cu]
 atomic_radius = 1.28
 vdw_radius = 1.88
 ionic_radius = 0.730
+uniform_radius = 0.50
 
 [elements.Zn]
 atomic_radius = 1.37
 vdw_radius = 1.88
 ionic_radius = 0.740
+uniform_radius = 0.50
 
 [elements.Ga]
 atomic_radius = 1.53
 vdw_radius = 1.88
 ionic_radius = 0.620
+uniform_radius = 0.50
 
 [elements.Ge]
 atomic_radius = 1.22
 vdw_radius = 1.88
 ionic_radius = 0.530
+uniform_radius = 0.50
 
 [elements.As]
 atomic_radius = 1.21
 vdw_radius = 1.85
 ionic_radius = 0.335
+uniform_radius = 0.50
 
 [elements.Se]
 atomic_radius = 1.04
 vdw_radius = 1.90
 ionic_radius = 1.980
+uniform_radius = 0.50
 
 [elements.Br]
 atomic_radius = 1.14
 vdw_radius = 1.85
 ionic_radius = 1.960
+uniform_radius = 0.50
 
 [elements.Kr]
 atomic_radius = 1.98
 vdw_radius = 2.02
 ionic_radius = 1.980
+uniform_radius = 0.50
 
 [elements.Rb]
 atomic_radius = 2.50
 vdw_radius = 2.02
 ionic_radius = 1.610
+uniform_radius = 0.50
 
 [elements.Sr]
 atomic_radius = 2.15
 vdw_radius = 2.02
 ionic_radius = 1.260
+uniform_radius = 0.50
 
 [elements.Y]
 atomic_radius = 1.82
 vdw_radius = 2.02
 ionic_radius = 1.019
+uniform_radius = 0.50
 
 [elements.Zr]
 atomic_radius = 1.60
 vdw_radius = 2.02
 ionic_radius = 0.720
+uniform_radius = 0.50
 
 [elements.Nb]
 atomic_radius = 1.47
 vdw_radius = 2.02
 ionic_radius = 0.640
+uniform_radius = 0.50
 
 [elements.Mo]
 atomic_radius = 1.40
 vdw_radius = 2.02
 ionic_radius = 0.590
+uniform_radius = 0.50
 
 [elements.Tc]
 atomic_radius = 1.35
 vdw_radius = 2.02
 ionic_radius = 0.560
+uniform_radius = 0.50
 
 [elements.Ru]
 atomic_radius = 1.34
 vdw_radius = 2.02
 ionic_radius = 0.620
+uniform_radius = 0.50
 
 [elements.Rh]
 atomic_radius = 1.34
 vdw_radius = 2.02
 ionic_radius = 0.665
+uniform_radius = 0.50
 
 [elements.Pd]
 atomic_radius = 1.37
 vdw_radius = 2.02
 ionic_radius = 0.860
+uniform_radius = 0.50
 
 [elements.Ag]
 atomic_radius = 1.44
 vdw_radius = 2.02
 ionic_radius = 1.150
+uniform_radius = 0.50
 
 [elements.Cd]
 atomic_radius = 1.52
 vdw_radius = 2.02
 ionic_radius = 0.950
+uniform_radius = 0.50
 
 [elements.In]
 atomic_radius = 1.67
 vdw_radius = 2.02
 ionic_radius = 0.800
+uniform_radius = 0.50
 
 [elements.Sn]
 atomic_radius = 1.58
 vdw_radius = 2.02
 ionic_radius = 0.690
+uniform_radius = 0.50
 
 [elements.Sb]
 atomic_radius = 1.41
 vdw_radius = 2.00
 ionic_radius = 0.760
+uniform_radius = 0.50
 
 [elements.Te]
 atomic_radius = 1.37
 vdw_radius = 2.06
 ionic_radius = 2.210
+uniform_radius = 0.50
 
 [elements.I]
 atomic_radius = 1.33
 vdw_radius = 1.98
 ionic_radius = 2.200
+uniform_radius = 0.50
 
 [elements.Xe]
 atomic_radius = 2.18
 vdw_radius = 2.16
 ionic_radius = 0.480
+uniform_radius = 0.50
 
 [elements.Cs]
 atomic_radius = 2.72
 vdw_radius = 2.16
 ionic_radius = 1.740
+uniform_radius = 0.50
 
 [elements.Ba]
 atomic_radius = 2.24
 vdw_radius = 2.16
 ionic_radius = 1.420
+uniform_radius = 0.50
 
 [elements.La]
 atomic_radius = 1.88
 vdw_radius = 2.16
 ionic_radius = 1.160
+uniform_radius = 0.50
 
 [elements.Ce]
 atomic_radius = 1.82
 vdw_radius = 2.16
 ionic_radius = 0.970
+uniform_radius = 0.50
 
 [elements.Pr]
 atomic_radius = 1.82
 vdw_radius = 2.16
 ionic_radius = 1.126
+uniform_radius = 0.50
 
 [elements.Nd]
 atomic_radius = 1.82
 vdw_radius = 2.16
 ionic_radius = 1.109
+uniform_radius = 0.50
 
 [elements.Pm]
 atomic_radius = 1.81
 vdw_radius = 2.16
 ionic_radius = 1.093
+uniform_radius = 0.50
 
 [elements.Sm]
 atomic_radius = 1.81
 vdw_radius = 2.16
 ionic_radius = 1.270
+uniform_radius = 0.50
 
 [elements.Eu]
 atomic_radius = 2.06
 vdw_radius = 2.16
 ionic_radius = 1.066
+uniform_radius = 0.50
 
 [elements.Gd]
 atomic_radius = 1.79
 vdw_radius = 2.16
 ionic_radius = 1.053
+uniform_radius = 0.50
 
 [elements.Tb]
 atomic_radius = 1.77
 vdw_radius = 2.16
 ionic_radius = 1.040
+uniform_radius = 0.50
 
 [elements.Dy]
 atomic_radius = 1.77
 vdw_radius = 2.16
 ionic_radius = 1.027
+uniform_radius = 0.50
 
 [elements.Ho]
 atomic_radius = 1.76
 vdw_radius = 2.16
 ionic_radius = 1.015
+uniform_radius = 0.50
 
 [elements.Er]
 atomic_radius = 1.75
 vdw_radius = 2.16
 ionic_radius = 1.004
+uniform_radius = 0.50
 
 [elements.Tm]
 atomic_radius = 1.00
 vdw_radius = 2.16
 ionic_radius = 0.994
+uniform_radius = 0.50
 
 [elements.Yb]
 atomic_radius = 1.94
 vdw_radius = 2.16
 ionic_radius = 0.985
+uniform_radius = 0.50
 
 [elements.Lu]
 atomic_radius = 1.72
 vdw_radius = 2.16
 ionic_radius = 0.977
+uniform_radius = 0.50
 
 [elements.Hf]
 atomic_radius = 1.59
 vdw_radius = 2.16
 ionic_radius = 0.710
+uniform_radius = 0.50
 
 [elements.Ta]
 atomic_radius = 1.47
 vdw_radius = 2.16
 ionic_radius = 0.640
+uniform_radius = 0.50
 
 [elements.W]
 atomic_radius = 1.41
 vdw_radius = 2.16
 ionic_radius = 0.600
+uniform_radius = 0.50
 
 [elements.Re]
 atomic_radius = 1.37
 vdw_radius = 2.16
 ionic_radius = 0.530
+uniform_radius = 0.50
 
 [elements.Os]
 atomic_radius = 1.35
 vdw_radius = 2.16
 ionic_radius = 0.630
+uniform_radius = 0.50
 
 [elements.Ir]
 atomic_radius = 1.36
 vdw_radius = 2.16
 ionic_radius = 0.625
+uniform_radius = 0.50
 
 [elements.Pt]
 atomic_radius = 1.39
 vdw_radius = 2.16
 ionic_radius = 0.625
+uniform_radius = 0.50
 
 [elements.Au]
 atomic_radius = 1.44
 vdw_radius = 2.16
 ionic_radius = 1.370
+uniform_radius = 0.50
 
 [elements.Hg]
 atomic_radius = 1.55
 vdw_radius = 2.16
 ionic_radius = 1.020
+uniform_radius = 0.50
 
 [elements.Tl]
 atomic_radius = 1.71
 vdw_radius = 2.16
 ionic_radius = 0.885
+uniform_radius = 0.50
 
 [elements.Pb]
 atomic_radius = 1.75
 vdw_radius = 2.16
 ionic_radius = 1.190
+uniform_radius = 0.50
 
 [elements.Bi]
 atomic_radius = 1.82
 vdw_radius = 2.16
 ionic_radius = 1.030
+uniform_radius = 0.50
 
 [elements.Po]
 atomic_radius = 1.77
 vdw_radius = 2.16
 ionic_radius = 0.940
+uniform_radius = 0.50
 
 [elements.At]
 atomic_radius = 0.62
 vdw_radius = 2.16
 ionic_radius = 0.620
+uniform_radius = 0.50
 
 [elements.Rn]
 atomic_radius = 0.80
 vdw_radius = 2.16
 ionic_radius = 0.800
+uniform_radius = 0.50
 
 [elements.Fr]
 atomic_radius = 1.00
 vdw_radius = 2.16
 ionic_radius = 1.800
+uniform_radius = 0.50
 
 [elements.Ra]
 atomic_radius = 2.35
 vdw_radius = 2.16
 ionic_radius = 1.480
+uniform_radius = 0.50
 
 [elements.Ac]
 atomic_radius = 2.03
 vdw_radius = 2.16
 ionic_radius = 1.120
+uniform_radius = 0.50
 
 [elements.Th]
 atomic_radius = 1.80
 vdw_radius = 2.16
 ionic_radius = 1.050
+uniform_radius = 0.50
 
 [elements.Pa]
 atomic_radius = 1.63
 vdw_radius = 2.16
 ionic_radius = 0.780
+uniform_radius = 0.50
 
 [elements.U]
 atomic_radius = 1.56
 vdw_radius = 2.16
 ionic_radius = 0.730
+uniform_radius = 0.50
 
 [elements.Np]
 atomic_radius = 1.56
 vdw_radius = 2.16
 ionic_radius = 0.750
+uniform_radius = 0.50
 
 [elements.Pu]
 atomic_radius = 1.64
 vdw_radius = 2.16
 ionic_radius = 0.860
+uniform_radius = 0.50
 
 [elements.Am]
 atomic_radius = 1.73
 vdw_radius = 2.16
 ionic_radius = 0.975
+uniform_radius = 0.50
 
 [elements.XX]
 atomic_radius = 0.80
 vdw_radius = 1.00
 ionic_radius = 0.800
+uniform_radius = 0.50
