@@ -93,7 +93,7 @@ export function App() {
 
       <aside
         className={cn(
-          "absolute left-4 top-4 w-[312px] max-w-[calc(100vw-2rem)] rounded-lg border p-3 shadow-xl shadow-foreground/10",
+          "absolute left-4 top-4 w-[312px] max-w-[calc(100vw-2rem)] rounded-xl border p-3 shadow-xl shadow-foreground/10",
           GLASS_SURFACE_CLASS,
           isSettingsOpen ? "max-[760px]:hidden" : null,
         )}
