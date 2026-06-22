@@ -18,10 +18,9 @@ export function LatticeScene({ scene }: { scene: SceneSpec }) {
         near: 0.1,
         far: 1000,
       }}
-      gl={{ antialias: true, preserveDrawingBuffer: true }}
+      gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
       data-testid="lattice-canvas"
     >
-      <color attach="background" args={["#f7f8f4"]} />
       <ambientLight intensity={0.62} />
       <directionalLight position={[5, 7, 9]} intensity={2.4} />
       <directionalLight position={[-4, -3, 2]} intensity={0.8} />

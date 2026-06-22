@@ -1,21 +1,14 @@
 import { FolderOpen } from "lucide-react";
-import { type ChangeEvent, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type ReactNode, useMemo, useRef, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 import { uploadStructurePreview, type SceneSpec } from "../api/scene";
 import { LatticeScene } from "../scene/LatticeScene";
-import { previewStatusLabel, summarizeScene, type PreviewStatus } from "./previewState";
-
-const previewStatusClasses: Record<PreviewStatus, string> = {
-  error: "border-destructive/20 bg-destructive/10 text-destructive",
-  idle: "border-border bg-secondary text-muted-foreground",
-  loading: "border-neutral-300 bg-neutral-100 text-neutral-800",
-  ready: "border-neutral-900 bg-neutral-900 text-white",
-};
+import { summarizeScene, type PreviewStatus } from "./previewState";
 
 export function App() {
   const [scene, setScene] = useState<SceneSpec | null>(null);
@@ -65,28 +58,41 @@ export function App() {
       </section>
 
       <aside
-        className="absolute left-5 top-5 w-[360px] max-w-[calc(100vw-2.5rem)] rounded-lg border bg-card/92 p-[18px] shadow-xl shadow-foreground/10 backdrop-blur-md"
-        aria-label="Structure preview"
+        className="absolute left-4 top-4 w-[332px] max-w-[calc(100vw-2rem)] rounded-lg border bg-card/92 p-4 shadow-xl shadow-foreground/10 backdrop-blur-md"
+        aria-label="Current structure"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="mb-1 text-[0.72rem] font-bold uppercase text-muted-foreground">
-              Pretty Lattice
-            </p>
-            <h1 className="text-xl font-semibold leading-tight">Structure Preview</h1>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <img
+              src="/favicon.svg"
+              alt=""
+              className="size-7 shrink-0"
+            />
+            <div className="min-w-0">
+              <h1 className="truncate text-[0.95rem] font-semibold leading-tight">Pretty Lattice</h1>
+            </div>
           </div>
-          <Badge
-            variant="outline"
-            className={cn(
-              "min-w-16 rounded-full px-2 py-1 font-mono",
-              previewStatusClasses[previewStatus],
-            )}
-          >
-            {previewStatusLabel(previewStatus)}
-          </Badge>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  aria-label="Open structure"
+                  className="h-7 gap-1.5 rounded-full px-2.5 text-xs [&_svg]:size-3.5"
+                  disabled={previewStatus === "loading"}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <FolderOpen data-icon="inline-start" aria-hidden="true" />
+                  <span>Open</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Open structure</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
-        <Separator className="my-4" />
+        <Separator className="my-3" />
 
         <input
           ref={fileInputRef}
@@ -96,17 +102,12 @@ export function App() {
           onChange={(event) => void handleFileChange(event)}
         />
 
-        <Button className="w-full justify-center" onClick={() => fileInputRef.current?.click()}>
-          <FolderOpen aria-hidden="true" />
-          <span>Open Structure</span>
-        </Button>
-
-        <div className="mt-4 rounded-md border bg-secondary/50 p-3">
-          <span className="block text-xs font-bold text-muted-foreground">File</span>
-          <strong className="mt-1 block break-words font-mono text-sm font-semibold leading-snug">
-            {selectedFileName ?? "No file selected"}
-          </strong>
-        </div>
+        <SummaryRow
+          label="File"
+          value={selectedFileName ?? "No file selected"}
+          valueClassName="font-normal"
+          title={selectedFileName ?? undefined}
+        />
 
         {errorMessage ? (
           <div
@@ -118,22 +119,188 @@ export function App() {
         ) : null}
 
         {scene ? (
-          <div className="mt-4 grid grid-cols-[0.8fr_1.2fr] gap-4">
-            <div className="min-h-14">
-              <span className="block text-xs font-bold text-muted-foreground">Atoms</span>
-              <strong className="mt-2 block font-mono text-3xl leading-none tabular-nums">
-                {summary.atomCount}
-              </strong>
+          <div className="mt-2.5 flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <SummaryRow
+                label="Formula"
+                value={renderFormula(summary.formula)}
+                mono={false}
+              />
+              <SummaryRow label="Atoms" value={summary.atomCount} />
             </div>
-            <div className="min-h-14 border-l pl-4">
-              <span className="block text-xs font-bold text-muted-foreground">Elements</span>
-              <strong className="mt-2 block break-words font-mono text-base font-semibold leading-tight">
-                {summary.elementSummary}
-              </strong>
+
+            <Separator />
+            <div>
+              <span className="block text-xs font-bold text-muted-foreground">Symmetry</span>
+              {summary.symmetry?.available ? (
+                <dl className="mt-1.5 flex flex-col gap-1.5 text-sm">
+                  <SymmetryMetric
+                    label="Space group"
+                    value={renderHermannMauguin(summary.symmetry.spaceGroup ?? "-")}
+                    title={summary.symmetry.spaceGroup ?? "-"}
+                  />
+                  <SymmetryMetric
+                    label="Point group"
+                    value={renderHermannMauguin(summary.symmetry.pointGroup ?? "-")}
+                    title={summary.symmetry.pointGroup ?? "-"}
+                  />
+                  <SymmetryMetric
+                    label="Crystal system"
+                    value={summary.symmetry.crystalSystem ?? "-"}
+                  />
+                  <SymmetryMetric
+                    label="Lattice system"
+                    value={summary.symmetry.latticeSystem ?? "-"}
+                  />
+                </dl>
+              ) : (
+                <p className="mt-1.5 text-sm text-muted-foreground">Symmetry unavailable</p>
+              )}
             </div>
+
+            {summary.cell ? (
+              <>
+                <Separator />
+                <div>
+                  <span className="block text-xs font-bold text-muted-foreground">Cell</span>
+                  <dl className="mt-1.5 grid grid-cols-3 gap-x-3 gap-y-1.5 font-mono text-sm">
+                    <CellMetric label="a" value={summary.cell.a} unit="Å" />
+                    <CellMetric label="b" value={summary.cell.b} unit="Å" />
+                    <CellMetric label="c" value={summary.cell.c} unit="Å" />
+                    <CellMetric label="α" value={summary.cell.alpha} unit="°" />
+                    <CellMetric label="β" value={summary.cell.beta} unit="°" />
+                    <CellMetric label="γ" value={summary.cell.gamma} unit="°" />
+                  </dl>
+                </div>
+              </>
+            ) : null}
           </div>
         ) : null}
       </aside>
     </main>
+  );
+}
+
+function SummaryRow({
+  label,
+  mono = true,
+  title,
+  value,
+  valueClassName,
+}: {
+  label: string;
+  mono?: boolean;
+  title?: string;
+  value: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="grid grid-cols-[4.25rem_minmax(0,1fr)] items-baseline gap-2.5 text-sm">
+      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+      <span title={title}>
+        <span
+          className={cn(
+            "block truncate font-normal leading-snug tabular-nums",
+            mono ? "font-mono" : "font-sans",
+            valueClassName,
+          )}
+        >
+          {value}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function SymmetryMetric({
+  label,
+  mono = false,
+  title,
+  value,
+}: {
+  label: string;
+  mono?: boolean;
+  title?: string;
+  value: ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[6.75rem_minmax(0,1fr)] items-baseline gap-2.5">
+      <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
+      <dd
+        className={cn(
+          "min-w-0 truncate font-normal leading-snug tabular-nums",
+          mono ? "font-mono" : "font-sans",
+        )}
+        title={title}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function renderHermannMauguin(symbol: string) {
+  const nodes: ReactNode[] = [];
+  let plainStart = 0;
+
+  for (let index = 0; index < symbol.length - 1; index += 1) {
+    const current = symbol[index] ?? "";
+    const next = symbol[index + 1] ?? "";
+    if (current !== "-" || !/\d/.test(next)) {
+      continue;
+    }
+
+    if (plainStart < index) {
+      nodes.push(symbol.slice(plainStart, index));
+    }
+    nodes.push(
+      <span key={`overline-${index}`} className="hm-overline-digit" aria-label={`overline ${next}`}>
+        {next}
+      </span>,
+    );
+    plainStart = index + 2;
+    index += 1;
+  }
+
+  if (plainStart === 0) {
+    return symbol;
+  }
+  if (plainStart < symbol.length) {
+    nodes.push(symbol.slice(plainStart));
+  }
+
+  return nodes;
+}
+
+function renderFormula(formula: string) {
+  return formula.split(/(\d+)/).map((part, index) =>
+    /^\d+$/.test(part) ? (
+      <sub key={`${part}-${index}`} className="text-[0.68em] leading-none">
+        {part}
+      </sub>
+    ) : (
+      part
+    ),
+  );
+}
+
+function CellMetric({
+  label,
+  value,
+  unit,
+}: {
+  label: string;
+  value: string;
+  unit: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-baseline gap-2">
+      <dt className="shrink-0 text-[0.78rem] font-semibold text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 truncate tabular-nums">
+        {value}
+        {unit === "Å" ? "\u2009" : ""}
+        {unit}
+      </dd>
+    </div>
   );
 }

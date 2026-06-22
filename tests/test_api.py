@@ -40,6 +40,25 @@ async def test_structure_preview_upload_endpoint_returns_scene() -> None:
             [0.0, 0.0, 5.64],
         ]
         assert [atom["element"] for atom in payload["atoms"]] == ["Na", "Cl"]
+        assert payload["summary"] == {
+            "formula": "NaCl",
+            "atomCount": 2,
+            "cell": {
+                "a": "5.64",
+                "b": "5.64",
+                "c": "5.64",
+                "alpha": "90.0",
+                "beta": "90.0",
+                "gamma": "90.0",
+            },
+            "symmetry": {
+                "available": True,
+                "spaceGroup": "Pm-3m",
+                "pointGroup": "m-3m",
+                "crystalSystem": "cubic",
+                "latticeSystem": "cubic",
+            },
+        }
         assert "bonds" not in payload
         assert "view" not in payload
 

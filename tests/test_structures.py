@@ -70,4 +70,40 @@ def test_scene_response_shape_uses_radius_and_color_defaults() -> None:
         "color": "#fadd3d",
     }
     assert scene["atoms"][1]["element"] == "Cl"
-    assert scene.keys() == {"cell", "atoms"}
+    assert scene["summary"] == {
+        "formula": "NaCl",
+        "atomCount": 2,
+        "cell": {
+            "a": "5.64",
+            "b": "5.64",
+            "c": "5.64",
+            "alpha": "90.0",
+            "beta": "90.0",
+            "gamma": "90.0",
+        },
+        "symmetry": {
+            "available": True,
+            "spaceGroup": "Pm-3m",
+            "pointGroup": "m-3m",
+            "crystalSystem": "cubic",
+            "latticeSystem": "cubic",
+        },
+    }
+    assert scene.keys() == {"cell", "atoms", "summary"}
+
+
+def test_scene_summary_marks_non_periodic_symmetry_unavailable() -> None:
+    atoms = read_structure_bytes(
+        b"2\nwater\nH 0 0 0\nO 0 0 1\n",
+        filename="water.xyz",
+    )
+
+    scene = build_scene_response(atoms)
+
+    assert scene["summary"]["symmetry"] == {
+        "available": False,
+        "spaceGroup": None,
+        "pointGroup": None,
+        "crystalSystem": None,
+        "latticeSystem": None,
+    }

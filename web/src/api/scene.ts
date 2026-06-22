@@ -3,6 +3,31 @@ export interface SceneSpec {
     vectors: [number, number, number][];
   };
   atoms: AtomSpec[];
+  summary: StructureSummary;
+}
+
+export interface StructureSummary {
+  formula: string;
+  atomCount: number;
+  cell: CellSummary;
+  symmetry: SymmetrySummary;
+}
+
+export interface CellSummary {
+  a: string;
+  b: string;
+  c: string;
+  alpha: string;
+  beta: string;
+  gamma: string;
+}
+
+export interface SymmetrySummary {
+  available: boolean;
+  spaceGroup: string | null;
+  pointGroup: string | null;
+  crystalSystem: string | null;
+  latticeSystem: string | null;
 }
 
 export interface AtomSpec {
