@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="docs/index.md"><img alt="Docs" src="https://img.shields.io/badge/docs-project_notes-22272e?style=flat-square"></a>
+  <img alt="100% Vibe Coded" src="https://img.shields.io/badge/vibe_coded-100%25-ff69b4?style=flat-square">
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square">
   <img alt="React and Three.js" src="https://img.shields.io/badge/web-React_+_Three.js-61dafb?style=flat-square">
 </p>

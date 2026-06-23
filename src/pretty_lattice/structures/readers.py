@@ -3,28 +3,27 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from ase import Atoms
-from ase.io import read
+from pymatgen.core import Structure
 
 
 class StructureReadError(ValueError):
     """Raised when a structure file cannot be parsed for preview."""
 
 
-def read_structure(path: str | Path) -> Atoms:
-    """Read a crystal structure with ASE."""
+def read_structure(path: str | Path) -> Structure:
+    """Read a periodic crystal structure with pymatgen."""
     structure_path = Path(path)
     try:
-        atoms = read(structure_path)
+        structure = Structure.from_file(structure_path)
     except Exception as exc:
         raise StructureReadError(
             f"Could not parse structure file {structure_path.name}: {exc}"
         ) from exc
 
-    return _ensure_atoms(atoms, structure_path.name)
+    return _ensure_structure(structure, structure_path.name)
 
 
-def read_structure_bytes(payload: bytes, filename: str | None = None) -> Atoms:
+def read_structure_bytes(payload: bytes, filename: str | None = None) -> Structure:
     if not payload:
         raise StructureReadError("Uploaded structure file is empty.")
 
@@ -34,13 +33,11 @@ def read_structure_bytes(payload: bytes, filename: str | None = None) -> Atoms:
         with TemporaryDirectory(prefix="pretty-lattice-structure-") as temp_dir:
             structure_path = Path(temp_dir) / safe_name
             structure_path.write_bytes(payload)
-            atoms = read(structure_path)
+            structure = Structure.from_file(structure_path)
     except Exception as exc:
-        raise StructureReadError(
-            f"Could not parse {display_name} as an ASE-readable structure file: {exc}"
-        ) from exc
+        raise StructureReadError(f"Could not parse {display_name}: {exc}") from exc
 
-    return _ensure_atoms(atoms, display_name)
+    return _ensure_structure(structure, display_name)
 
 
 def _safe_upload_name(filename: str) -> str:
@@ -50,9 +47,9 @@ def _safe_upload_name(filename: str) -> str:
     return name
 
 
-def _ensure_atoms(atoms: Atoms, display_name: str) -> Atoms:
-    if not isinstance(atoms, Atoms):
-        raise StructureReadError(f"Parsed {display_name}, but did not get an ASE Atoms object.")
-    if len(atoms) == 0:
+def _ensure_structure(structure: Structure, display_name: str) -> Structure:
+    if not isinstance(structure, Structure):
+        raise StructureReadError(f"Parsed {display_name}, but did not get a pymatgen Structure.")
+    if len(structure) == 0:
         raise StructureReadError(f"Parsed {display_name}, but it contains no atoms.")
-    return atoms
+    return structure

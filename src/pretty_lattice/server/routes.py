@@ -19,8 +19,8 @@ def health() -> dict[str, str]:
 async def create_structure_preview(request: Request) -> dict[str, object]:
     filename = _uploaded_filename(request)
     try:
-        atoms = read_structure_bytes(await request.body(), filename=filename)
-        return build_scene_response(atoms)
+        structure = read_structure_bytes(await request.body(), filename=filename)
+        return build_scene_response(structure)
     except StructureReadError as exc:
         raise HTTPException(status_code=400, detail={"message": str(exc)}) from exc
 

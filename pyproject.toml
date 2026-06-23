@@ -9,10 +9,9 @@ description = "Local web GUI for rendering crystal structures as publication-rea
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "ase>=3.25.0",
     "fastapi>=0.115.0",
     "numpy>=2.0.0",
-    "spglib>=2.7.0",
+    "pymatgen>=2026.5.4",
     "typer>=0.16.0",
     "uvicorn[standard]>=0.30.0",
 ]

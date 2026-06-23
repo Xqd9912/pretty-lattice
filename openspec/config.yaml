@@ -12,5 +12,5 @@ rules:
   design:
     - For non-goals, include only what is necessary or easy to confuse; omit the obvious.
   tasks:
-    - Keep each task at a moderate granularity; do not split tasks too finely.
+    - Keep each task at a moderate granularity.
     - Do not prescribe incidental implementation details unless they were explicitly discussed and decided. Leave room for judgment within the boundaries.

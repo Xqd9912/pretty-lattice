@@ -21,7 +21,7 @@ async def test_health_endpoint() -> None:
 
 @pytest.mark.anyio
 async def test_structure_preview_upload_endpoint_returns_scene() -> None:
-    payload = (FIXTURE_DIR / "binary_nacl.poscar").read_bytes()
+    payload = (FIXTURE_DIR / "SrTiO3.cif").read_bytes()
 
     async with AsyncClient(
         transport=ASGITransport(app=create_app()), base_url="http://testserver"
@@ -29,31 +29,31 @@ async def test_structure_preview_upload_endpoint_returns_scene() -> None:
         response = await client.post(
             "/api/structure-preview",
             content=payload,
-            headers={"x-pretty-lattice-filename": "binary_nacl.poscar"},
+            headers={"x-pretty-lattice-filename": "SrTiO3.cif"},
         )
         payload = response.json()
 
         assert response.status_code == 200
         assert payload["cell"]["vectors"] == [
-            [5.64, 0.0, 0.0],
-            [0.0, 5.64, 0.0],
-            [0.0, 0.0, 5.64],
+            [3.91270131, 0.0, 0.0],
+            [0.0, 3.91270131, 0.0],
+            [0.0, 0.0, 3.91270131],
         ]
         canonical_atoms = [atom for atom in payload["atoms"] if not atom["isPeriodicImage"]]
         periodic_image_atoms = [atom for atom in payload["atoms"] if atom["isPeriodicImage"]]
-        assert [atom["element"] for atom in canonical_atoms] == ["Na", "Cl"]
-        assert canonical_atoms[0]["siteId"] == "Na-0"
+        assert [atom["element"] for atom in canonical_atoms] == ["Sr", "Ti", "O", "O", "O"]
+        assert canonical_atoms[0]["siteId"] == "Sr-0"
         assert canonical_atoms[0]["fractionalPosition"] == [0.0, 0.0, 0.0]
         assert canonical_atoms[0]["imageOffset"] == [0, 0, 0]
-        assert len(periodic_image_atoms) == 7
-        assert {atom["siteId"] for atom in periodic_image_atoms} == {"Na-0"}
+        assert len(periodic_image_atoms) == 10
+        assert "Sr-0" in {atom["siteId"] for atom in periodic_image_atoms}
         assert payload["summary"] == {
-            "formula": "NaCl",
-            "atomCount": 2,
+            "formula": "SrTiO3",
+            "atomCount": 5,
             "cell": {
-                "a": "5.64",
-                "b": "5.64",
-                "c": "5.64",
+                "a": "3.91",
+                "b": "3.91",
+                "c": "3.91",
                 "alpha": "90.0",
                 "beta": "90.0",
                 "gamma": "90.0",
@@ -70,6 +70,20 @@ async def test_structure_preview_upload_endpoint_returns_scene() -> None:
         }
         assert "bonds" not in payload
         assert "view" not in payload
+
+
+@pytest.mark.anyio
+async def test_structure_preview_upload_endpoint_requires_pymatgen_recognizable_filename() -> None:
+    payload = (FIXTURE_DIR / "SrTiO3.cif").read_bytes()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app()), base_url="http://testserver"
+    ) as client:
+        response = await client.post("/api/structure-preview", content=payload)
+        payload = response.json()
+
+        assert response.status_code == 400
+        assert "Could not parse uploaded structure" in payload["detail"]["message"]
 
 
 @pytest.mark.anyio
