@@ -27,7 +27,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 
 import { uploadStructurePreview, type SceneSpec } from "../api/scene";
-import { LatticeScene, type PreviewSafeArea } from "../scene/LatticeScene";
+import {
+  LatticeScene,
+  previewSafeAreaForViewport,
+  type PreviewSafeArea,
+} from "../scene/LatticeScene";
 import { OrientationGizmo } from "../scene/OrientationGizmo";
 import {
   hasPeriodicImageAtoms,
@@ -57,7 +61,9 @@ const GLASS_SURFACE_CLASS =
 const LOCKED_INTERACTION_DRAG_THRESHOLD_PX = 4;
 const LOCKED_INTERACTION_FEEDBACK_ANIMATION_MS = 420;
 const LOCKED_INTERACTION_WHEEL_IDLE_MS = 150;
+const MAX_ORIENTATION_GIZMO_SIZE_PX = 280;
 const RESET_VIEW_FEEDBACK_ANIMATION_MS = 150;
+const ORIENTATION_GIZMO_AVAILABLE_SIDE_RATIO = 0.35;
 const ZOOM_SLIDER_BLUR_DELAY_MS = 1000;
 const ZOOM_SLIDER_HEIGHT_PX = 200;
 const ZOOM_SLIDER_THUMB_SIZE_PX = 14;
@@ -69,6 +75,11 @@ interface LockedInteractionPointer {
   triggered: boolean;
 }
 
+interface ViewportSize {
+  height: number;
+  width: number;
+}
+
 export function App() {
   const [scene, setScene] = useState<SceneSpec | null>(null);
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("idle");
@@ -78,6 +89,7 @@ export function App() {
   const [showBoundaryAtoms, setShowBoundaryAtoms] = useState(false);
   const [viewState, setViewState] = useState(createPreviewViewState);
   const [lockedInteractionFeedbackCount, setLockedInteractionFeedbackCount] = useState(0);
+  const viewportSize = useViewportSize();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraOrientationRef = useRef(new Quaternion());
   const lockedInteractionPointerRef = useRef<LockedInteractionPointer | null>(null);
@@ -139,6 +151,14 @@ export function App() {
   );
   const hasVisibleScene = visibleScene !== null;
   const previewSafeArea = previewSafeAreaForSettings();
+  const effectivePreviewSafeArea = useMemo(
+    () => previewSafeAreaForViewport(previewSafeArea, viewportSize.width),
+    [previewSafeArea, viewportSize.width],
+  );
+  const orientationGizmoSize = useMemo(
+    () => orientationGizmoSizeForViewport(viewportSize, effectivePreviewSafeArea),
+    [effectivePreviewSafeArea, viewportSize],
+  );
   const triggerLockedInteractionFeedback = useCallback(() => {
     setLockedInteractionFeedbackCount((count) => count + 1);
   }, []);
@@ -268,8 +288,8 @@ export function App() {
         <OrientationGizmo
           cameraOrientationRef={cameraOrientationRef}
           cellVectors={visibleScene.cell.vectors}
-          className="pointer-events-none absolute h-[clamp(176px,34vmin,300px)] w-[clamp(176px,34vmin,300px)]"
-          style={orientationGizmoContainerStyle(previewSafeArea)}
+          className="pointer-events-none absolute"
+          style={orientationGizmoContainerStyle(effectivePreviewSafeArea, orientationGizmoSize)}
         />
       ) : null}
 
@@ -940,10 +960,51 @@ function legendContainerStyle(safeArea: PreviewSafeArea): CSSProperties {
   };
 }
 
-function orientationGizmoContainerStyle(safeArea: PreviewSafeArea): CSSProperties {
+function orientationGizmoContainerStyle(
+  safeArea: PreviewSafeArea,
+  size: number,
+): CSSProperties {
   return {
-    bottom: Math.max(16, safeArea.bottom - 80),
-    left: Math.max(16, safeArea.left - 38),
+    bottom: Math.max(16, safeArea.bottom - 100),
+    height: size,
+    left: Math.max(16, safeArea.left - 58),
+    width: size,
+  };
+}
+
+function orientationGizmoSizeForViewport(
+  viewportSize: ViewportSize,
+  safeArea: PreviewSafeArea,
+): number {
+  const availableWidth = Math.max(1, viewportSize.width - safeArea.left - safeArea.right);
+  const availableHeight = Math.max(1, viewportSize.height - safeArea.top - safeArea.bottom);
+
+  return Math.min(
+    Math.min(availableWidth, availableHeight) * ORIENTATION_GIZMO_AVAILABLE_SIDE_RATIO,
+    MAX_ORIENTATION_GIZMO_SIZE_PX,
+  );
+}
+
+function useViewportSize(): ViewportSize {
+  const [viewportSize, setViewportSize] = useState(getViewportSize);
+
+  useEffect(() => {
+    function handleResize() {
+      setViewportSize(getViewportSize());
+    }
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return viewportSize;
+}
+
+function getViewportSize(): ViewportSize {
+  return {
+    height: window.innerHeight,
+    width: window.innerWidth,
   };
 }
 
