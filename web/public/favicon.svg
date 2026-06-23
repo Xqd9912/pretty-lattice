@@ -1,31 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1170 1348" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="80.767 91.585 1008.466 1162.83" role="img" aria-labelledby="title desc">
   <title id="title">Pretty Lattice logo</title>
   <desc id="desc">A geometric hexagon logo traced from a Physical Review Letters cover motif.</desc>
   <defs>
     <style>
-      .lavender { fill: #a4a7c8; }
-      .green { fill: #a4a7c8; }
-      .peach { fill: #a4a7c8; }
-      .cyan { fill: #a5dcd8; }
+      .outer { fill: #a4a7c8; }
+      .inner { fill: #a5dcd8; }
     </style>
   </defs>
 
-  <polygon class="lavender" points="585,8 1162,340 1162,1007 585,1339 8,1007 8,340" />
-
-  <polygon class="green" points="299,176 871,176 585,341" />
-  <polygon class="green" points="299,1170 871,1170 585,1005" />
-  <polygon class="green" points="299,176 299,508 12,673" />
-  <polygon class="green" points="299,1170 299,839 12,673" />
-  <polygon class="green" points="871,176 1158,673 871,508" />
-  <polygon class="green" points="871,1170 871,839 1158,673" />
-
-  <polygon class="peach" points="299,176 585,341 299,508" />
-  <polygon class="peach" points="871,176 871,508 585,341" />
-  <polygon class="peach" points="12,673 299,508 299,839" />
-  <polygon class="peach" points="1158,673 871,508 871,839" />
-  <polygon class="peach" points="299,1170 299,839 585,1005" />
-  <polygon class="peach" points="871,1170 585,1005 871,839" />
-
-  <polygon class="cyan" points="585,341 871,508 871,839 585,1005 299,839 299,508" />
+  <g transform="rotate(30 585 673)">
+    <polygon class="outer" points="299,176 871,176 1158,673 871,1170 299,1170 12,673" />
+    <polygon class="inner" points="585,341 871,508 871,839 585,1005 299,839 299,508" />
+  </g>
 
 </svg>
