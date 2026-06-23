@@ -3,7 +3,7 @@ import type { PreviewSafeArea } from "../scene/LatticeScene";
 
 export const SETTINGS_PREVIEW_SAFE_AREA: PreviewSafeArea = {
   bottom: 132,
-  left: 380,
+  left: 420,
   right: 176,
   top: 24,
 };

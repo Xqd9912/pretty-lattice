@@ -41,7 +41,7 @@ describe("settings", () => {
 
     expect(safeArea).toBe(SETTINGS_PREVIEW_SAFE_AREA);
     expect(safeArea.right).toBe(176);
-    expect(safeArea.left).toBe(380);
+    expect(safeArea.left).toBe(420);
     expect(safeArea.bottom).toBe(132);
   });
 });
