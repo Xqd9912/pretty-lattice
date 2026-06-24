@@ -40,6 +40,7 @@ import {
   SettingsTrigger,
 } from "./settings/SettingsDrawer";
 import {
+  createDefaultComponentOpacity,
   createDefaultComponentVisibility,
   hasPolyhedra,
   previewSafeAreaForSettings,
@@ -76,10 +77,14 @@ export function App() {
   const [componentVisibility, setComponentVisibility] = useState(
     createDefaultComponentVisibility,
   );
+  const [componentOpacity, setComponentOpacity] = useState(createDefaultComponentOpacity);
   const [viewState, setViewState] = useState(createPreviewViewState);
   const [lockedInteractionFeedbackCount, setLockedInteractionFeedbackCount] = useState(0);
+  const [isStructureSummaryCollapsed, setIsStructureSummaryCollapsed] = useState(false);
   const viewportSize = useViewportSize();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const leftOverlayRef = useRef<HTMLDivElement>(null);
+  const commonControlsPanelRef = useRef<HTMLDivElement>(null);
   const cameraOrientationRef = useRef(new Quaternion());
   const lockedInteractionPointerRef = useRef<LockedInteractionPointer | null>(null);
   const lockedInteractionWheelIdleTimeoutRef = useRef<number | null>(null);
@@ -119,7 +124,9 @@ export function App() {
     setIsSettingsOpen(false);
     setBondAlgorithm(DEFAULT_BOND_ALGORITHM);
     setComponentVisibility(createDefaultComponentVisibility());
+    setComponentOpacity(createDefaultComponentOpacity());
     setViewState(createPreviewViewState());
+    setIsStructureSummaryCollapsed(false);
 
     try {
       const nextScene = await uploadStructurePreview(file);
@@ -162,11 +169,11 @@ export function App() {
     [currentFile],
   );
 
-  const legendEntries = useMemo(() => deriveElementLegendEntries(scene), [scene]);
   const visibleScene = useMemo(
     () => visibleSceneForComponents(scene, componentVisibility),
     [componentVisibility, scene],
   );
+  const legendEntries = useMemo(() => deriveElementLegendEntries(scene), [scene]);
   const hasVisibleScene = visibleScene !== null;
   const previewSafeArea = previewSafeAreaForSettings();
   const effectivePreviewSafeArea = useMemo(
@@ -181,6 +188,19 @@ export function App() {
     setLockedInteractionFeedbackCount((count) => count + 1);
   }, []);
 
+  const collapseStructureSummaryIfControlsOverflow = useCallback(() => {
+    const commonControlsPanelElement = commonControlsPanelRef.current;
+    if (!commonControlsPanelElement || isStructureSummaryCollapsed) {
+      return;
+    }
+
+    const controlsRect = commonControlsPanelElement.getBoundingClientRect();
+    const safeBottom = window.innerHeight - 16;
+    if (controlsRect.bottom > safeBottom) {
+      setIsStructureSummaryCollapsed(true);
+    }
+  }, [isStructureSummaryCollapsed]);
+
   const clearLockedInteractionWheelGate = useCallback(() => {
     if (lockedInteractionWheelIdleTimeoutRef.current === null) {
       return;
@@ -191,6 +211,40 @@ export function App() {
   }, []);
 
   useEffect(() => () => clearLockedInteractionWheelGate(), [clearLockedInteractionWheelGate]);
+
+  useEffect(() => {
+    if (!scene || isStructureSummaryCollapsed) {
+      return;
+    }
+
+    const leftOverlayElement = leftOverlayRef.current;
+    const commonControlsPanelElement = commonControlsPanelRef.current;
+    if (!leftOverlayElement || !commonControlsPanelElement) {
+      return;
+    }
+
+    collapseStructureSummaryIfControlsOverflow();
+    const animationFrame = window.requestAnimationFrame(collapseStructureSummaryIfControlsOverflow);
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", collapseStructureSummaryIfControlsOverflow);
+      return () => {
+        window.cancelAnimationFrame(animationFrame);
+        window.removeEventListener("resize", collapseStructureSummaryIfControlsOverflow);
+      };
+    }
+
+    const resizeObserver = new ResizeObserver(collapseStructureSummaryIfControlsOverflow);
+    resizeObserver.observe(leftOverlayElement);
+    resizeObserver.observe(commonControlsPanelElement);
+    window.addEventListener("resize", collapseStructureSummaryIfControlsOverflow);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", collapseStructureSummaryIfControlsOverflow);
+    };
+  }, [collapseStructureSummaryIfControlsOverflow, isStructureSummaryCollapsed, scene]);
 
   useEffect(() => {
     if (!hasVisibleScene || !viewState.interactionLocked) {
@@ -299,6 +353,7 @@ export function App() {
             resetCounter={viewState.resetCounter}
             safeArea={previewSafeArea}
             scene={visibleScene}
+            componentOpacity={componentOpacity}
             showAtoms={componentVisibility.atoms}
             showUnitCell={componentVisibility.unitCell}
             viewScale={viewState.viewScale}
@@ -323,10 +378,14 @@ export function App() {
       ) : null}
 
       {legendEntries.length > 0 ? (
-        <ElementLegend entries={legendEntries} safeArea={previewSafeArea} />
+        <ElementLegend
+          entries={legendEntries}
+          safeArea={previewSafeArea}
+        />
       ) : null}
 
       <div
+        ref={leftOverlayRef}
         className={cn(
           "absolute left-4 top-4 flex w-[296px] max-w-[calc(100vw-2rem)] flex-col gap-4",
           isSettingsOpen ? "max-[760px]:hidden" : null,
@@ -334,6 +393,8 @@ export function App() {
       >
         <StructureSummaryCard
           errorMessage={errorMessage}
+          isCollapsed={isStructureSummaryCollapsed}
+          onCollapsedChange={setIsStructureSummaryCollapsed}
           onOpenStructure={() => fileInputRef.current?.click()}
           previewStatus={previewStatus}
           scene={scene}
@@ -341,11 +402,15 @@ export function App() {
         />
 
         {scene ? (
-          <CommonControlsPanel
-            componentVisibility={componentVisibility}
-            hasPolyhedra={hasPolyhedra(scene)}
-            onComponentVisibilityChange={setComponentVisibility}
-          />
+          <div ref={commonControlsPanelRef}>
+            <CommonControlsPanel
+              componentOpacity={componentOpacity}
+              componentVisibility={componentVisibility}
+              hasPolyhedra={hasPolyhedra(scene)}
+              onComponentOpacityChange={setComponentOpacity}
+              onComponentVisibilityChange={setComponentVisibility}
+            />
+          </div>
         ) : null}
       </div>
 

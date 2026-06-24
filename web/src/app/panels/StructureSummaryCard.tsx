@@ -1,9 +1,10 @@
-import { FolderOpen } from "lucide-react";
-import { useMemo } from "react";
+import { ChevronDown, ChevronUp, FolderOpen } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 import type { SceneSpec } from "../../api/scene";
@@ -22,18 +23,67 @@ import { GLASS_SURFACE_CLASS } from "../surface";
 
 export function StructureSummaryCard({
   errorMessage,
+  isCollapsed,
+  onCollapsedChange,
   onOpenStructure,
   previewStatus,
   scene,
   selectedFileName,
 }: {
   errorMessage: string | null;
+  isCollapsed: boolean;
+  onCollapsedChange: (isCollapsed: boolean) => void;
   onOpenStructure: () => void;
   previewStatus: PreviewStatus;
   scene: SceneSpec | null;
   selectedFileName: string | null;
 }) {
   const summary = useMemo(() => summarizeScene(scene), [scene]);
+  const expandableContentId = useId();
+  const expandableContentRef = useRef<HTMLDivElement>(null);
+  const [expandableContentHeight, setExpandableContentHeight] = useState<number | null>(null);
+  const hasExpandableContent = Boolean(scene || errorMessage);
+  const toggleDetailsLabel = isCollapsed ? "Expand details" : "Collapse details";
+  const expandableContentStyle = {
+    height: hasExpandableContent && !isCollapsed
+      ? (expandableContentHeight === null ? "auto" : `${expandableContentHeight}px`)
+      : "0px",
+  } as CSSProperties;
+
+  useEffect(() => {
+    const expandableContentElement = expandableContentRef.current;
+    if (!expandableContentElement) {
+      return;
+    }
+
+    const measuredContentElement = expandableContentElement;
+
+    function updateExpandableContentHeight() {
+      const nextHeight = measuredContentElement.scrollHeight;
+      setExpandableContentHeight(nextHeight > 0 ? nextHeight : null);
+    }
+
+    updateExpandableContentHeight();
+    const animationFrame = window.requestAnimationFrame(updateExpandableContentHeight);
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateExpandableContentHeight);
+      return () => {
+        window.cancelAnimationFrame(animationFrame);
+        window.removeEventListener("resize", updateExpandableContentHeight);
+      };
+    }
+
+    const resizeObserver = new ResizeObserver(updateExpandableContentHeight);
+    resizeObserver.observe(expandableContentElement);
+    window.addEventListener("resize", updateExpandableContentHeight);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateExpandableContentHeight);
+    };
+  }, [hasExpandableContent, scene, errorMessage]);
 
   return (
     <aside
@@ -50,8 +100,28 @@ export function StructureSummaryCard({
             alt=""
             className="size-7 shrink-0"
           />
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-1">
             <h1 className="truncate text-[0.95rem] font-semibold leading-tight">Pretty Lattice</h1>
+            {hasExpandableContent ? (
+              <TooltipProvider delayDuration={500}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-controls={expandableContentId}
+                      aria-expanded={!isCollapsed}
+                      aria-label={toggleDetailsLabel}
+                      className="view-rail-button size-6 rounded-[9px] border border-transparent bg-transparent text-muted-foreground shadow-none transition-[background-color,border-color,color,box-shadow] duration-150 [&_svg]:size-3.25"
+                      onClick={() => onCollapsedChange(!isCollapsed)}
+                    >
+                      {isCollapsed ? <ChevronDown aria-hidden="true" /> : <ChevronUp aria-hidden="true" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{toggleDetailsLabel}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : null}
           </div>
         </div>
 
@@ -90,79 +160,94 @@ export function StructureSummaryCard({
         ) : null}
       </div>
 
-      {errorMessage ? (
-        <Alert variant="destructive" className="mt-2 rounded-md px-2.5 py-2">
-          <AlertDescription className="font-mono text-xs leading-snug">
-            {errorMessage}
-          </AlertDescription>
-        </Alert>
-      ) : null}
+      {hasExpandableContent ? (
+        <div
+          id={expandableContentId}
+          data-slot="structure-summary-details"
+          className="overflow-hidden transition-[height] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          style={expandableContentStyle}
+        >
+          <div
+            ref={expandableContentRef}
+            aria-hidden={isCollapsed ? "true" : undefined}
+            className="pt-2.5"
+          >
+            {errorMessage ? (
+              <Alert variant="destructive" className="rounded-md px-2.5 py-2">
+                <AlertDescription className="font-mono text-xs leading-snug">
+                  {errorMessage}
+                </AlertDescription>
+              </Alert>
+            ) : null}
 
-      {scene?.warnings?.map((warning) => (
-        <Alert key={warning.code} className="mt-2 rounded-md px-2.5 py-2">
-          <AlertDescription className="text-xs leading-snug">
-            {warning.message}
-          </AlertDescription>
-        </Alert>
-      ))}
+            {scene?.warnings?.map((warning) => (
+              <Alert key={warning.code} className="mt-2 rounded-md px-2.5 py-2">
+                <AlertDescription className="text-xs leading-snug">
+                  {warning.message}
+                </AlertDescription>
+              </Alert>
+            ))}
 
-      {scene ? (
-        <div className="mt-2.5 flex flex-col gap-2.5 max-[760px]:hidden">
-          <Separator />
-          <div>
-            <span className="block text-xs font-bold text-muted-foreground">Symmetry</span>
-            {summary.symmetry?.available ? (
-              <dl className="mt-1.5 flex flex-col gap-1 text-sm">
-                <SymmetryMetric
-                  label="Space group"
-                  value={renderSpaceGroup(
-                    summary.symmetry.spaceGroup,
-                    summary.symmetry.spaceGroupNumber,
+            {scene ? (
+              <div className="flex flex-col gap-2.5 max-[760px]:hidden">
+                <Separator />
+                <div>
+                  <span className="block text-xs font-bold text-muted-foreground">Symmetry</span>
+                  {summary.symmetry?.available ? (
+                    <dl className="mt-1.5 flex flex-col gap-1 text-sm">
+                      <SymmetryMetric
+                        label="Space group"
+                        value={renderSpaceGroup(
+                          summary.symmetry.spaceGroup,
+                          summary.symmetry.spaceGroupNumber,
+                        )}
+                        title={formatSpaceGroupTitle(
+                          summary.symmetry.spaceGroup,
+                          summary.symmetry.spaceGroupNumber,
+                        )}
+                      />
+                      <SymmetryMetric
+                        label="Point group"
+                        value={renderPointGroup(
+                          summary.symmetry.pointGroup,
+                          summary.symmetry.pointGroupSchoenflies,
+                        )}
+                        title={formatPointGroupTitle(
+                          summary.symmetry.pointGroup,
+                          summary.symmetry.pointGroupSchoenflies,
+                        )}
+                      />
+                      <SymmetryMetric
+                        label="Crystal system"
+                        value={summary.symmetry.crystalSystem ?? "-"}
+                      />
+                    </dl>
+                  ) : (
+                    <p className="mt-1 text-sm text-muted-foreground">Symmetry unavailable</p>
                   )}
-                  title={formatSpaceGroupTitle(
-                    summary.symmetry.spaceGroup,
-                    summary.symmetry.spaceGroupNumber,
-                  )}
-                />
-                <SymmetryMetric
-                  label="Point group"
-                  value={renderPointGroup(
-                    summary.symmetry.pointGroup,
-                    summary.symmetry.pointGroupSchoenflies,
-                  )}
-                  title={formatPointGroupTitle(
-                    summary.symmetry.pointGroup,
-                    summary.symmetry.pointGroupSchoenflies,
-                  )}
-                />
-                <SymmetryMetric
-                  label="Crystal system"
-                  value={summary.symmetry.crystalSystem ?? "-"}
-                />
-              </dl>
-            ) : (
-              <p className="mt-1 text-sm text-muted-foreground">Symmetry unavailable</p>
-            )}
-          </div>
+                </div>
 
-          {summary.cell ? (
-            <>
-              <Separator />
-              <div>
-                <span className="block text-xs font-bold text-muted-foreground">
-                  Lattice Parameters
-                </span>
-                <dl className="mt-1.5 grid grid-cols-3 gap-x-3 gap-y-1 font-mono text-sm">
-                  <CellMetric label="a" value={summary.cell.a} unit="Å" />
-                  <CellMetric label="b" value={summary.cell.b} unit="Å" />
-                  <CellMetric label="c" value={summary.cell.c} unit="Å" />
-                  <CellMetric label="α" value={summary.cell.alpha} unit="°" />
-                  <CellMetric label="β" value={summary.cell.beta} unit="°" />
-                  <CellMetric label="γ" value={summary.cell.gamma} unit="°" />
-                </dl>
+                {summary.cell ? (
+                  <>
+                    <Separator />
+                    <div>
+                      <span className="block text-xs font-bold text-muted-foreground">
+                        Lattice Parameters
+                      </span>
+                      <dl className="mt-1.5 grid grid-cols-3 gap-x-3 gap-y-1 font-mono text-sm">
+                        <CellMetric label="a" value={summary.cell.a} unit="Å" />
+                        <CellMetric label="b" value={summary.cell.b} unit="Å" />
+                        <CellMetric label="c" value={summary.cell.c} unit="Å" />
+                        <CellMetric label="α" value={summary.cell.alpha} unit="°" />
+                        <CellMetric label="β" value={summary.cell.beta} unit="°" />
+                        <CellMetric label="γ" value={summary.cell.gamma} unit="°" />
+                      </dl>
+                    </div>
+                  </>
+                ) : null}
               </div>
-            </>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       ) : null}
     </aside>

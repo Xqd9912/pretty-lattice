@@ -21,13 +21,13 @@ describe("settings", () => {
     expect(hasPeriodicImageAtoms(null)).toBe(false);
   });
 
-  test("detects polyhedra and defaults polyhedra visibility from scene data", () => {
+  test("detects polyhedra while default visibility keeps polyhedra hidden", () => {
     const scene = sceneWithPeriodicImages();
 
     expect(hasPolyhedra(scene)).toBe(true);
     expect(hasPolyhedra({ ...scene, polyhedra: [] })).toBe(false);
     expect(hasPolyhedra(null)).toBe(false);
-    expect(createDefaultComponentVisibility(scene).polyhedra).toBe(true);
+    expect(createDefaultComponentVisibility(scene).polyhedra).toBe(false);
     expect(createDefaultComponentVisibility({ ...scene, polyhedra: [] }).polyhedra).toBe(false);
     expect(createDefaultComponentVisibility().polyhedra).toBe(false);
   });
@@ -38,20 +38,42 @@ describe("settings", () => {
 
     const visibleScene = visibleSceneForComponents(scene, defaultVisibility);
 
+    expect(defaultVisibility.oneHopBondedAtoms).toBe(false);
     expect(visibleScene?.atoms.map((atom) => atom.id)).toEqual([
+      "Na-0",
+      "Na-0-image-1-0-0",
+      "Cl-1",
+    ]);
+    expect(visibleScene?.bonds.map((bond) => bond.id)).toEqual([
+      "bond-canonical",
+      "bond-boundary-canonical",
+    ]);
+    expect(visibleScene?.polyhedra).toEqual([]);
+
+    const withOneHop = visibleSceneForComponents(scene, {
+      ...defaultVisibility,
+      oneHopBondedAtoms: true,
+    });
+    expect(withOneHop?.atoms.map((atom) => atom.id)).toEqual([
       "Na-0",
       "Na-0-image-1-0-0",
       "Cl-1",
       "Cl-1-image-0--1-0",
       "Cl-1-image-1-1-0",
     ]);
-    expect(visibleScene?.bonds.map((bond) => bond.id)).toEqual([
+    expect(withOneHop?.bonds.map((bond) => bond.id)).toEqual([
       "bond-canonical",
       "bond-boundary-canonical",
       "bond-one-hop",
       "bond-boundary-source",
     ]);
-    expect(visibleScene?.polyhedra.map((polyhedron) => polyhedron.id)).toEqual([
+
+    const withPolyhedra = visibleSceneForComponents(scene, {
+      ...defaultVisibility,
+      polyhedra: true,
+      oneHopBondedAtoms: true,
+    });
+    expect(withPolyhedra?.polyhedra.map((polyhedron) => polyhedron.id)).toEqual([
       "polyhedron-canonical",
       "polyhedron-boundary",
       "polyhedron-one-hop",
@@ -60,6 +82,8 @@ describe("settings", () => {
 
     const withoutBoundary = visibleSceneForComponents(scene, {
       ...defaultVisibility,
+      polyhedra: true,
+      oneHopBondedAtoms: true,
       boundaryAtoms: false,
     });
     expect(withoutBoundary?.atoms.map((atom) => atom.id)).toEqual([
@@ -78,6 +102,7 @@ describe("settings", () => {
 
     const withoutOneHop = visibleSceneForComponents(scene, {
       ...defaultVisibility,
+      polyhedra: true,
       oneHopBondedAtoms: false,
     });
     expect(withoutOneHop?.atoms.map((atom) => atom.id)).toEqual([
@@ -97,6 +122,8 @@ describe("settings", () => {
     const withoutBonds = visibleSceneForComponents(scene, {
       ...defaultVisibility,
       bonds: false,
+      polyhedra: true,
+      oneHopBondedAtoms: true,
     });
     expect(withoutBonds?.atoms).toHaveLength(5);
     expect(withoutBonds?.bonds).toEqual([]);
@@ -106,13 +133,15 @@ describe("settings", () => {
       ...defaultVisibility,
       polyhedra: false,
     });
-    expect(withoutPolyhedra?.atoms).toHaveLength(5);
-    expect(withoutPolyhedra?.bonds).toHaveLength(4);
+    expect(withoutPolyhedra?.atoms).toHaveLength(3);
+    expect(withoutPolyhedra?.bonds).toHaveLength(2);
     expect(withoutPolyhedra?.polyhedra).toEqual([]);
 
     const withoutAtomSpheres = visibleSceneForComponents(scene, {
       ...defaultVisibility,
       atoms: false,
+      polyhedra: true,
+      oneHopBondedAtoms: true,
     });
     expect(withoutAtomSpheres?.atoms).toHaveLength(5);
     expect(withoutAtomSpheres?.polyhedra).toHaveLength(4);

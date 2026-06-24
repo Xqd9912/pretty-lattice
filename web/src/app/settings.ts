@@ -29,16 +29,50 @@ export const DEFAULT_COMPONENT_VISIBILITY: ComponentVisibilityState = {
   bonds: true,
   polyhedra: false,
   boundaryAtoms: true,
-  oneHopBondedAtoms: true,
+  oneHopBondedAtoms: false,
+};
+
+export interface ComponentOpacityState {
+  atoms: number;
+  unitCell: number;
+  bonds: number;
+  polyhedra: number;
+}
+
+export const DEFAULT_COMPONENT_OPACITY: ComponentOpacityState = {
+  atoms: 100,
+  unitCell: 100,
+  bonds: 80,
+  polyhedra: 25,
+};
+
+export const COMPONENT_OPACITY_MAX: ComponentOpacityState = {
+  atoms: 100,
+  unitCell: 100,
+  bonds: 100,
+  polyhedra: 50,
 };
 
 export function createDefaultComponentVisibility(
-  scene: SceneSpec | null = null,
+  _scene: SceneSpec | null = null,
 ): ComponentVisibilityState {
-  return {
-    ...DEFAULT_COMPONENT_VISIBILITY,
-    polyhedra: hasPolyhedra(scene),
-  };
+  return { ...DEFAULT_COMPONENT_VISIBILITY };
+}
+
+export function createDefaultComponentOpacity(): ComponentOpacityState {
+  return { ...DEFAULT_COMPONENT_OPACITY };
+}
+
+export function componentOpacityEquals(
+  firstOpacity: ComponentOpacityState,
+  secondOpacity: ComponentOpacityState,
+): boolean {
+  return (
+    firstOpacity.atoms === secondOpacity.atoms &&
+    firstOpacity.unitCell === secondOpacity.unitCell &&
+    firstOpacity.bonds === secondOpacity.bonds &&
+    firstOpacity.polyhedra === secondOpacity.polyhedra
+  );
 }
 
 export function countPeriodicImageAtoms(scene: SceneSpec | null): number {

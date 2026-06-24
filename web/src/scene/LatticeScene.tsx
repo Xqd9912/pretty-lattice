@@ -18,7 +18,10 @@ import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 
 import type { AtomSpec, BondSpec, PolyhedronSpec, SceneSpec } from "../api/scene";
+import type { ComponentOpacityState } from "../app/settings";
 import { applyWheelZoomDelta, type InteractionMode } from "../app/viewState";
+import { CameraHeadlight } from "./CameraHeadlight";
+import { PREVIEW_AMBIENT_LIGHT_INTENSITY } from "./renderAppearance";
 import {
   applyOrthographicFrustum,
   computeCameraFitZoom,
@@ -57,12 +60,15 @@ export const BOND_COLOR = "#c7cbd1";
 export const BOND_RADIUS = 0.12;
 const CELL_FRAME_COLOR = "#111111";
 export const CELL_FRAME_LINE_WIDTH_PIXELS = 1;
-export const POLYHEDRON_SURFACE_OPACITY = 0.28;
+export const POLYHEDRON_SURFACE_OPACITY = 0.25;
 export const POLYHEDRON_EDGE_COLOR = "#525866";
 export const POLYHEDRON_EDGE_OPACITY = 0.42;
+const POLYHEDRON_EDGE_OPACITY_RATIO =
+  POLYHEDRON_EDGE_OPACITY / POLYHEDRON_SURFACE_OPACITY;
 
 export function LatticeScene({
   cameraOrientationRef,
+  componentOpacity,
   interactionLocked,
   interactionMode,
   layoutScene,
@@ -75,6 +81,7 @@ export function LatticeScene({
   viewScale,
 }: {
   cameraOrientationRef?: CameraOrientationRef;
+  componentOpacity: ComponentOpacityState;
   interactionLocked: boolean;
   interactionMode: InteractionMode;
   layoutScene?: SceneSpec;
@@ -101,10 +108,10 @@ export function LatticeScene({
       gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
       data-testid="lattice-canvas"
     >
-      <ambientLight intensity={0.62} />
-      <directionalLight position={[5, 7, 9]} intensity={2.4} />
-      <directionalLight position={[-4, -3, 2]} intensity={0.8} />
+      <ambientLight intensity={PREVIEW_AMBIENT_LIGHT_INTENSITY} />
+      <CameraHeadlight />
       <SceneContent
+        componentOpacity={componentOpacity}
         layout={layout}
         resetCounter={resetCounter}
         safeArea={safeArea}
@@ -144,6 +151,7 @@ function CameraOrientationTracker({
 }
 
 function SceneContent({
+  componentOpacity,
   layout,
   resetCounter,
   safeArea,
@@ -152,6 +160,7 @@ function SceneContent({
   showUnitCell,
   viewScale,
 }: {
+  componentOpacity: ComponentOpacityState;
   layout: SceneLayout;
   resetCounter: number;
   safeArea: PreviewSafeArea;
@@ -185,15 +194,36 @@ function SceneContent({
   return (
     <group>
       <group position={layout.groupPosition}>
-        {showUnitCell ? <CellFrame vectors={scene.cell.vectors} /> : null}
+        {showUnitCell ? (
+          <CellFrame
+            opacity={componentOpacity.unitCell / 100}
+            vectors={scene.cell.vectors}
+          />
+        ) : null}
         {scene.polyhedra.map((polyhedron) => (
-          <Polyhedron key={polyhedron.id} atomById={atomById} polyhedron={polyhedron} />
+          <Polyhedron
+            key={polyhedron.id}
+            atomById={atomById}
+            opacity={componentOpacity.polyhedra / 100}
+            polyhedron={polyhedron}
+          />
         ))}
         {scene.bonds.map((bond) => (
-          <Bond key={bond.id} atomById={atomById} bond={bond} />
+          <Bond
+            key={bond.id}
+            atomById={atomById}
+            bond={bond}
+            opacity={componentOpacity.bonds / 100}
+          />
         ))}
         {showAtoms
-          ? scene.atoms.map((atom) => <Atom key={atom.id} atom={atom} />)
+          ? scene.atoms.map((atom) => (
+              <Atom
+                key={atom.id}
+                atom={atom}
+                opacity={componentOpacity.atoms / 100}
+              />
+            ))
           : null}
       </group>
     </group>
@@ -335,11 +365,19 @@ function applyStandardCameraPose(
   camera.position.set(...standardPose.cameraPosition);
 }
 
-function Atom({ atom }: { atom: AtomSpec }) {
+function Atom({ atom, opacity }: { atom: AtomSpec; opacity: number }) {
+  const isTransparent = opacity < 1;
+
   return (
     <mesh position={atom.position}>
       <sphereGeometry args={[atom.radius, 48, 32]} />
-      <meshStandardMaterial color={atom.color} roughness={0.42} metalness={0.04} />
+      <meshLambertMaterial
+        key={isTransparent ? "transparent" : "opaque"}
+        color={atom.color}
+        depthWrite={!isTransparent}
+        opacity={opacity}
+        transparent={isTransparent}
+      />
     </mesh>
   );
 }
@@ -347,9 +385,11 @@ function Atom({ atom }: { atom: AtomSpec }) {
 function Bond({
   atomById,
   bond,
+  opacity,
 }: {
   atomById: Map<string, AtomSpec>;
   bond: BondSpec;
+  opacity: number;
 }) {
   const geometry = useMemo(() => {
     const startAtom = atomById.get(bond.startAtomId);
@@ -380,19 +420,29 @@ function Bond({
     return null;
   }
 
+  const isTransparent = opacity < 1;
+
   return (
     <mesh position={geometry.position} quaternion={geometry.quaternion}>
       <cylinderGeometry args={[BOND_RADIUS, BOND_RADIUS, geometry.length, 24]} />
-      <meshStandardMaterial color={BOND_COLOR} roughness={0.42} metalness={0.04} />
+      <meshLambertMaterial
+        key={isTransparent ? "transparent" : "opaque"}
+        color={BOND_COLOR}
+        depthWrite={!isTransparent}
+        opacity={opacity}
+        transparent={isTransparent}
+      />
     </mesh>
   );
 }
 
 function Polyhedron({
   atomById,
+  opacity,
   polyhedron,
 }: {
   atomById: Map<string, AtomSpec>;
+  opacity: number;
   polyhedron: PolyhedronSpec;
 }) {
   const geometry = useMemo(
@@ -413,12 +463,10 @@ function Polyhedron({
   return (
     <group>
       <mesh geometry={geometry}>
-        <meshStandardMaterial
+        <meshLambertMaterial
           color={polyhedron.color}
           depthWrite={false}
-          metalness={0}
-          opacity={POLYHEDRON_SURFACE_OPACITY}
-          roughness={0.68}
+          opacity={opacity}
           side={DoubleSide}
           transparent
         />
@@ -428,7 +476,7 @@ function Polyhedron({
         <lineBasicMaterial
           color={POLYHEDRON_EDGE_COLOR}
           depthWrite={false}
-          opacity={POLYHEDRON_EDGE_OPACITY}
+          opacity={Math.min(1, opacity * POLYHEDRON_EDGE_OPACITY_RATIO)}
           transparent
         />
       </lineSegments>
@@ -479,19 +527,22 @@ export function polyhedronGeometryFromAtoms(
   return geometry;
 }
 
-function CellFrame({ vectors }: { vectors: VectorTuple[] }) {
+function CellFrame({ opacity, vectors }: { opacity: number; vectors: VectorTuple[] }) {
   const cellFrame = useMemo(() => {
     const geometry = new LineSegmentsGeometry();
     geometry.setPositions(cellFrameLinePositions(vectors));
 
     const material = new LineMaterial({
       color: CELL_FRAME_COLOR,
+      depthWrite: opacity >= 1,
       linewidth: CELL_FRAME_LINE_WIDTH_PIXELS,
+      opacity,
+      transparent: opacity < 1,
       worldUnits: false,
     });
 
     return new LineSegments2(geometry, material);
-  }, [vectors]);
+  }, [opacity, vectors]);
 
   useEffect(() => {
     return () => {

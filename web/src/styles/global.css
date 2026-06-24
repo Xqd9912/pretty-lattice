@@ -254,6 +254,97 @@
     transition-duration: 150ms;
   }
 
+  .opacity-slider {
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    background: transparent;
+    opacity: 0;
+  }
+
+  .opacity-slider:disabled {
+    cursor: not-allowed;
+  }
+
+  .opacity-slider-track {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 50%;
+    height: 4px;
+    translate: 0 -50%;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--foreground) 14%, transparent);
+  }
+
+  .opacity-slider-fill {
+    position: absolute;
+    inset-inline-start: 0;
+    inset-block-start: 50%;
+    width: var(--opacity-slider-position);
+    height: 4px;
+    translate: 0 -50%;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--foreground) 45%, transparent);
+  }
+
+  .opacity-slider-thumb {
+    position: absolute;
+    inset-inline-start: var(--opacity-slider-position);
+    inset-block-start: 50%;
+    width: 12px;
+    height: 12px;
+    translate: -50% -50%;
+    border: 3px solid color-mix(in srgb, var(--card) 92%, transparent);
+    border-radius: 999px;
+    background: var(--foreground);
+    box-shadow: 0 2px 7px rgb(0 0 0 / 16%);
+    transition:
+      box-shadow 180ms ease-out,
+      opacity 150ms ease-out,
+      background-color 150ms ease-out;
+  }
+
+  .opacity-slider-shell:focus-within .opacity-slider-thumb {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--ring) 30%, transparent),
+      0 2px 7px rgb(0 0 0 / 16%);
+  }
+
+  .opacity-slider-shell[data-disabled="true"] .opacity-slider-track {
+    background: color-mix(in srgb, var(--foreground) 8%, transparent);
+  }
+
+  .opacity-slider-shell[data-disabled="true"] .opacity-slider-fill,
+  .opacity-slider-shell[data-disabled="true"] .opacity-slider-thumb {
+    opacity: 0.35;
+  }
+
+  .opacity-value-control {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .opacity-value-control[data-disabled="false"]:hover {
+    border-color: rgb(23 23 23 / 10%) !important;
+    background: rgb(23 23 23 / 4%) !important;
+    border-color: color-mix(in srgb, var(--foreground) 10%, transparent) !important;
+    background: color-mix(in srgb, var(--foreground) 4%, transparent) !important;
+  }
+
+  .opacity-value-control:focus-within {
+    border-color: rgb(23 23 23 / 18%) !important;
+    background: rgb(250 250 250 / 78%) !important;
+    box-shadow: 0 0 0 1px rgb(23 23 23 / 16%) !important;
+    border-color: color-mix(in srgb, var(--ring) 18%, transparent) !important;
+    background: color-mix(in srgb, var(--background) 78%, transparent) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ring) 16%, transparent) !important;
+  }
+
+  .opacity-value-input:disabled {
+    cursor: not-allowed;
+    color: color-mix(in srgb, var(--muted-foreground) 72%, transparent);
+  }
+
   @keyframes view-reset-feedback-a {
     0%,
     100% {

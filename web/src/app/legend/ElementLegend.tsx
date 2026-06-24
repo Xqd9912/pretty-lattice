@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
 import type { PreviewSafeArea } from "../../scene/LatticeScene";
+import { lambertLegendSwatchBackground } from "../../scene/renderAppearance";
 import type { ElementLegendEntry } from "../elementLegend";
 import { GLASS_SURFACE_CLASS } from "../surface";
 
@@ -27,6 +28,7 @@ export function ElementLegend({
           <li key={entry.element} className="flex min-w-0 items-center gap-2">
             <span
               aria-hidden="true"
+              data-slot="element-legend-swatch"
               className="size-[18px] shrink-0 rounded-full border border-foreground/10 shadow-sm"
               style={legendSphereStyle(entry.color)}
             />
@@ -49,6 +51,6 @@ function legendContainerStyle(safeArea: PreviewSafeArea): CSSProperties {
 
 function legendSphereStyle(color: string): CSSProperties {
   return {
-    background: `radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.96) 0 8%, ${color} 36%, ${color} 72%, rgba(0, 0, 0, 0.42) 100%)`,
+    background: lambertLegendSwatchBackground(color),
   };
 }

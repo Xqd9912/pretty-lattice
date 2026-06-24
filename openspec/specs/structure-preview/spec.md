@@ -391,7 +391,7 @@ The frontend SHALL show a second left floating card below the structure summary 
 
 ### Requirement: Display tab controls visible scene components
 
-The `Display` tab SHALL expose visible-component checkboxes for `Atoms`, `Unit cell`, `Bonds`, and `Polyhedra`, plus image switches for `Cell-boundary atoms` and `One-hop bonded atoms`. `Atoms`, `Unit cell`, `Bonds`, `Cell-boundary atoms`, and `One-hop bonded atoms` SHALL default to enabled. `Polyhedra` SHALL default to enabled when the loaded scene includes polyhedron records and SHALL appear disabled and unchecked only when the loaded scene has no polyhedron records. The preview SHALL allow all enabled components to be turned off without forcing a non-empty scene.
+The `Display` tab SHALL expose visible-component checkboxes for `Atoms`, `Unit cell`, `Bonds`, and `Polyhedra`, plus image switches for `Cell-boundary atoms` and `One-hop bonded atoms`. `Atoms`, `Unit cell`, `Bonds`, and `Cell-boundary atoms` SHALL default to enabled. `One-hop bonded atoms` and `Polyhedra` SHALL default to disabled. `Polyhedra` SHALL appear disabled and unchecked when the loaded scene has no polyhedron records. The preview SHALL allow all enabled components to be turned off without forcing a non-empty scene.
 
 #### Scenario: Toggle atom spheres
 
@@ -425,18 +425,18 @@ The `Display` tab SHALL expose visible-component checkboxes for `Atoms`, `Unit c
 
 ### Requirement: One-hop bonded atom visibility can be toggled locally
 
-The frontend SHALL default to showing one-hop bonded atom images when the loaded scene provides them. The `One-hop bonded atoms` switch SHALL control whether atom instances and bonds that depend on one-hop bonded image display participate in the visible scene. The switch SHALL be independent from `Cell-boundary atoms`, SHALL NOT trigger a file re-upload, and SHALL NOT change the loaded scene used for camera fit and layout.
+The frontend SHALL default to hiding one-hop bonded atom images when the loaded scene provides them. The `One-hop bonded atoms` switch SHALL control whether atom instances and bonds that depend on one-hop bonded image display participate in the visible scene. The switch SHALL be independent from `Cell-boundary atoms`, SHALL NOT trigger a file re-upload, and SHALL NOT change the loaded scene used for camera fit and layout.
 
-#### Scenario: Show one-hop bonded atoms by default
+#### Scenario: Hide one-hop bonded atoms by default
 
 - **WHEN** the scene includes one-hop bonded atom image instances
-- **THEN** the preview includes those atom instances and their bonds in the visible scene by default
+- **THEN** the preview excludes those atom instances and their bonds from the visible scene by default
 
-#### Scenario: Hide one-hop bonded atoms
+#### Scenario: Show one-hop bonded atoms
 
-- **WHEN** the user turns off `One-hop bonded atoms`
-- **THEN** the preview excludes one-hop bonded atom image instances
-- **AND** it excludes bonds whose endpoints depend on those hidden instances
+- **WHEN** the user turns on `One-hop bonded atoms`
+- **THEN** the preview includes one-hop bonded atom image instances
+- **AND** it includes bonds whose endpoints depend on those visible instances
 - **AND** the unit-cell visual scale remains based on the loaded scene rather than the filtered visible subset
 - **AND** the frontend does not re-upload the file to the API
 
@@ -509,7 +509,8 @@ The frontend SHALL keep the current file object available while a scene is loade
 
 - **WHEN** the user loads a different structure file
 - **THEN** the bond algorithm resets to CrystalNN
-- **AND** component visibility resets to the default enabled states for atoms, unit cell, bonds, polyhedra when available, cell-boundary atoms, and one-hop bonded atoms
+- **AND** component visibility resets to the default enabled states for atoms, unit cell, bonds, and cell-boundary atoms
+- **AND** one-hop bonded atoms and polyhedra reset to disabled
 
 ### Requirement: Preview presents parse errors and analysis warnings consistently
 

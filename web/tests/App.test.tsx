@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { ReactNode } from "react";
@@ -159,12 +159,17 @@ describe("App", () => {
     expect(within(commonControls).getByText("Images").isConnected).toBe(true);
     expect(
       commonControls.querySelector("[data-slot='common-controls-content']")?.className,
-    ).toContain("h-[144px]");
+    ).not.toContain("h-[");
     const polyhedraCheckbox = within(commonControls).getByRole("checkbox", {
       name: "Polyhedra",
     }) as HTMLButtonElement;
     expect(polyhedraCheckbox.disabled).toBe(false);
-    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("true");
+    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("false");
+    expect(
+      within(commonControls)
+        .getAllByRole("checkbox")
+        .map((checkbox) => checkbox.getAttribute("aria-label")),
+    ).toEqual(["Atoms", "Bonds", "Unit cell", "Polyhedra"]);
   });
 
   test("lets display controls change image visibility and advanced settings change rotation mode", async () => {
@@ -185,11 +190,11 @@ describe("App", () => {
     const oneHopSwitch = screen.getByRole("switch", {
       name: "One-hop bonded atoms",
     });
-    expect(oneHopSwitch.getAttribute("aria-checked")).toBe("true");
+    expect(oneHopSwitch.getAttribute("aria-checked")).toBe("false");
 
     await user.click(oneHopSwitch);
 
-    expect(oneHopSwitch.getAttribute("aria-checked")).toBe("false");
+    expect(oneHopSwitch.getAttribute("aria-checked")).toBe("true");
 
     await user.click(screen.getByRole("button", { name: "Open advanced settings" }));
 
@@ -223,6 +228,10 @@ describe("App", () => {
       name: "Polyhedra",
     });
 
+    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("false");
+    await user.click(polyhedraCheckbox);
+    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("true");
+
     await user.click(atomsCheckbox);
     expect(atomsCheckbox.getAttribute("aria-checked")).toBe("false");
     expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("true");
@@ -250,6 +259,92 @@ describe("App", () => {
     expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("false");
   });
 
+  test("manages component opacity with clamped numeric input and opacity-only reset", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    const resetOpacityButton = within(commonControls).getByRole("button", {
+      name: "Reset opacity",
+    }) as HTMLButtonElement;
+    const atomsCheckbox = within(commonControls).getByRole("checkbox", {
+      name: "Atoms",
+    });
+    const atomsOpacityInput = within(commonControls).getByRole("textbox", {
+      name: "Atoms opacity value",
+    }) as HTMLInputElement;
+    const atomsOpacitySlider = within(commonControls).getByRole("slider", {
+      name: "Atoms opacity",
+    }) as HTMLInputElement;
+    const unitCellOpacityInput = within(commonControls).getByRole("textbox", {
+      name: "Unit cell opacity value",
+    }) as HTMLInputElement;
+    const bondsOpacityInput = within(commonControls).getByRole("textbox", {
+      name: "Bonds opacity value",
+    }) as HTMLInputElement;
+    const polyhedraOpacityInput = within(commonControls).getByRole("textbox", {
+      name: "Polyhedra opacity value",
+    }) as HTMLInputElement;
+    const polyhedraOpacitySlider = within(commonControls).getByRole("slider", {
+      name: "Polyhedra opacity",
+    }) as HTMLInputElement;
+
+    expect(resetOpacityButton.disabled).toBe(false);
+    expect(atomsOpacityInput.value).toBe("100");
+    expect(bondsOpacityInput.value).toBe("80");
+    expect(polyhedraOpacityInput.value).toBe("25");
+    expect(polyhedraOpacitySlider.max).toBe("50");
+
+    await user.clear(atomsOpacityInput);
+    await user.type(atomsOpacityInput, "98{Enter}");
+
+    expect(atomsOpacityInput.value).toBe("98");
+    expect(atomsOpacitySlider.value).toBe("98");
+
+    fireEvent.change(atomsOpacitySlider, { target: { value: "99" } });
+
+    expect(atomsOpacityInput.value).toBe("100");
+    expect(atomsOpacitySlider.value).toBe("100");
+
+    await user.click(resetOpacityButton);
+
+    expect(resetOpacityButton.className).toContain("view-rail-button-reset-feedback");
+    expect(polyhedraOpacityInput.value).toBe("25");
+
+    const polyhedraCheckbox = within(commonControls).getByRole("checkbox", {
+      name: "Polyhedra",
+    });
+    await user.click(polyhedraCheckbox);
+    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("true");
+
+    await user.clear(polyhedraOpacityInput);
+    await user.type(polyhedraOpacityInput, "80{Enter}");
+
+    expect(polyhedraOpacityInput.value).toBe("50");
+    expect(polyhedraOpacitySlider.value).toBe("50");
+
+    await user.click(atomsCheckbox);
+    expect(atomsCheckbox.getAttribute("aria-checked")).toBe("false");
+
+    await user.clear(unitCellOpacityInput);
+    await user.type(unitCellOpacityInput, "20{Enter}");
+
+    expect(unitCellOpacityInput.value).toBe("20");
+
+    await user.click(resetOpacityButton);
+
+    expect(atomsCheckbox.getAttribute("aria-checked")).toBe("false");
+    expect(unitCellOpacityInput.value).toBe("100");
+    expect(bondsOpacityInput.value).toBe("80");
+    expect(polyhedraOpacityInput.value).toBe("25");
+    expect(resetOpacityButton.className).toContain("view-rail-button-reset-feedback");
+    await waitFor(() =>
+      expect(resetOpacityButton.className).not.toContain("view-rail-button-reset-feedback"),
+    );
+    expect(resetOpacityButton.disabled).toBe(false);
+  });
+
   test("uses a single sliding active indicator for tab animation", async () => {
     const user = userEvent.setup();
 
@@ -258,7 +353,7 @@ describe("App", () => {
     const commonControls = screen.getByRole("complementary", { name: "Common controls" });
     const content = commonControls.querySelector("[data-slot='common-controls-content']");
     expect(content?.className).toContain("transition-[height]");
-    expect(content?.className).toContain("h-[144px]");
+    expect(content?.className).not.toContain("h-[");
     expect(content?.className).not.toContain("min-h");
     const activeIndicator = commonControls.querySelector(
       "[data-slot='common-controls-active-indicator']",
@@ -286,7 +381,7 @@ describe("App", () => {
 
     await user.click(cameraTab);
 
-    expect(content?.className).toContain("h-[76px]");
+    expect(content?.className).not.toContain("h-[");
     expect(within(commonControls).getByRole("tab", { name: "Camera" }).className).toContain(
       "!bg-transparent",
     );
@@ -309,7 +404,42 @@ describe("App", () => {
 
     await user.click(within(commonControls).getByRole("tab", { name: "Display" }));
 
-    expect(content?.className).toContain("h-[144px]");
+    expect(content?.className).not.toContain("h-[");
+  });
+
+  test("collapses and expands extended structure details from the card", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    const structureCard = screen.getByRole("complementary", { name: "Current structure" });
+    const detailsRegion = structureCard.querySelector(
+      "[data-slot='structure-summary-details']",
+    ) as HTMLElement | null;
+    const collapseButton = within(structureCard).getByRole("button", {
+      name: "Collapse details",
+    });
+
+    expect(collapseButton.getAttribute("aria-expanded")).toBe("true");
+    expect(detailsRegion?.className).toContain("transition-[height]");
+    expect(detailsRegion?.style.height).not.toBe("0px");
+
+    await user.click(collapseButton);
+
+    const expandButton = within(structureCard).getByRole("button", {
+      name: "Expand details",
+    });
+    expect(expandButton.getAttribute("aria-expanded")).toBe("false");
+    expect(detailsRegion?.style.height).toBe("0px");
+
+    await user.click(expandButton);
+
+    expect(
+      within(structureCard)
+        .getByRole("button", { name: "Collapse details" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(detailsRegion?.style.height).not.toBe("0px");
   });
 
   test("reuploads the current file when the bond algorithm changes", async () => {
@@ -332,7 +462,7 @@ describe("App", () => {
       "/api/structure-preview?bondAlgorithm=minimum-distance",
     );
     expect(fetchCalls[1]?.init?.body).toBeInstanceOf(File);
-    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("false");
+    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("true");
   });
 
   test("keeps view controls wired to lock, zoom, and reset state", async () => {

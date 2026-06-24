@@ -11,7 +11,9 @@ import {
 } from "three";
 
 import type { CameraOrientationRef } from "./LatticeScene";
+import { CameraHeadlight } from "./CameraHeadlight";
 import { computeOrientationGizmoAxes, type OrientationGizmoAxisSpec } from "./orientationGizmoMath";
+import { PREVIEW_AMBIENT_LIGHT_INTENSITY } from "./renderAppearance";
 import type { VectorTuple } from "./viewMath";
 
 const CAMERA_POSITION: VectorTuple = [0, 0, 5];
@@ -60,9 +62,8 @@ export function OrientationGizmo({
           gl={{ antialias: true, alpha: true }}
           style={{ pointerEvents: "none" }}
         >
-          <ambientLight intensity={0.95} />
-          <directionalLight position={[3, 4, 5]} intensity={1.35} />
-          <directionalLight position={[-4, -3, 2]} intensity={0.35} />
+          <ambientLight intensity={PREVIEW_AMBIENT_LIGHT_INTENSITY} />
+          <CameraHeadlight />
           <ResponsiveGizmoCamera />
           <OrientationGizmoScene
             cameraOrientationRef={cameraOrientationRef}
@@ -116,11 +117,7 @@ function OrientationGizmoScene({
       ))}
       <mesh renderOrder={4}>
         <sphereGeometry args={[ORIGIN_SPHERE_RADIUS, 40, 24]} />
-        <meshStandardMaterial
-          color="#f3f2ee"
-          metalness={0}
-          roughness={0.9}
-        />
+        <meshLambertMaterial color="#f3f2ee" />
       </mesh>
     </group>
   );
@@ -136,23 +133,11 @@ function AxisArrow({ axis }: { axis: OrientationGizmoAxisSpec }) {
     <group quaternion={axisRotation}>
       <mesh position={[0, SHAFT_LENGTH / 2, 0]}>
         <cylinderGeometry args={[SHAFT_RADIUS, SHAFT_RADIUS, SHAFT_LENGTH, 32]} />
-        <meshStandardMaterial
-          color={axis.color}
-          metalness={0.12}
-          opacity={0.9}
-          roughness={0.84}
-          transparent
-        />
+        <meshLambertMaterial color={axis.color} />
       </mesh>
       <mesh position={[0, SHAFT_LENGTH + CONE_LENGTH / 2, 0]}>
         <coneGeometry args={[CONE_RADIUS, CONE_LENGTH, 40]} />
-        <meshStandardMaterial
-          color={axis.color}
-          metalness={0.12}
-          opacity={0.9}
-          roughness={0.82}
-          transparent
-        />
+        <meshLambertMaterial color={axis.color} />
       </mesh>
       <AxisLabel label={axis.label} position={[0, LABEL_DISTANCE, 0]} />
     </group>

@@ -125,7 +125,7 @@ describe("computeSceneLayout", () => {
 
     expect(POLYHEDRON_EDGE_COLOR).toBe("#525866");
     expect(POLYHEDRON_EDGE_OPACITY).toBe(0.42);
-    expect(POLYHEDRON_SURFACE_OPACITY).toBe(0.28);
+    expect(POLYHEDRON_SURFACE_OPACITY).toBe(0.25);
     expect(geometry?.getAttribute("position").count).toBe(4);
     expect(geometry?.index?.count).toBe(12);
     geometry?.dispose();
