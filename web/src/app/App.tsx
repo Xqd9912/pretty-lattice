@@ -62,10 +62,11 @@ const LOCKED_INTERACTION_DRAG_THRESHOLD_PX = 4;
 const LOCKED_INTERACTION_FEEDBACK_ANIMATION_MS = 420;
 const LOCKED_INTERACTION_WHEEL_IDLE_MS = 150;
 const MAX_ORIENTATION_GIZMO_SIZE_PX = 280;
+const MIN_ORIENTATION_GIZMO_SIZE_PX = 160;
 const RESET_VIEW_FEEDBACK_ANIMATION_MS = 150;
 const ORIENTATION_GIZMO_AVAILABLE_SIDE_RATIO = 0.35;
-const ZOOM_SLIDER_BLUR_DELAY_MS = 1000;
-const ZOOM_SLIDER_HEIGHT_PX = 200;
+const ZOOM_SLIDER_BLUR_DELAY_MS = 500;
+const ZOOM_SLIDER_HEIGHT_PX = 180;
 const ZOOM_SLIDER_THUMB_SIZE_PX = 14;
 
 interface LockedInteractionPointer {
@@ -320,7 +321,7 @@ export function App() {
           <Button
             size="sm"
             aria-label="Open structure"
-            className="h-7 gap-1.5 rounded-full px-2.5 text-xs transition-[background-color,color,box-shadow,translate] duration-200 ease-out hover:-translate-y-px hover:shadow-md active:translate-y-0 disabled:translate-y-0 [&_svg]:size-3.5"
+            className="h-7 gap-1.5 rounded-full px-2.5 text-xs transition-colors duration-150 ease-out active:bg-primary/80 [&_svg]:size-3.5"
             disabled={previewStatus === "loading"}
             onClick={() => fileInputRef.current?.click()}
           >
@@ -616,13 +617,13 @@ function ViewControlRail({
       <aside
         aria-label="View controls"
         className={cn(
-          "absolute left-[340px] top-4 flex w-12 flex-col items-center gap-1.5 max-[760px]:bottom-[8.5rem] max-[760px]:left-auto max-[760px]:right-4 max-[760px]:top-auto",
+          "absolute left-[340px] top-4 flex w-[42px] flex-col items-center max-[760px]:bottom-[8.5rem] max-[760px]:left-auto max-[760px]:right-4 max-[760px]:top-auto",
           className,
         )}
       >
         <div
           className={cn(
-            "flex w-[42px] flex-col items-center gap-1.5 rounded-full border px-1 pb-2.5 pt-2.5 shadow-xl shadow-foreground/10",
+            "flex w-[42px] flex-col items-center gap-1.5 rounded-xl border px-1 pb-2 pt-2 shadow-xl shadow-foreground/10",
             GLASS_SURFACE_CLASS,
           )}
         >
@@ -633,7 +634,7 @@ function ViewControlRail({
                 size="icon"
                 aria-label="Reset view"
                 className={cn(
-                  "view-rail-button mb-0.5 size-[28px] rounded-full border border-transparent bg-transparent text-muted-foreground shadow-none transition-[background-color,border-color,color,box-shadow] duration-150 [&_svg]:size-3.5",
+                  "view-rail-button size-7 rounded-[10px] border border-transparent bg-transparent text-muted-foreground shadow-none transition-[background-color,border-color,color,box-shadow] duration-150 [&_svg]:size-3.5",
                   resetFeedbackPhase === "a" ? "view-rail-button-reset-feedback-a" : null,
                   resetFeedbackPhase === "b" ? "view-rail-button-reset-feedback-b" : null,
                 )}
@@ -655,7 +656,7 @@ function ViewControlRail({
                   interactionLocked ? "Unlock canvas interaction" : "Lock canvas interaction"
                 }
                 className={cn(
-                  "view-rail-button size-[28px] rounded-full border border-transparent bg-transparent shadow-none transition-[background-color,border-color,color,box-shadow] duration-100 ease-out motion-reduce:transition-none [&_svg]:size-3.5",
+                  "view-rail-button size-7 rounded-[10px] border border-transparent bg-transparent shadow-none transition-[background-color,border-color,color,box-shadow] duration-100 ease-out motion-reduce:transition-none [&_svg]:size-3.5",
                   interactionLocked
                     ? "view-rail-button-active"
                     : "text-muted-foreground",
@@ -672,7 +673,7 @@ function ViewControlRail({
             </TooltipContent>
           </Tooltip>
 
-          <div className="zoom-slider-shell relative h-[200px] w-7" style={sliderStyle}>
+          <div className="zoom-slider-shell relative h-[180px] w-7" style={sliderStyle}>
             <input
               ref={zoomSliderRef}
               type="range"
@@ -713,28 +714,28 @@ function ViewControlRail({
               className="zoom-slider-thumb pointer-events-none"
             />
           </div>
-        </div>
 
-        <label className="zoom-percent-control group mt-px flex h-[22px] w-[42px] items-baseline justify-center gap-0 rounded-[8px] border px-1 transition-[background-color,border-color,box-shadow] duration-150">
-          <span className="sr-only">Zoom percentage</span>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={zoomText}
-            aria-label="Zoom percentage input"
-            className="zoom-percent-input h-full w-[1.45rem] border-0 bg-transparent px-0 text-center font-mono text-[0.68rem] leading-none tabular-nums outline-none"
-            data-testid="zoom-input"
-            onBlur={commitZoomText}
-            onChange={(event) => setZoomText(event.target.value)}
-            onKeyDown={handleZoomKeyDown}
-          />
-          <span
-            aria-hidden="true"
-            className="pointer-events-none font-mono text-[0.68rem] font-normal leading-none text-muted-foreground"
-          >
-            %
-          </span>
-        </label>
+          <label className="zoom-percent-control group -mt-1 flex h-[22px] w-[34px] items-baseline justify-center gap-0 rounded-md border px-0.5 transition-[background-color,border-color,box-shadow] duration-150">
+            <span className="sr-only">Zoom percentage</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={zoomText}
+              aria-label="Zoom percentage input"
+              className="zoom-percent-input h-full w-[1.35rem] border-0 bg-transparent px-0 text-center font-mono text-[0.68rem] leading-none tabular-nums outline-none"
+              data-testid="zoom-input"
+              onBlur={commitZoomText}
+              onChange={(event) => setZoomText(event.target.value)}
+              onKeyDown={handleZoomKeyDown}
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none font-mono text-[0.68rem] font-normal leading-none text-muted-foreground"
+            >
+              %
+            </span>
+          </label>
+        </div>
       </aside>
     </TooltipProvider>
   );
@@ -979,9 +980,12 @@ function orientationGizmoSizeForViewport(
   const availableWidth = Math.max(1, viewportSize.width - safeArea.left - safeArea.right);
   const availableHeight = Math.max(1, viewportSize.height - safeArea.top - safeArea.bottom);
 
-  return Math.min(
-    Math.min(availableWidth, availableHeight) * ORIENTATION_GIZMO_AVAILABLE_SIDE_RATIO,
-    MAX_ORIENTATION_GIZMO_SIZE_PX,
+  return Math.max(
+    MIN_ORIENTATION_GIZMO_SIZE_PX,
+    Math.min(
+      Math.min(availableWidth, availableHeight) * ORIENTATION_GIZMO_AVAILABLE_SIDE_RATIO,
+      MAX_ORIENTATION_GIZMO_SIZE_PX,
+    ),
   );
 }
 

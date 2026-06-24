@@ -17,9 +17,9 @@ const FALLBACK_DIRECTIONS: Record<OrientationGizmoAxisLabel, Vector3> = {
 };
 
 const AXIS_COLORS: Record<OrientationGizmoAxisLabel, string> = {
-  a: "#b8434e",
-  b: "#41831c",
-  c: "#4c69c7",
+  a: "#d27686",
+  b: "#80c393",
+  c: "#75a4dd",
 };
 
 export function computeOrientationGizmoAxes(vectors: VectorTuple[]): OrientationGizmoAxisSpec[] {

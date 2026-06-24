@@ -20,10 +20,10 @@ const BASE_INNER_CANVAS_SIZE = 588;
 const CONE_LENGTH = 0.24;
 const CONE_RADIUS = 0.13;
 const GIZMO_SCALE = 1.36;
-const LABEL_DISTANCE = 1.38;
+const LABEL_DISTANCE = 1.3;
 const LABEL_SCALE = 0.38;
-const LABEL_FILL_COLOR = "#262626";
-const LABEL_HALO_COLOR = "#fafafa";
+const LABEL_FILL_COLOR = "#343434";
+const LABEL_HALO_COLOR = "rgb(255 255 255)";
 const ORIGIN_SPHERE_RADIUS = 0.13;
 const SHAFT_LENGTH = 0.82;
 const SHAFT_RADIUS = 0.055;
@@ -139,7 +139,7 @@ function AxisArrow({ axis }: { axis: OrientationGizmoAxisSpec }) {
         <meshStandardMaterial
           color={axis.color}
           metalness={0.12}
-          opacity={0.85}
+          opacity={0.9}
           roughness={0.84}
           transparent
         />
@@ -149,7 +149,7 @@ function AxisArrow({ axis }: { axis: OrientationGizmoAxisSpec }) {
         <meshStandardMaterial
           color={axis.color}
           metalness={0.12}
-          opacity={0.85}
+          opacity={0.9}
           roughness={0.82}
           transparent
         />
@@ -195,7 +195,7 @@ function createLabelTexture(label: string) {
 
   if (context) {
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.font = "700 76px Geist, Arial, sans-serif";
+    context.font = "italic 500 76px Geist, 'Helvetica Neue', Arial, sans-serif";
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.lineJoin = "round";
