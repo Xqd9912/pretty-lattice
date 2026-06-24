@@ -70,6 +70,7 @@ const OPAQUE_OPACITY_VALUE = 100;
 const OPAQUE_SLIDER_SNAP_DISTANCE = 2;
 const STYLE_SCALE_DEFAULT_VALUE = 100;
 const STYLE_SCALE_SLIDER_SNAP_DISTANCE = 4;
+const COMMON_SLIDER_BLUR_DELAY_MS = 500;
 const BOND_COLOR_OPTIONS: { label: string; value: BondColorMode }[] = [
   { label: "Unicolor", value: "neutral" },
   { label: "Bicolor", value: "by-atom" },
@@ -728,6 +729,7 @@ function ComponentOpacityRow({
   value: number;
 }) {
   const [opacityText, setOpacityText] = useState(formatOpacityValue(value));
+  const sliderBlur = useAutoBlurSlider();
   const sliderPosition = max > 0 ? value / max : 0;
   const sliderStyle = {
     "--opacity-slider-position": `${Math.min(100, Math.max(0, sliderPosition * 100))}%`,
@@ -745,7 +747,9 @@ function ComponentOpacityRow({
       return;
     }
 
-    onOpacityChange(clampOpacityValue(nextOpacity, max));
+    const clampedOpacity = clampOpacityValue(nextOpacity, max);
+    setOpacityText(formatOpacityValue(clampedOpacity));
+    onOpacityChange(clampedOpacity);
   }
 
   function handleOpacityKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -814,9 +818,15 @@ function ComponentOpacityRow({
           aria-label={`${label} opacity`}
           aria-valuetext={`${formatOpacityValue(value)}%`}
           className="opacity-slider absolute inset-0 z-10 h-full w-full"
+          ref={sliderBlur.ref}
           onChange={(event) =>
             onOpacityChange(snapSliderOpacityValue(Number(event.target.value), max))
           }
+          onMouseDown={sliderBlur.handlePointerDown}
+          onMouseUp={sliderBlur.handlePointerEnd}
+          onPointerCancel={sliderBlur.handlePointerEnd}
+          onPointerDown={sliderBlur.handlePointerDown}
+          onPointerUp={sliderBlur.handlePointerEnd}
         />
         <span aria-hidden="true" className="opacity-slider-track pointer-events-none" />
         <span aria-hidden="true" className="opacity-slider-fill pointer-events-none" />
@@ -869,6 +879,7 @@ function PercentSliderRow({
   value: number;
 }) {
   const [valueText, setValueText] = useState(formatPercentValue(value));
+  const sliderBlur = useAutoBlurSlider();
   const sliderPosition = percentValueToLinearSliderPosition(value, min, max);
   const sliderStyle = {
     "--opacity-slider-position": `${Math.min(100, Math.max(0, sliderPosition * 100))}%`,
@@ -885,7 +896,9 @@ function PercentSliderRow({
       return;
     }
 
-    onValueChange(clampPercentValue(nextValue, min, max));
+    const clampedValue = clampPercentValue(nextValue, min, max);
+    setValueText(formatPercentValue(clampedValue));
+    onValueChange(clampedValue);
   }
 
   function handleValueKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -926,9 +939,15 @@ function PercentSliderRow({
           aria-label={`${accessibleLabel} scale`}
           aria-valuetext={`${formatPercentValue(value)}%`}
           className="opacity-slider absolute inset-0 z-10 h-full w-full"
+          ref={sliderBlur.ref}
           onChange={(event) =>
             onValueChange(snapSliderPercentValue(Number(event.target.value), min, max))
           }
+          onMouseDown={sliderBlur.handlePointerDown}
+          onMouseUp={sliderBlur.handlePointerEnd}
+          onPointerCancel={sliderBlur.handlePointerEnd}
+          onPointerDown={sliderBlur.handlePointerDown}
+          onPointerUp={sliderBlur.handlePointerEnd}
         />
         <span aria-hidden="true" className="opacity-slider-track pointer-events-none" />
         <span aria-hidden="true" className="opacity-slider-snap-marker pointer-events-none" />
@@ -960,6 +979,56 @@ function PercentSliderRow({
       </label>
     </div>
   );
+}
+
+function useAutoBlurSlider() {
+  const sliderRef = useRef<HTMLInputElement>(null);
+  const blurTimeoutRef = useRef<number | null>(null);
+  const isPointerActiveRef = useRef(false);
+
+  useEffect(
+    () => () => {
+      if (blurTimeoutRef.current !== null) {
+        window.clearTimeout(blurTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  function clearBlurTimeout() {
+    if (blurTimeoutRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(blurTimeoutRef.current);
+    blurTimeoutRef.current = null;
+  }
+
+  function scheduleBlur() {
+    clearBlurTimeout();
+    blurTimeoutRef.current = window.setTimeout(() => {
+      sliderRef.current?.blur();
+      isPointerActiveRef.current = false;
+      blurTimeoutRef.current = null;
+    }, COMMON_SLIDER_BLUR_DELAY_MS);
+  }
+
+  function handlePointerDown() {
+    isPointerActiveRef.current = true;
+    clearBlurTimeout();
+  }
+
+  function handlePointerEnd() {
+    if (isPointerActiveRef.current) {
+      scheduleBlur();
+    }
+  }
+
+  return {
+    ref: sliderRef,
+    handlePointerDown,
+    handlePointerEnd,
+  };
 }
 
 function clampOpacityValue(value: number, max: number): number {
@@ -1034,7 +1103,11 @@ function parsePercentNumberInput(value: string): number | null {
   }
 
   const parsedValue = Number(trimmedValue);
-  return Number.isFinite(parsedValue) ? parsedValue : null;
+  if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+    return null;
+  }
+
+  return parsedValue;
 }
 
 function ImageSwitchRow({

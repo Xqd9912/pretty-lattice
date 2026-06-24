@@ -327,11 +327,22 @@ describe("App", () => {
     expect(polyhedraOpacityInput.value).toBe("50");
     expect(polyhedraOpacitySlider.value).toBe("50");
 
+    await user.clear(polyhedraOpacityInput);
+    await user.type(polyhedraOpacityInput, "80%{Enter}");
+
+    expect(polyhedraOpacityInput.value).toBe("50");
+    expect(polyhedraOpacitySlider.value).toBe("50");
+
     await user.click(atomsCheckbox);
     expect(atomsCheckbox.getAttribute("aria-checked")).toBe("false");
 
     await user.clear(unitCellOpacityInput);
     await user.type(unitCellOpacityInput, "20{Enter}");
+
+    expect(unitCellOpacityInput.value).toBe("20");
+
+    await user.clear(unitCellOpacityInput);
+    await user.type(unitCellOpacityInput, "-20{Enter}");
 
     expect(unitCellOpacityInput.value).toBe("20");
 
@@ -414,6 +425,24 @@ describe("App", () => {
 
     expect(bondThicknessInput.value).toBe("200");
     expect(bondThicknessSlider.value).toBe("200");
+
+    await user.clear(bondThicknessInput);
+    await user.type(bondThicknessInput, "240{Enter}");
+
+    expect(bondThicknessInput.value).toBe("200");
+    expect(bondThicknessSlider.value).toBe("200");
+
+    await user.clear(atomRadiusInput);
+    await user.type(atomRadiusInput, "50{Enter}");
+
+    expect(atomRadiusInput.value).toBe("50");
+    expect(atomRadiusSlider.value).toBe("50");
+
+    await user.clear(atomRadiusInput);
+    await user.type(atomRadiusInput, "-10{Enter}");
+
+    expect(atomRadiusInput.value).toBe("50");
+    expect(atomRadiusSlider.value).toBe("50");
 
     const resetScaleButton = within(commonControls).getByRole("button", {
       name: "Reset scale",
