@@ -258,7 +258,7 @@ export function CommonControlsPanel({
                   value={value}
                   aria-label={label}
                   className={cn(
-                    "z-10 !h-6 min-w-0 rounded-md !bg-transparent text-xs !shadow-none transition-[color,padding] duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] data-[state=active]:!bg-transparent data-[state=active]:!shadow-none motion-reduce:transition-none [&_svg]:size-3.5",
+                    "z-10 !h-6 min-w-0 rounded-lg !bg-transparent text-xs !shadow-none transition-[color,padding] duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] data-[state=active]:!bg-transparent data-[state=active]:!shadow-none motion-reduce:transition-none [&_svg]:size-3.5",
                     isActive ? "px-2 text-foreground" : "px-0.5 text-muted-foreground",
                   )}
                 >

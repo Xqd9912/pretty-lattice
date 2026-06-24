@@ -154,7 +154,9 @@ describe("App", () => {
     expect(within(legend).getByText("Cl").isConnected).toBe(true);
     expect(screen.getByRole("complementary", { name: "View controls" }).isConnected).toBe(true);
     const commonControls = screen.getByRole("complementary", { name: "Common controls" });
-    expect(within(commonControls).getByRole("tab", { name: "Display" }).isConnected).toBe(true);
+    const displayTab = within(commonControls).getByRole("tab", { name: "Display" });
+    expect(displayTab.isConnected).toBe(true);
+    expect(displayTab.className).toContain("rounded-lg");
     expect(within(commonControls).queryByRole("heading", { name: "Display" })).toBeNull();
     expect(within(commonControls).getByText("Periodic images").isConnected).toBe(true);
     expect(
@@ -582,16 +584,55 @@ describe("App", () => {
 
   test("shows API parse errors without leaving a stale scene behind", async () => {
     const user = userEvent.setup();
-    queueFetchResponse(errorResponse("Could not parse CIF."));
+    queueFetchResponse(errorResponse("Could not parse bad.cif: long backend parser detail."));
 
     render(<App />);
 
     await user.upload(getFileInput(), structureFile("bad.cif"));
 
-    expect((await screen.findByRole("alert")).textContent).toContain("Could not parse CIF.");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Unsupported file");
+    expect(alert.textContent).toContain("pymatgen could not parse this file.");
+    expect(alert.textContent).not.toContain("bad.cif");
+    expect(alert.textContent).not.toContain("long backend parser detail");
+    const alertIcon = alert.querySelector("svg");
+    expect(alertIcon).not.toBeNull();
+    expect(alertIcon?.getAttribute("class")).not.toContain("text-destructive");
+    expect(alert.className).toContain("[&>svg]:text-destructive");
+    expect(alert.className).toContain("rounded-xl");
+    expect(alert.className).toContain("shadow-sm");
+    expect(alert.className).toContain("shadow-foreground/5");
+    expect(alert.className).not.toContain("right-4");
+    expect(alert.className).not.toContain("top-4");
+    const structureCard = screen.getByRole("complementary", { name: "Current structure" });
+    expect(alert.parentElement).toBe(structureCard.parentElement);
+    expect(within(structureCard).queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("File")).toBeNull();
+    expect(screen.queryByText("bad.cif")).toBeNull();
     expect(screen.getByText("No structure loaded").isConnected).toBe(true);
     expect(screen.queryByTestId("lattice-canvas")).toBeNull();
     expect(screen.queryByRole("button", { name: "Open advanced settings" })).toBeNull();
+  });
+
+  test("rejects oversized files before uploading", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    const largeFile = new File(
+      [new Uint8Array(10 * 1024 * 1024 + 1)],
+      "movie.mp4",
+      { type: "video/mp4" },
+    );
+    await user.upload(getFileInput(), largeFile);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Unsupported file");
+    expect(alert.textContent).toContain("File is too large to preview.");
+    expect(screen.queryByText("File")).toBeNull();
+    expect(screen.queryByText("movie.mp4")).toBeNull();
+    expect(fetchCalls).toHaveLength(0);
+    expect(screen.getByText("No structure loaded").isConnected).toBe(true);
   });
 
   test("shows non-fatal analysis warnings while keeping the scene visible", async () => {

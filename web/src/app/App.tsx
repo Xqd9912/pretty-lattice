@@ -1,3 +1,4 @@
+import { CircleAlert } from "lucide-react";
 import { Quaternion } from "three";
 import {
   type ChangeEvent,
@@ -11,6 +12,7 @@ import {
 
 import { cn } from "@/lib/utils";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   DEFAULT_BOND_ALGORITHM,
   uploadStructurePreview,
@@ -58,6 +60,9 @@ import {
 
 const LOCKED_INTERACTION_DRAG_THRESHOLD_PX = 4;
 const LOCKED_INTERACTION_WHEEL_IDLE_MS = 150;
+const MAX_STRUCTURE_UPLOAD_BYTES = 10 * 1024 * 1024;
+const STRUCTURE_FILE_TOO_LARGE_MESSAGE = "File is too large to preview.";
+const STRUCTURE_PARSE_ERROR_MESSAGE = "pymatgen could not parse this file.";
 
 interface LockedInteractionPointer {
   pointerId: number;
@@ -118,6 +123,17 @@ export function App() {
       return;
     }
 
+    if (file.size > MAX_STRUCTURE_UPLOAD_BYTES) {
+      setSelectedFileName(null);
+      setPreviewStatus("error");
+      setErrorMessage(STRUCTURE_FILE_TOO_LARGE_MESSAGE);
+      setScene(null);
+      setCurrentFile(null);
+      setIsSettingsOpen(false);
+      setIsStructureSummaryCollapsed(false);
+      return;
+    }
+
     setSelectedFileName(file.name);
     setPreviewStatus("loading");
     setErrorMessage(null);
@@ -136,12 +152,13 @@ export function App() {
       setScene(nextScene);
       setComponentVisibility(createDefaultComponentVisibility(nextScene));
       setPreviewStatus("ready");
-    } catch (error) {
+    } catch {
       setScene(null);
       setCurrentFile(null);
+      setSelectedFileName(null);
       setIsSettingsOpen(false);
       setPreviewStatus("error");
-      setErrorMessage(error instanceof Error ? error.message : "Could not parse structure.");
+      setErrorMessage(STRUCTURE_PARSE_ERROR_MESSAGE);
     }
   }
 
@@ -161,12 +178,13 @@ export function App() {
         });
         setScene(nextScene);
         setPreviewStatus("ready");
-      } catch (error) {
+      } catch {
         setScene(null);
         setCurrentFile(null);
+        setSelectedFileName(null);
         setIsSettingsOpen(false);
         setPreviewStatus("error");
-        setErrorMessage(error instanceof Error ? error.message : "Could not parse structure.");
+        setErrorMessage(STRUCTURE_PARSE_ERROR_MESSAGE);
       }
     },
     [currentFile],
@@ -396,7 +414,6 @@ export function App() {
         )}
       >
         <StructureSummaryCard
-          errorMessage={errorMessage}
           isCollapsed={isStructureSummaryCollapsed}
           onCollapsedChange={setIsStructureSummaryCollapsed}
           onOpenStructure={() => fileInputRef.current?.click()}
@@ -404,6 +421,16 @@ export function App() {
           scene={scene}
           selectedFileName={selectedFileName}
         />
+
+        {errorMessage ? (
+          <Alert
+            className="rounded-xl shadow-sm shadow-foreground/5 [&>svg]:text-destructive"
+          >
+            <CircleAlert aria-hidden="true" />
+            <AlertTitle className="font-semibold">Unsupported file</AlertTitle>
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        ) : null}
 
         {scene ? (
           <div ref={commonControlsPanelRef}>

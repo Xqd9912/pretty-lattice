@@ -175,6 +175,21 @@ async def test_structure_preview_upload_endpoint_returns_parse_error() -> None:
 
 
 @pytest.mark.anyio
+async def test_structure_preview_upload_endpoint_rejects_oversized_payload() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app()), base_url="http://testserver"
+    ) as client:
+        response = await client.post(
+            "/api/structure-preview",
+            content=b"x" * (10 * 1024 * 1024 + 1),
+            headers={"x-pretty-lattice-filename": "movie.mp4"},
+        )
+
+        assert response.status_code == 413
+        assert response.json()["detail"]["message"] == "File is too large to preview."
+
+
+@pytest.mark.anyio
 async def test_static_index_is_served_from_explicit_static_root(tmp_path) -> None:
     (tmp_path / "assets").mkdir()
     (tmp_path / "index.html").write_text("<!doctype html><title>Pretty Lattice</title>")

@@ -39,16 +39,16 @@ describe("preview view state", () => {
     });
   });
 
-  test("clamps zoom at the shared 25 to 400 percent bounds", () => {
-    expect(clampViewScale(0.1)).toBe(0.25);
-    expect(clampViewScale(6)).toBe(4);
+  test("clamps zoom at the shared 20 to 500 percent bounds", () => {
+    expect(clampViewScale(0.1)).toBe(0.2);
+    expect(clampViewScale(6)).toBe(5);
     expect(clampViewScale(Number.NaN)).toBe(1);
   });
 
   test("maps the logarithmic slider with 100 percent at the midpoint", () => {
-    expect(viewScaleToSliderPosition(0.25)).toBeCloseTo(0);
+    expect(viewScaleToSliderPosition(0.2)).toBeCloseTo(0);
     expect(viewScaleToSliderPosition(1)).toBeCloseTo(0.5);
-    expect(viewScaleToSliderPosition(4)).toBeCloseTo(1);
+    expect(viewScaleToSliderPosition(5)).toBeCloseTo(1);
     expect(sliderPositionToViewScale(0.5)).toBeCloseTo(1);
   });
 
@@ -61,8 +61,8 @@ describe("preview view state", () => {
   test("parses and formats editable zoom percentages with clamping for positive values", () => {
     expect(formatZoomPercent(1)).toBe("100");
     expect(parseZoomPercentInput("250")).toBe(2.5);
-    expect(parseZoomPercentInput("10%")).toBe(0.25);
-    expect(parseZoomPercentInput("700")).toBe(4);
+    expect(parseZoomPercentInput("10%")).toBe(0.2);
+    expect(parseZoomPercentInput("700")).toBe(5);
     expect(parseZoomPercentInput("-10")).toBeNull();
     expect(parseZoomPercentInput("0")).toBeNull();
     expect(parseZoomPercentInput("not a number")).toBeNull();
@@ -70,7 +70,7 @@ describe("preview view state", () => {
 
   test("applies wheel zoom through the same clamp", () => {
     expect(applyWheelZoomDelta(1, -360)).toBe(2);
-    expect(applyWheelZoomDelta(1, 1080)).toBe(0.25);
-    expect(applyWheelZoomDelta(3.9, -360)).toBe(4);
+    expect(applyWheelZoomDelta(1, 1080)).toBe(0.2);
+    expect(applyWheelZoomDelta(4.9, -360)).toBe(5);
   });
 });

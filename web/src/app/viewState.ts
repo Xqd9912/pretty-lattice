@@ -7,8 +7,8 @@ export interface PreviewViewState {
   viewScale: number;
 }
 
-export const MIN_VIEW_SCALE = 0.25;
-export const MAX_VIEW_SCALE = 4;
+export const MIN_VIEW_SCALE = 0.2;
+export const MAX_VIEW_SCALE = 5;
 export const DEFAULT_VIEW_SCALE = 1;
 export const ZOOM_SLIDER_SNAP_POSITION = 0.5;
 export const ZOOM_SLIDER_SNAP_THRESHOLD = 0.03;

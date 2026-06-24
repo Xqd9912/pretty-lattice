@@ -22,7 +22,6 @@ import { summarizeScene, type PreviewStatus } from "../previewState";
 import { GLASS_SURFACE_CLASS } from "../surface";
 
 export function StructureSummaryCard({
-  errorMessage,
   isCollapsed,
   onCollapsedChange,
   onOpenStructure,
@@ -30,7 +29,6 @@ export function StructureSummaryCard({
   scene,
   selectedFileName,
 }: {
-  errorMessage: string | null;
   isCollapsed: boolean;
   onCollapsedChange: (isCollapsed: boolean) => void;
   onOpenStructure: () => void;
@@ -42,7 +40,7 @@ export function StructureSummaryCard({
   const expandableContentId = useId();
   const expandableContentRef = useRef<HTMLDivElement>(null);
   const [expandableContentHeight, setExpandableContentHeight] = useState<number | null>(null);
-  const hasExpandableContent = Boolean(scene || errorMessage);
+  const hasExpandableContent = Boolean(scene);
   const toggleDetailsLabel = isCollapsed ? "Expand details" : "Collapse details";
   const expandableContentStyle = {
     height: hasExpandableContent && !isCollapsed
@@ -83,7 +81,7 @@ export function StructureSummaryCard({
       resizeObserver.disconnect();
       window.removeEventListener("resize", updateExpandableContentHeight);
     };
-  }, [hasExpandableContent, scene, errorMessage]);
+  }, [hasExpandableContent, scene]);
 
   return (
     <aside
@@ -172,16 +170,8 @@ export function StructureSummaryCard({
             aria-hidden={isCollapsed ? "true" : undefined}
             className="pt-2.5"
           >
-            {errorMessage ? (
-              <Alert variant="destructive" className="rounded-md px-2.5 py-2">
-                <AlertDescription className="font-mono text-xs leading-snug">
-                  {errorMessage}
-                </AlertDescription>
-              </Alert>
-            ) : null}
-
             {scene?.warnings?.map((warning) => (
-              <Alert key={warning.code} className="mt-2 rounded-md px-2.5 py-2">
+              <Alert key={warning.code} className="rounded-md px-2.5 py-2">
                 <AlertDescription className="text-xs leading-snug">
                   {warning.message}
                 </AlertDescription>
