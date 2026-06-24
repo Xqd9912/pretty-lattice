@@ -219,7 +219,7 @@ export function ViewControlRail({
                 size="icon"
                 aria-pressed={interactionLocked}
                 aria-label={
-                  interactionLocked ? "Unlock canvas interaction" : "Lock canvas interaction"
+                  interactionLocked ? "Unlock mouse interaction" : "Lock mouse interaction"
                 }
                 className={cn(
                   "view-rail-button size-7 rounded-[10px] border border-transparent bg-transparent shadow-none transition-[background-color,border-color,color,box-shadow] duration-100 ease-out motion-reduce:transition-none [&_svg]:size-3.5",
@@ -235,7 +235,7 @@ export function ViewControlRail({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              {interactionLocked ? "Unlock interaction" : "Lock interaction"}
+              {interactionLocked ? "Unlock mouse interaction" : "Lock mouse interaction"}
             </TooltipContent>
           </Tooltip>
 

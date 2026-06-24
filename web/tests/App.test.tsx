@@ -279,6 +279,7 @@ describe("App", () => {
     const atomsOpacitySlider = within(commonControls).getByRole("slider", {
       name: "Atoms opacity",
     }) as HTMLInputElement;
+    const atomsLabel = within(commonControls).getByText("Atoms");
     const unitCellOpacityInput = within(commonControls).getByRole("textbox", {
       name: "Unit cell opacity value",
     }) as HTMLInputElement;
@@ -335,6 +336,9 @@ describe("App", () => {
 
     await user.click(atomsCheckbox);
     expect(atomsCheckbox.getAttribute("aria-checked")).toBe("false");
+    expect(atomsLabel.className).not.toContain("text-muted-foreground/60");
+    expect(atomsOpacityInput.disabled).toBe(true);
+    expect(atomsOpacitySlider.disabled).toBe(true);
 
     await user.clear(unitCellOpacityInput);
     await user.type(unitCellOpacityInput, "20{Enter}");
@@ -592,10 +596,10 @@ describe("App", () => {
 
     await renderLoadedStructure(user);
 
-    await user.click(screen.getByRole("button", { name: "Lock canvas interaction" }));
+    await user.click(screen.getByRole("button", { name: "Lock mouse interaction" }));
 
     expect(
-      screen.getByRole("button", { name: "Unlock canvas interaction" }).getAttribute(
+      screen.getByRole("button", { name: "Unlock mouse interaction" }).getAttribute(
         "aria-pressed",
       ),
     ).toBe("true");

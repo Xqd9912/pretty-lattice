@@ -796,7 +796,7 @@ function ComponentOpacityRow({
         <span
           className={cn(
             "min-w-0 truncate leading-tight",
-            inputDisabled ? "text-muted-foreground/60" : null,
+            checkboxDisabled ? "text-muted-foreground/60" : null,
           )}
         >
           {label}
