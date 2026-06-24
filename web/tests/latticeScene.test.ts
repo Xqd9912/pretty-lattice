@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import type { AtomSpec, SceneSpec } from "../src/api/scene";
 import {
+  BOND_COLOR,
+  BOND_RADIUS,
   CELL_FRAME_LINE_WIDTH_PIXELS,
   cellFrameLinePositions,
   computeSceneLayout,
@@ -75,7 +77,7 @@ describe("computeSceneLayout", () => {
       bottom: 132,
       left: 16,
       right: 88,
-      top: 384,
+      top: 476,
     });
   });
 
@@ -90,6 +92,11 @@ describe("computeSceneLayout", () => {
     expect(positions).toHaveLength(72);
     expect(positions.slice(0, 6)).toEqual([0, 0, 0, 4, 0, 0]);
     expect(positions.slice(-6)).toEqual([1, 3, 2, 5, 3, 2]);
+  });
+
+  test("uses fixed first-version bond styling", () => {
+    expect(BOND_COLOR).toBe("#c7cbd1");
+    expect(BOND_RADIUS).toBe(0.12);
   });
 
   test("normalizes orientation gizmo axes without orthogonalizing the cell", () => {
@@ -122,6 +129,7 @@ function sceneWithOffCenterAtoms(): SceneSpec {
       atom("Si-0", [0.1, 0.1, 0.1]),
       atom("Si-1", [0.3, 0.1, 0.1]),
     ],
+    bonds: [],
     cell: {
       vectors: [
         [4, 0, 0],
@@ -161,6 +169,9 @@ function atom(id: string, position: [number, number, number]): AtomSpec {
     id,
     imageOffset: [0, 0, 0],
     isPeriodicImage: false,
+    imageReasons: [],
+    visibilityDependencies: [],
+    visibilityDependencyGroups: [],
     position,
     radius: 0.5,
     siteId: id,

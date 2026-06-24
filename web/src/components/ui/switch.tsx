@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 type SwitchProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "value"> & {
   checked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
+  thumbClassName?: string;
 };
 
 function Switch({
@@ -13,6 +14,7 @@ function Switch({
   disabled,
   onCheckedChange,
   onClick,
+  thumbClassName,
   ...props
 }: SwitchProps) {
   const state = checked ? "checked" : "unchecked";
@@ -47,6 +49,7 @@ function Switch({
         className={cn(
           "pointer-events-none block size-4 rounded-full bg-background shadow-sm transition-transform",
           "data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0",
+          thumbClassName,
         )}
       />
     </button>

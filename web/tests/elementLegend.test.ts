@@ -63,8 +63,12 @@ function sceneWithAtoms(atoms: TestAtom[]): SceneSpec {
       fractionalPosition: [index, 0, 0],
       imageOffset: isPeriodicImage ? [1, 0, 0] : [0, 0, 0],
       isPeriodicImage,
+      imageReasons: isPeriodicImage ? ["boundary"] : [],
+      visibilityDependencies: isPeriodicImage ? ["boundaryAtoms"] : [],
+      visibilityDependencyGroups: isPeriodicImage ? [["boundaryAtoms"]] : [],
       radius: 1,
     })),
+    bonds: [],
     cell: {
       vectors: [
         [1, 0, 0],

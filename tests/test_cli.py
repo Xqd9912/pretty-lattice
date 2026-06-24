@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import socket
 
-import pretty_lattice.cli as cli
-from pretty_lattice.cli import _choose_port, _wait_for_server
 from typer.testing import CliRunner
 
+import pretty_lattice.cli as cli
+from pretty_lattice.cli import _choose_port, _wait_for_server
 
 runner = CliRunner()
 

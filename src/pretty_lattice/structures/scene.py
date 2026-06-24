@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
 from itertools import product
-from typing import TypedDict
+from typing import Literal, NotRequired, TypedDict
 
+from pymatgen.analysis.local_env import CrystalNN, MinimumDistanceNN, VoronoiNN
 from pymatgen.core import Structure
 from pymatgen.core.sites import PeriodicSite
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
@@ -16,6 +18,26 @@ from pretty_lattice.structures.symmetry import point_group_schoenflies_symbol
 _BOUNDARY_TOLERANCE = 1e-6
 _CANONICAL_IMAGE_OFFSET = (0, 0, 0)
 _FLOAT_ZERO_TOLERANCE = 1e-12
+DEFAULT_BOND_ALGORITHM = "crystal-nn"
+
+BondAlgorithm = Literal["crystal-nn", "minimum-distance", "voronoi-nn"]
+ImageReason = Literal["boundary", "bonded"]
+VisibilityDependency = Literal["boundaryAtoms", "oneHopBondedAtoms"]
+
+_BOND_ALGORITHM_LABELS: dict[BondAlgorithm, str] = {
+    "crystal-nn": "CrystalNN",
+    "minimum-distance": "MinimumDistanceNN",
+    "voronoi-nn": "VoronoiNN",
+}
+_IMAGE_REASON_ORDER: tuple[ImageReason, ...] = ("boundary", "bonded")
+_VISIBILITY_DEPENDENCY_ORDER: tuple[VisibilityDependency, ...] = (
+    "boundaryAtoms",
+    "oneHopBondedAtoms",
+)
+
+
+class UnsupportedBondAlgorithmError(ValueError):
+    """Raised when a requested preview bond algorithm is not allowlisted."""
 
 
 class CellSpec(TypedDict):
@@ -56,70 +78,183 @@ class AtomSpec(TypedDict):
     fractionalPosition: list[float]
     imageOffset: list[int]
     isPeriodicImage: bool
+    imageReasons: list[ImageReason]
+    visibilityDependencies: list[VisibilityDependency]
+    visibilityDependencyGroups: list[list[VisibilityDependency]]
     radius: float
     color: str
+
+
+class BondSpec(TypedDict):
+    id: str
+    startAtomId: str
+    endAtomId: str
+    visibilityDependencies: list[VisibilityDependency]
+    visibilityDependencyGroups: list[list[VisibilityDependency]]
+
+
+class AnalysisWarningSpec(TypedDict):
+    code: str
+    message: str
 
 
 class SceneSpec(TypedDict):
     cell: CellSpec
     atoms: list[AtomSpec]
+    bonds: list[BondSpec]
     summary: StructureSummarySpec
+    warnings: NotRequired[list[AnalysisWarningSpec]]
+
+
+@dataclass(frozen=True)
+class _SiteRenderData:
+    index: int
+    site_id: str
+    element_symbol: str
+    fractional_position: list[float]
+    radius: float
+    color: str
+
+
+@dataclass
+class _AtomRecord:
+    site: _SiteRenderData
+    image_offset: tuple[int, int, int]
+    image_reasons: set[ImageReason] = field(default_factory=set)
+    visibility_dependencies: set[VisibilityDependency] = field(default_factory=set)
+    visibility_dependency_groups: list[frozenset[VisibilityDependency]] = field(
+        default_factory=list
+    )
+
+
+@dataclass
+class _BondRecord:
+    start_atom_id: str
+    end_atom_id: str
+    visibility_dependencies: set[VisibilityDependency] = field(default_factory=set)
+    visibility_dependency_groups: list[frozenset[VisibilityDependency]] = field(
+        default_factory=list
+    )
 
 
 def build_scene_response(
     structure: Structure,
     *,
+    bond_algorithm: str | None = None,
     element_registry: ElementRegistry | None = None,
     colormap: Colormap | None = None,
 ) -> SceneSpec:
+    normalized_bond_algorithm = normalize_bond_algorithm(bond_algorithm)
     elements = element_registry or load_element_registry()
     colors = colormap or load_colormap()
     cell_vectors = [_vector3(vector) for vector in structure.lattice.matrix]
     can_generate_periodic_images = _has_valid_3d_periodic_cell(structure)
 
-    scene_atoms: list[AtomSpec] = []
+    site_render_data: list[_SiteRenderData] = []
+    atom_records: dict[tuple[int, tuple[int, int, int]], _AtomRecord] = {}
+    canonical_source_keys: list[tuple[int, tuple[int, int, int]]] = []
     for index, site in enumerate(structure):
         symbol = _site_element_symbol(site)
-        position = _vector3(site.coords)
         fractional_position = _vector3(site.frac_coords)
         element = elements.resolve(symbol)
         site_id = f"{element.symbol}-{index}"
         color = colors.resolve(element.symbol)
+        canonical_fractional_position = fractional_position
+        boundary_axes: tuple[int, ...] = ()
 
         if can_generate_periodic_images:
             canonical_fractional_position, boundary_axes = _canonicalize_fractional_position(
                 fractional_position
             )
+
+        site_data = _SiteRenderData(
+            index=index,
+            site_id=site_id,
+            element_symbol=element.symbol,
+            fractional_position=canonical_fractional_position,
+            radius=element.uniform_radius,
+            color=color,
+        )
+        site_render_data.append(site_data)
+
+        if can_generate_periodic_images:
             for image_offset in _periodic_image_offsets(boundary_axes):
-                scene_atoms.append(
-                    _atom_instance(
-                        cell_vectors=cell_vectors,
-                        color=color,
-                        element_symbol=element.symbol,
-                        fractional_position=canonical_fractional_position,
-                        image_offset=image_offset,
-                        radius=element.uniform_radius,
-                        site_id=site_id,
-                    )
+                image_reasons: tuple[ImageReason, ...] = ()
+                visibility_dependencies: tuple[VisibilityDependency, ...] = ()
+                if image_offset != _CANONICAL_IMAGE_OFFSET:
+                    image_reasons = ("boundary",)
+                    visibility_dependencies = ("boundaryAtoms",)
+
+                _ensure_atom_record(
+                    atom_records,
+                    image_offset=image_offset,
+                    image_reasons=image_reasons,
+                    site=site_data,
+                    visibility_dependencies=visibility_dependencies,
                 )
+                if image_offset == _CANONICAL_IMAGE_OFFSET:
+                    canonical_source_keys.append((index, image_offset))
             continue
 
-        scene_atoms.append(
-            _non_periodic_atom_instance(
-                color=color,
-                element_symbol=element.symbol,
-                fractional_position=fractional_position,
-                position=_vector3(position),
-                radius=element.uniform_radius,
-                site_id=site_id,
-            )
+        _ensure_atom_record(
+            atom_records,
+            image_offset=_CANONICAL_IMAGE_OFFSET,
+            image_reasons=(),
+            site=site_data,
+            visibility_dependencies=(),
         )
+        canonical_source_keys.append((index, _CANONICAL_IMAGE_OFFSET))
 
-    return {
+    bonds: list[BondSpec] = []
+    warnings: list[AnalysisWarningSpec] = []
+    if can_generate_periodic_images:
+        boundary_source_keys = [
+            key for key, atom in atom_records.items() if "boundary" in atom.image_reasons
+        ]
+        try:
+            bonds = _build_bonds(
+                atom_records=atom_records,
+                bond_algorithm=normalized_bond_algorithm,
+                canonical_source_keys=canonical_source_keys,
+                boundary_source_keys=boundary_source_keys,
+                site_render_data=site_render_data,
+                structure=structure,
+            )
+        except Exception as exc:
+            warnings.append(
+                {
+                    "code": "bond-analysis-failed",
+                    "message": (
+                        "Bond analysis with "
+                        f"{_BOND_ALGORITHM_LABELS[normalized_bond_algorithm]} failed: {exc}"
+                    ),
+                }
+            )
+
+    scene: SceneSpec = {
         "cell": {"vectors": cell_vectors},
-        "atoms": scene_atoms,
+        "atoms": [_atom_record_to_spec(atom, cell_vectors) for atom in atom_records.values()],
+        "bonds": bonds,
         "summary": _build_structure_summary(structure),
     }
+    if warnings:
+        scene["warnings"] = warnings
+
+    return scene
+
+
+def normalize_bond_algorithm(value: str | None) -> BondAlgorithm:
+    if value is None or value == "":
+        return DEFAULT_BOND_ALGORITHM
+
+    normalized = value.strip()
+    if normalized in _BOND_ALGORITHM_LABELS:
+        return normalized  # type: ignore[return-value]
+
+    supported = ", ".join(_BOND_ALGORITHM_LABELS)
+    raise UnsupportedBondAlgorithmError(
+        f"Unsupported bond algorithm '{value}'. Supported algorithms: {supported}."
+    )
 
 
 def _vector3(values: Sequence[float]) -> list[float]:
@@ -143,51 +278,60 @@ def _site_element_symbol(site: PeriodicSite) -> str:
     return str(symbol)
 
 
-def _atom_instance(
+def _ensure_atom_record(
+    records: dict[tuple[int, tuple[int, int, int]], _AtomRecord],
     *,
-    cell_vectors: list[list[float]],
-    color: str,
-    element_symbol: str,
-    fractional_position: list[float],
     image_offset: tuple[int, int, int],
-    radius: float,
-    site_id: str,
+    image_reasons: Sequence[ImageReason],
+    site: _SiteRenderData,
+    visibility_dependencies: Sequence[VisibilityDependency],
+) -> _AtomRecord:
+    key = (site.index, image_offset)
+    record = records.get(key)
+    if record is None:
+        record = _AtomRecord(site=site, image_offset=image_offset)
+        records[key] = record
+
+    record.image_reasons.update(image_reasons)
+    _merge_visibility_dependencies(record, visibility_dependencies)
+    return record
+
+
+def _merge_visibility_dependencies(
+    record: _AtomRecord,
+    visibility_dependencies: Sequence[VisibilityDependency],
+) -> None:
+    new_dependencies = frozenset(visibility_dependencies)
+    if not new_dependencies:
+        return
+
+    record.visibility_dependencies.update(new_dependencies)
+    if new_dependencies not in record.visibility_dependency_groups:
+        record.visibility_dependency_groups.append(new_dependencies)
+
+
+def _atom_record_to_spec(
+    atom: _AtomRecord,
+    cell_vectors: list[list[float]],
 ) -> AtomSpec:
     shifted_fractional_position = [
-        fractional_position[axis] + image_offset[axis] for axis in range(3)
+        atom.site.fractional_position[axis] + atom.image_offset[axis] for axis in range(3)
     ]
     return {
-        "id": _atom_instance_id(site_id, image_offset),
-        "siteId": site_id,
-        "element": element_symbol,
+        "id": _atom_instance_id(atom.site.site_id, atom.image_offset),
+        "siteId": atom.site.site_id,
+        "element": atom.site.element_symbol,
         "position": _fractional_to_cartesian(shifted_fractional_position, cell_vectors),
         "fractionalPosition": shifted_fractional_position,
-        "imageOffset": [int(value) for value in image_offset],
-        "isPeriodicImage": image_offset != _CANONICAL_IMAGE_OFFSET,
-        "radius": radius,
-        "color": color,
-    }
-
-
-def _non_periodic_atom_instance(
-    *,
-    color: str,
-    element_symbol: str,
-    fractional_position: list[float],
-    position: list[float],
-    radius: float,
-    site_id: str,
-) -> AtomSpec:
-    return {
-        "id": site_id,
-        "siteId": site_id,
-        "element": element_symbol,
-        "position": position,
-        "fractionalPosition": fractional_position,
-        "imageOffset": [0, 0, 0],
-        "isPeriodicImage": False,
-        "radius": radius,
-        "color": color,
+        "imageOffset": [int(value) for value in atom.image_offset],
+        "isPeriodicImage": atom.image_offset != _CANONICAL_IMAGE_OFFSET,
+        "imageReasons": _ordered_image_reasons(atom.image_reasons),
+        "visibilityDependencies": _ordered_visibility_dependencies(atom.visibility_dependencies),
+        "visibilityDependencyGroups": _ordered_visibility_dependency_groups(
+            atom.visibility_dependency_groups
+        ),
+        "radius": atom.site.radius,
+        "color": atom.site.color,
     }
 
 
@@ -195,6 +339,172 @@ def _atom_instance_id(site_id: str, image_offset: tuple[int, int, int]) -> str:
     if image_offset == _CANONICAL_IMAGE_OFFSET:
         return site_id
     return f"{site_id}-image-{image_offset[0]}-{image_offset[1]}-{image_offset[2]}"
+
+
+def _build_bonds(
+    *,
+    atom_records: dict[tuple[int, tuple[int, int, int]], _AtomRecord],
+    bond_algorithm: BondAlgorithm,
+    canonical_source_keys: list[tuple[int, tuple[int, int, int]]],
+    boundary_source_keys: list[tuple[int, tuple[int, int, int]]],
+    site_render_data: list[_SiteRenderData],
+    structure: Structure,
+) -> list[BondSpec]:
+    neighbor_analyzer = _neighbor_analyzer_for_bond_algorithm(bond_algorithm)
+    source_keys = [*canonical_source_keys, *boundary_source_keys]
+    bond_records: dict[tuple[str, str], _BondRecord] = {}
+
+    for source_site_index, source_image_offset in source_keys:
+        source_site = site_render_data[source_site_index]
+        source_atom_id = _atom_instance_id(source_site.site_id, source_image_offset)
+        source_is_boundary_image = source_image_offset != _CANONICAL_IMAGE_OFFSET
+
+        for neighbor in neighbor_analyzer.get_nn_info(structure, source_site_index):
+            target_site_index = int(neighbor["site_index"])
+            target_site = site_render_data[target_site_index]
+            target_image_offset = _add_image_offsets(
+                source_image_offset,
+                _normalize_image_offset(neighbor.get("image", _CANONICAL_IMAGE_OFFSET)),
+            )
+            target_atom_id = _atom_instance_id(target_site.site_id, target_image_offset)
+            if target_atom_id == source_atom_id:
+                continue
+
+            if target_image_offset != _CANONICAL_IMAGE_OFFSET:
+                visibility_dependencies: tuple[VisibilityDependency, ...] = (
+                    ("boundaryAtoms", "oneHopBondedAtoms")
+                    if source_is_boundary_image
+                    else ("oneHopBondedAtoms",)
+                )
+                _ensure_atom_record(
+                    atom_records,
+                    image_offset=target_image_offset,
+                    image_reasons=("bonded",),
+                    site=target_site,
+                    visibility_dependencies=visibility_dependencies,
+                )
+
+            endpoint_key = tuple(sorted((source_atom_id, target_atom_id)))
+            bond_record = bond_records.get(endpoint_key)
+            if bond_record is None:
+                bond_record = _BondRecord(
+                    start_atom_id=source_atom_id,
+                    end_atom_id=target_atom_id,
+                )
+                bond_records[endpoint_key] = bond_record
+
+            source_atom = atom_records[(source_site_index, source_image_offset)]
+            target_atom = atom_records[(target_site_index, target_image_offset)]
+            for dependency_group in _combined_visibility_dependency_groups(
+                source_atom, target_atom
+            ):
+                _merge_bond_visibility_dependency_group(bond_record, dependency_group)
+
+    return [
+        {
+            "id": f"bond-{bond.start_atom_id}--{bond.end_atom_id}",
+            "startAtomId": bond.start_atom_id,
+            "endAtomId": bond.end_atom_id,
+            "visibilityDependencies": _ordered_visibility_dependencies(
+                bond.visibility_dependencies
+            ),
+            "visibilityDependencyGroups": _ordered_visibility_dependency_groups(
+                bond.visibility_dependency_groups
+            ),
+        }
+        for bond in bond_records.values()
+    ]
+
+
+def _neighbor_analyzer_for_bond_algorithm(bond_algorithm: BondAlgorithm):
+    if bond_algorithm == "crystal-nn":
+        return CrystalNN()
+    if bond_algorithm == "minimum-distance":
+        return MinimumDistanceNN()
+    if bond_algorithm == "voronoi-nn":
+        return VoronoiNN()
+
+    raise UnsupportedBondAlgorithmError(f"Unsupported bond algorithm '{bond_algorithm}'.")
+
+
+def _combined_visibility_dependency_groups(
+    left: _AtomRecord,
+    right: _AtomRecord,
+) -> list[frozenset[VisibilityDependency]]:
+    left_groups = _record_visibility_dependency_groups(left)
+    right_groups = _record_visibility_dependency_groups(right)
+
+    return _minimal_visibility_dependency_groups(
+        frozenset(left_group | right_group)
+        for left_group, right_group in product(left_groups, right_groups)
+    )
+
+
+def _record_visibility_dependency_groups(
+    record: _AtomRecord,
+) -> list[frozenset[VisibilityDependency]]:
+    if not record.visibility_dependency_groups:
+        return [frozenset()]
+
+    return record.visibility_dependency_groups
+
+
+def _minimal_visibility_dependency_groups(
+    dependency_groups: Iterable[frozenset[VisibilityDependency]],
+) -> list[frozenset[VisibilityDependency]]:
+    minimal_groups: list[frozenset[VisibilityDependency]] = []
+    for dependency_group in dependency_groups:
+        if any(group.issubset(dependency_group) for group in minimal_groups):
+            continue
+
+        minimal_groups = [group for group in minimal_groups if not dependency_group.issubset(group)]
+        minimal_groups.append(dependency_group)
+
+    return minimal_groups
+
+
+def _merge_bond_visibility_dependency_group(
+    record: _BondRecord,
+    dependency_group: frozenset[VisibilityDependency],
+) -> None:
+    if not dependency_group:
+        return
+
+    record.visibility_dependency_groups = _minimal_visibility_dependency_groups(
+        [*record.visibility_dependency_groups, dependency_group]
+    )
+    record.visibility_dependencies = set().union(*record.visibility_dependency_groups)
+
+
+def _normalize_image_offset(value: object) -> tuple[int, int, int]:
+    image = tuple(value)  # type: ignore[arg-type]
+    return (int(round(float(image[0]))), int(round(float(image[1]))), int(round(float(image[2]))))
+
+
+def _add_image_offsets(
+    left: tuple[int, int, int],
+    right: tuple[int, int, int],
+) -> tuple[int, int, int]:
+    return (left[0] + right[0], left[1] + right[1], left[2] + right[2])
+
+
+def _ordered_image_reasons(image_reasons: set[ImageReason]) -> list[ImageReason]:
+    return [reason for reason in _IMAGE_REASON_ORDER if reason in image_reasons]
+
+
+def _ordered_visibility_dependencies(
+    dependencies: set[VisibilityDependency],
+) -> list[VisibilityDependency]:
+    return [dependency for dependency in _VISIBILITY_DEPENDENCY_ORDER if dependency in dependencies]
+
+
+def _ordered_visibility_dependency_groups(
+    dependency_groups: list[frozenset[VisibilityDependency]],
+) -> list[list[VisibilityDependency]]:
+    return [
+        _ordered_visibility_dependencies(set(dependency_group))
+        for dependency_group in dependency_groups
+    ]
 
 
 def _canonicalize_fractional_position(

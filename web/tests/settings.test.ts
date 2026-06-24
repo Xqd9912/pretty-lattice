@@ -2,37 +2,90 @@ import { describe, expect, test } from "bun:test";
 
 import type { AtomSpec, SceneSpec } from "../src/api/scene";
 import {
+  createDefaultComponentVisibility,
   SETTINGS_PREVIEW_SAFE_AREA,
   countPeriodicImageAtoms,
   hasPeriodicImageAtoms,
   previewSafeAreaForSettings,
-  visibleSceneForBoundaryAtoms,
+  visibleSceneForComponents,
 } from "../src/app/settings";
 
 describe("settings", () => {
   test("detects periodic image atoms", () => {
     const scene = sceneWithPeriodicImages();
 
-    expect(countPeriodicImageAtoms(scene)).toBe(2);
+    expect(countPeriodicImageAtoms(scene)).toBe(3);
     expect(hasPeriodicImageAtoms(scene)).toBe(true);
     expect(countPeriodicImageAtoms(null)).toBe(0);
     expect(hasPeriodicImageAtoms(null)).toBe(false);
   });
 
-  test("filters boundary atom images locally without mutating the loaded scene", () => {
+  test("filters image atoms and bonds locally without mutating the loaded scene", () => {
     const scene = sceneWithPeriodicImages();
+    const defaultVisibility = createDefaultComponentVisibility();
 
-    expect(visibleSceneForBoundaryAtoms(scene, true)).toBe(scene);
+    const visibleScene = visibleSceneForComponents(scene, defaultVisibility);
 
-    const filteredScene = visibleSceneForBoundaryAtoms(scene, false);
+    expect(visibleScene?.atoms.map((atom) => atom.id)).toEqual([
+      "Na-0",
+      "Na-0-image-1-0-0",
+      "Cl-1",
+      "Cl-1-image-0--1-0",
+      "Cl-1-image-1-1-0",
+    ]);
+    expect(visibleScene?.bonds.map((bond) => bond.id)).toEqual([
+      "bond-canonical",
+      "bond-boundary-canonical",
+      "bond-one-hop",
+      "bond-boundary-source",
+    ]);
 
-    expect(filteredScene).not.toBe(scene);
-    expect(filteredScene?.atoms.map((atom) => atom.id)).toEqual(["Na-0", "Cl-1"]);
+    const withoutBoundary = visibleSceneForComponents(scene, {
+      ...defaultVisibility,
+      boundaryAtoms: false,
+    });
+    expect(withoutBoundary?.atoms.map((atom) => atom.id)).toEqual([
+      "Na-0",
+      "Cl-1",
+      "Cl-1-image-0--1-0",
+    ]);
+    expect(withoutBoundary?.bonds.map((bond) => bond.id)).toEqual([
+      "bond-canonical",
+      "bond-one-hop",
+    ]);
+
+    const withoutOneHop = visibleSceneForComponents(scene, {
+      ...defaultVisibility,
+      oneHopBondedAtoms: false,
+    });
+    expect(withoutOneHop?.atoms.map((atom) => atom.id)).toEqual([
+      "Na-0",
+      "Na-0-image-1-0-0",
+      "Cl-1",
+    ]);
+    expect(withoutOneHop?.bonds.map((bond) => bond.id)).toEqual([
+      "bond-canonical",
+      "bond-boundary-canonical",
+    ]);
+
+    const withoutBonds = visibleSceneForComponents(scene, {
+      ...defaultVisibility,
+      bonds: false,
+    });
+    expect(withoutBonds?.atoms).toHaveLength(5);
+    expect(withoutBonds?.bonds).toEqual([]);
+
+    const withoutAtomSpheres = visibleSceneForComponents(scene, {
+      ...defaultVisibility,
+      atoms: false,
+    });
+    expect(withoutAtomSpheres?.atoms).toHaveLength(5);
     expect(scene.atoms.map((atom) => atom.id)).toEqual([
       "Na-0",
       "Na-0-image-1-0-0",
       "Cl-1",
-      "Cl-1-image-1-0-0",
+      "Cl-1-image-0--1-0",
+      "Cl-1-image-1-1-0",
     ]);
   });
 
@@ -49,10 +102,53 @@ describe("settings", () => {
 function sceneWithPeriodicImages(): SceneSpec {
   return {
     atoms: [
-      atom("Na-0", "Na", false),
-      atom("Na-0-image-1-0-0", "Na", true),
-      atom("Cl-1", "Cl", false),
-      atom("Cl-1-image-1-0-0", "Cl", true),
+      atom("Na-0", "Na", [0, 0, 0], [], []),
+      atom("Na-0-image-1-0-0", "Na", [1, 0, 0], ["boundary"], [["boundaryAtoms"]]),
+      atom("Cl-1", "Cl", [0, 0, 0], [], []),
+      atom(
+        "Cl-1-image-0--1-0",
+        "Cl",
+        [0, -1, 0],
+        ["bonded"],
+        [["oneHopBondedAtoms"]],
+      ),
+      atom(
+        "Cl-1-image-1-1-0",
+        "Cl",
+        [1, 1, 0],
+        ["bonded"],
+        [["boundaryAtoms", "oneHopBondedAtoms"]],
+      ),
+    ],
+    bonds: [
+      {
+        id: "bond-canonical",
+        startAtomId: "Na-0",
+        endAtomId: "Cl-1",
+        visibilityDependencies: [],
+        visibilityDependencyGroups: [],
+      },
+      {
+        id: "bond-boundary-canonical",
+        startAtomId: "Na-0-image-1-0-0",
+        endAtomId: "Cl-1",
+        visibilityDependencies: ["boundaryAtoms", "oneHopBondedAtoms"],
+        visibilityDependencyGroups: [["boundaryAtoms", "oneHopBondedAtoms"]],
+      },
+      {
+        id: "bond-one-hop",
+        startAtomId: "Na-0",
+        endAtomId: "Cl-1-image-0--1-0",
+        visibilityDependencies: ["oneHopBondedAtoms"],
+        visibilityDependencyGroups: [["oneHopBondedAtoms"]],
+      },
+      {
+        id: "bond-boundary-source",
+        startAtomId: "Na-0-image-1-0-0",
+        endAtomId: "Cl-1-image-1-1-0",
+        visibilityDependencies: ["boundaryAtoms", "oneHopBondedAtoms"],
+        visibilityDependencyGroups: [["boundaryAtoms", "oneHopBondedAtoms"]],
+      },
     ],
     cell: {
       vectors: [
@@ -85,18 +181,27 @@ function sceneWithPeriodicImages(): SceneSpec {
   };
 }
 
-function atom(id: string, element: string, isPeriodicImage: boolean): AtomSpec {
-  const vector: [number, number, number] = isPeriodicImage ? [1, 0, 0] : [0, 0, 0];
-
+function atom(
+  id: string,
+  element: string,
+  imageOffset: [number, number, number],
+  imageReasons: AtomSpec["imageReasons"],
+  visibilityDependencyGroups: AtomSpec["visibilityDependencyGroups"],
+): AtomSpec {
+  const isPeriodicImage = imageOffset.some((value) => value !== 0);
+  const visibilityDependencies = Array.from(new Set(visibilityDependencyGroups.flat()));
   return {
     color: element === "Na" ? "#fadd3d" : "#1ff01f",
     element,
-    fractionalPosition: vector,
+    fractionalPosition: imageOffset,
     id,
-    imageOffset: vector,
+    imageOffset,
     isPeriodicImage,
-    position: vector,
+    imageReasons,
+    visibilityDependencies,
+    visibilityDependencyGroups,
+    position: imageOffset,
     radius: 0.5,
-    siteId: id.replace("-image-1-0-0", ""),
+    siteId: id.split("-image-", 1)[0]!,
   };
 }

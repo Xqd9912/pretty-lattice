@@ -1,10 +1,15 @@
 import {
   FolderOpen,
+  ImageDown,
   Lock,
+  Palette,
   PanelRightClose,
   RotateCcw,
+  Rotate3d as CameraIcon,
   SlidersHorizontal,
   Unlock,
+  View as DisplayIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { Quaternion } from "three";
 import {
@@ -13,6 +18,8 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type Dispatch,
+  type SetStateAction,
   useCallback,
   useEffect,
   useMemo,
@@ -20,13 +27,30 @@ import {
   useState,
 } from "react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-import { uploadStructurePreview, type SceneSpec } from "../api/scene";
+import {
+  BOND_ALGORITHM_OPTIONS,
+  DEFAULT_BOND_ALGORITHM,
+  uploadStructurePreview,
+  type BondAlgorithm,
+  type SceneSpec,
+} from "../api/scene";
 import {
   LatticeScene,
   previewSafeAreaForViewport,
@@ -34,9 +58,10 @@ import {
 } from "../scene/LatticeScene";
 import { OrientationGizmo } from "../scene/OrientationGizmo";
 import {
-  hasPeriodicImageAtoms,
+  createDefaultComponentVisibility,
   previewSafeAreaForSettings,
-  visibleSceneForBoundaryAtoms,
+  visibleSceneForComponents,
+  type ComponentVisibilityState,
 } from "./settings";
 import { deriveElementLegendEntries, type ElementLegendEntry } from "./elementLegend";
 import { summarizeScene, type PreviewStatus } from "./previewState";
@@ -69,6 +94,8 @@ const ZOOM_SLIDER_BLUR_DELAY_MS = 500;
 const ZOOM_SLIDER_HEIGHT_PX = 180;
 const ZOOM_SLIDER_THUMB_SIZE_PX = 14;
 
+type CommonPanelTab = "camera" | "display" | "style" | "export";
+
 interface LockedInteractionPointer {
   pointerId: number;
   startX: number;
@@ -81,13 +108,20 @@ interface ViewportSize {
   width: number;
 }
 
+
 export function App() {
   const [scene, setScene] = useState<SceneSpec | null>(null);
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("idle");
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [showBoundaryAtoms, setShowBoundaryAtoms] = useState(false);
+  const [currentFile, setCurrentFile] = useState<File | null>(null);
+  const [bondAlgorithm, setBondAlgorithm] =
+    useState<BondAlgorithm>(DEFAULT_BOND_ALGORITHM);
+  const [componentVisibility, setComponentVisibility] = useState(
+    createDefaultComponentVisibility,
+  );
+  const [commonPanelTab, setCommonPanelTab] = useState<CommonPanelTab>("display");
   const [viewState, setViewState] = useState(createPreviewViewState);
   const [lockedInteractionFeedbackCount, setLockedInteractionFeedbackCount] = useState(0);
   const viewportSize = useViewportSize();
@@ -127,28 +161,58 @@ export function App() {
     setPreviewStatus("loading");
     setErrorMessage(null);
     setScene(null);
+    setCurrentFile(file);
     setIsSettingsOpen(false);
-    setShowBoundaryAtoms(false);
+    setBondAlgorithm(DEFAULT_BOND_ALGORITHM);
+    setComponentVisibility(createDefaultComponentVisibility());
+    setCommonPanelTab("display");
     setViewState(createPreviewViewState());
 
     try {
       const nextScene = await uploadStructurePreview(file);
       setScene(nextScene);
-      setShowBoundaryAtoms(hasPeriodicImageAtoms(nextScene));
       setPreviewStatus("ready");
     } catch (error) {
       setScene(null);
+      setCurrentFile(null);
       setIsSettingsOpen(false);
       setPreviewStatus("error");
       setErrorMessage(error instanceof Error ? error.message : "Could not parse structure.");
     }
   }
 
+  const handleBondAlgorithmChange = useCallback(
+    async (nextBondAlgorithm: BondAlgorithm) => {
+      setBondAlgorithm(nextBondAlgorithm);
+      if (!currentFile) {
+        return;
+      }
+
+      setPreviewStatus("loading");
+      setErrorMessage(null);
+
+      try {
+        const nextScene = await uploadStructurePreview(currentFile, {
+          bondAlgorithm: nextBondAlgorithm,
+        });
+        setScene(nextScene);
+        setPreviewStatus("ready");
+      } catch (error) {
+        setScene(null);
+        setCurrentFile(null);
+        setIsSettingsOpen(false);
+        setPreviewStatus("error");
+        setErrorMessage(error instanceof Error ? error.message : "Could not parse structure.");
+      }
+    },
+    [currentFile],
+  );
+
   const summary = useMemo(() => summarizeScene(scene), [scene]);
   const legendEntries = useMemo(() => deriveElementLegendEntries(scene), [scene]);
   const visibleScene = useMemo(
-    () => visibleSceneForBoundaryAtoms(scene, showBoundaryAtoms),
-    [scene, showBoundaryAtoms],
+    () => visibleSceneForComponents(scene, componentVisibility),
+    [componentVisibility, scene],
   );
   const hasVisibleScene = visibleScene !== null;
   const previewSafeArea = previewSafeAreaForSettings();
@@ -269,10 +333,13 @@ export function App() {
             cameraOrientationRef={cameraOrientationRef}
             interactionLocked={viewState.interactionLocked}
             interactionMode={viewState.interactionMode}
+            layoutScene={scene ?? visibleScene}
             onViewScaleChange={handleViewScaleChange}
             resetCounter={viewState.resetCounter}
             safeArea={previewSafeArea}
             scene={visibleScene}
+            showAtoms={componentVisibility.atoms}
+            showUnitCell={componentVisibility.unitCell}
             viewScale={viewState.viewScale}
           />
         ) : (
@@ -298,136 +365,160 @@ export function App() {
         <ElementLegend entries={legendEntries} safeArea={previewSafeArea} />
       ) : null}
 
-      <aside
+      <div
         className={cn(
-          "absolute left-4 top-4 w-[312px] max-w-[calc(100vw-2rem)] rounded-xl border px-3 py-3.5 shadow-xl shadow-foreground/10",
-          GLASS_SURFACE_CLASS,
+          "absolute left-4 top-4 flex w-[296px] max-w-[calc(100vw-2rem)] flex-col gap-4",
           isSettingsOpen ? "max-[760px]:hidden" : null,
         )}
-        aria-label="Current structure"
       >
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <img
-              src="/favicon.svg"
-              alt=""
-              className="size-7 shrink-0"
-            />
-            <div className="min-w-0">
-              <h1 className="truncate text-[0.95rem] font-semibold leading-tight">Pretty Lattice</h1>
+        <aside
+          className={cn(
+            "rounded-xl border px-3 py-3.5 shadow-xl shadow-foreground/10",
+            GLASS_SURFACE_CLASS,
+          )}
+          aria-label="Current structure"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <img
+                src="/favicon.svg"
+                alt=""
+                className="size-7 shrink-0"
+              />
+              <div className="min-w-0">
+                <h1 className="truncate text-[0.95rem] font-semibold leading-tight">Pretty Lattice</h1>
+              </div>
             </div>
+
+            <Button
+              size="sm"
+              aria-label="Open structure"
+              className="h-7 gap-1.5 rounded-full px-2.5 text-xs transition-colors duration-150 ease-out active:bg-primary/80 [&_svg]:size-3.5"
+              disabled={previewStatus === "loading"}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <FolderOpen data-icon="inline-start" aria-hidden="true" />
+              <span>Open</span>
+            </Button>
           </div>
 
-          <Button
-            size="sm"
-            aria-label="Open structure"
-            className="h-7 gap-1.5 rounded-full px-2.5 text-xs transition-colors duration-150 ease-out active:bg-primary/80 [&_svg]:size-3.5"
-            disabled={previewStatus === "loading"}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <FolderOpen data-icon="inline-start" aria-hidden="true" />
-            <span>Open</span>
-          </Button>
-        </div>
+          {selectedFileName ? <Separator className="my-2.5" /> : null}
 
-        <Separator className="my-2.5" />
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          tabIndex={-1}
-          onChange={(event) => void handleFileChange(event)}
-        />
-
-        <div className="flex flex-col gap-1">
-          <SummaryRow
-            label="File"
-            value={selectedFileName ?? "No file selected"}
-            title={selectedFileName ?? undefined}
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            tabIndex={-1}
+            onChange={(event) => void handleFileChange(event)}
           />
 
-          {scene ? (
-            <>
+          <div className="flex flex-col gap-1">
+            {selectedFileName ? (
               <SummaryRow
-                label="Formula"
-                value={renderFormula(summary.formula)}
-                mono={false}
+                label="File"
+                value={selectedFileName}
+                title={selectedFileName}
               />
-              <SummaryRow label="Atoms" value={summary.atomCount} />
-            </>
-          ) : null}
-        </div>
+            ) : null}
 
-        {errorMessage ? (
-          <div
-            className="mt-2 rounded-md border border-destructive/20 bg-destructive/10 p-2.5 font-mono text-sm leading-snug text-destructive"
-            role="alert"
-          >
-            {errorMessage}
-          </div>
-        ) : null}
-
-        {scene ? (
-          <div className="mt-2.5 flex flex-col gap-2.5">
-            <Separator />
-            <div>
-              <span className="block text-xs font-bold text-muted-foreground">Symmetry</span>
-              {summary.symmetry?.available ? (
-                <dl className="mt-1.5 flex flex-col gap-1 text-sm">
-                  <SymmetryMetric
-                    label="Space group"
-                    value={renderSpaceGroup(
-                      summary.symmetry.spaceGroup,
-                      summary.symmetry.spaceGroupNumber,
-                    )}
-                    title={formatSpaceGroupTitle(
-                      summary.symmetry.spaceGroup,
-                      summary.symmetry.spaceGroupNumber,
-                    )}
-                  />
-                  <SymmetryMetric
-                    label="Point group"
-                    value={renderPointGroup(
-                      summary.symmetry.pointGroup,
-                      summary.symmetry.pointGroupSchoenflies,
-                    )}
-                    title={formatPointGroupTitle(
-                      summary.symmetry.pointGroup,
-                      summary.symmetry.pointGroupSchoenflies,
-                    )}
-                  />
-                  <SymmetryMetric
-                    label="Crystal system"
-                    value={summary.symmetry.crystalSystem ?? "-"}
-                  />
-                </dl>
-              ) : (
-                <p className="mt-1 text-sm text-muted-foreground">Symmetry unavailable</p>
-              )}
-            </div>
-
-            {summary.cell ? (
+            {scene ? (
               <>
-                <Separator />
-                <div>
-                  <span className="block text-xs font-bold text-muted-foreground">
-                    Lattice Parameters
-                  </span>
-                  <dl className="mt-1.5 grid grid-cols-3 gap-x-3 gap-y-1 font-mono text-sm">
-                    <CellMetric label="a" value={summary.cell.a} unit="Å" />
-                    <CellMetric label="b" value={summary.cell.b} unit="Å" />
-                    <CellMetric label="c" value={summary.cell.c} unit="Å" />
-                    <CellMetric label="α" value={summary.cell.alpha} unit="°" />
-                    <CellMetric label="β" value={summary.cell.beta} unit="°" />
-                    <CellMetric label="γ" value={summary.cell.gamma} unit="°" />
-                  </dl>
-                </div>
+                <SummaryRow
+                  label="Formula"
+                  value={renderFormula(summary.formula)}
+                  mono={false}
+                />
+                <SummaryRow label="Atoms" value={summary.atomCount} />
               </>
             ) : null}
           </div>
+
+          {errorMessage ? (
+            <Alert variant="destructive" className="mt-2 rounded-md px-2.5 py-2">
+              <AlertDescription className="font-mono text-xs leading-snug">
+                {errorMessage}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {scene?.warnings?.map((warning) => (
+            <Alert key={warning.code} className="mt-2 rounded-md px-2.5 py-2">
+              <AlertDescription className="text-xs leading-snug">
+                {warning.message}
+              </AlertDescription>
+            </Alert>
+          ))}
+
+          {scene ? (
+            <div className="mt-2.5 flex flex-col gap-2.5 max-[760px]:hidden">
+              <Separator />
+              <div>
+                <span className="block text-xs font-bold text-muted-foreground">Symmetry</span>
+                {summary.symmetry?.available ? (
+                  <dl className="mt-1.5 flex flex-col gap-1 text-sm">
+                    <SymmetryMetric
+                      label="Space group"
+                      value={renderSpaceGroup(
+                        summary.symmetry.spaceGroup,
+                        summary.symmetry.spaceGroupNumber,
+                      )}
+                      title={formatSpaceGroupTitle(
+                        summary.symmetry.spaceGroup,
+                        summary.symmetry.spaceGroupNumber,
+                      )}
+                    />
+                    <SymmetryMetric
+                      label="Point group"
+                      value={renderPointGroup(
+                        summary.symmetry.pointGroup,
+                        summary.symmetry.pointGroupSchoenflies,
+                      )}
+                      title={formatPointGroupTitle(
+                        summary.symmetry.pointGroup,
+                        summary.symmetry.pointGroupSchoenflies,
+                      )}
+                    />
+                    <SymmetryMetric
+                      label="Crystal system"
+                      value={summary.symmetry.crystalSystem ?? "-"}
+                    />
+                  </dl>
+                ) : (
+                  <p className="mt-1 text-sm text-muted-foreground">Symmetry unavailable</p>
+                )}
+              </div>
+
+              {summary.cell ? (
+                <>
+                  <Separator />
+                  <div>
+                    <span className="block text-xs font-bold text-muted-foreground">
+                      Lattice Parameters
+                    </span>
+                    <dl className="mt-1.5 grid grid-cols-3 gap-x-3 gap-y-1 font-mono text-sm">
+                      <CellMetric label="a" value={summary.cell.a} unit="Å" />
+                      <CellMetric label="b" value={summary.cell.b} unit="Å" />
+                      <CellMetric label="c" value={summary.cell.c} unit="Å" />
+                      <CellMetric label="α" value={summary.cell.alpha} unit="°" />
+                      <CellMetric label="β" value={summary.cell.beta} unit="°" />
+                      <CellMetric label="γ" value={summary.cell.gamma} unit="°" />
+                    </dl>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+        </aside>
+
+        {scene ? (
+          <CommonControlsPanel
+            activeTab={commonPanelTab}
+            componentVisibility={componentVisibility}
+            onActiveTabChange={setCommonPanelTab}
+            onComponentVisibilityChange={setComponentVisibility}
+          />
         ) : null}
-      </aside>
+      </div>
 
       {scene ? (
         <>
@@ -447,16 +538,245 @@ export function App() {
           />
 
           <SettingsDrawer
+            bondAlgorithm={bondAlgorithm}
             interactionMode={viewState.interactionMode}
             isOpen={isSettingsOpen}
+            isSceneLoading={previewStatus === "loading"}
+            onBondAlgorithmChange={(nextBondAlgorithm) => {
+              void handleBondAlgorithmChange(nextBondAlgorithm);
+            }}
             onInteractionModeChange={handleInteractionModeChange}
-            showBoundaryAtoms={showBoundaryAtoms}
             onOpenChange={setIsSettingsOpen}
-            onShowBoundaryAtomsChange={setShowBoundaryAtoms}
           />
         </>
       ) : null}
     </main>
+  );
+}
+
+const COMMON_PANEL_TABS: {
+  Icon: LucideIcon;
+  label: string;
+  value: CommonPanelTab;
+}[] = [
+  { Icon: CameraIcon, label: "Camera", value: "camera" },
+  { Icon: DisplayIcon, label: "Display", value: "display" },
+  { Icon: Palette, label: "Style", value: "style" },
+  { Icon: ImageDown, label: "Export", value: "export" },
+];
+
+function CommonControlsPanel({
+  activeTab,
+  componentVisibility,
+  onActiveTabChange,
+  onComponentVisibilityChange,
+}: {
+  activeTab: CommonPanelTab;
+  componentVisibility: ComponentVisibilityState;
+  onActiveTabChange: (tab: CommonPanelTab) => void;
+  onComponentVisibilityChange: Dispatch<SetStateAction<ComponentVisibilityState>>;
+}) {
+  return (
+    <TooltipProvider>
+      <aside
+        aria-label="Common controls"
+        className={cn(
+          "rounded-xl border px-3 py-2 shadow-xl shadow-foreground/10",
+          GLASS_SURFACE_CLASS,
+        )}
+      >
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => onActiveTabChange(value as CommonPanelTab)}
+        >
+          <TabsList className="flex h-8 w-full rounded-lg bg-muted/70 p-1">
+            {COMMON_PANEL_TABS.map(({ Icon, label, value }) => {
+              const isActive = value === activeTab;
+              const trigger = (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  aria-label={label}
+                  style={{ flexGrow: isActive ? 2 : 0.9 }}
+                  className={cn(
+                    "h-6 min-w-0 basis-0 rounded-md text-xs transition-[flex-grow,color,background-color,box-shadow,padding] duration-[360ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none [&_svg]:size-3.5",
+                    isActive ? "px-2.5" : "px-0",
+                  )}
+                >
+                  <Icon aria-hidden="true" />
+                  {isActive ? <span className="truncate">{label}</span> : null}
+                </TabsTrigger>
+              );
+
+              if (isActive) {
+                return trigger;
+              }
+
+              return (
+                <Tooltip key={value}>
+                  <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+                  <TooltipContent side="top">{label}</TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </TabsList>
+
+          <div
+            data-slot="common-controls-content"
+            className={cn(
+              "overflow-hidden transition-[height] duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+              contentHeight,
+            )}
+          >
+            <TabsContent value="camera" className="mt-1.5">
+              <ReservedTabContent />
+            </TabsContent>
+            <TabsContent value="display" className="mt-1.5">
+              <DisplayTabContent
+                visibility={componentVisibility}
+                onVisibilityChange={onComponentVisibilityChange}
+              />
+            </TabsContent>
+            <TabsContent value="style" className="mt-1.5">
+              <ReservedTabContent />
+            </TabsContent>
+            <TabsContent value="export" className="mt-1.5">
+              <ReservedTabContent />
+            </TabsContent>
+          </div>
+        </Tabs>
+      </aside>
+    </TooltipProvider>
+  );
+}
+
+function ReservedTabContent() {
+  return (
+    <div className="flex min-h-[64px] items-center justify-center rounded-md border border-dashed border-border/80 bg-background/40 text-xs text-muted-foreground">
+      No controls
+    </div>
+  );
+}
+
+function DisplayTabContent({
+  onVisibilityChange,
+  visibility,
+}: {
+  onVisibilityChange: Dispatch<SetStateAction<ComponentVisibilityState>>;
+  visibility: ComponentVisibilityState;
+}) {
+  function setVisibility(key: keyof ComponentVisibilityState, value: boolean) {
+    onVisibilityChange((currentVisibility) => ({
+      ...currentVisibility,
+      [key]: value,
+    }));
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <section aria-label="Display components">
+        <div className="grid grid-cols-2 gap-0.5">
+          <ComponentCheckboxRow
+            checked={visibility.atoms}
+            label="Atoms"
+            onCheckedChange={(checked) => setVisibility("atoms", checked)}
+          />
+          <ComponentCheckboxRow
+            checked={visibility.unitCell}
+            label="Unit cell"
+            onCheckedChange={(checked) => setVisibility("unitCell", checked)}
+          />
+          <ComponentCheckboxRow
+            checked={visibility.bonds}
+            label="Bonds"
+            onCheckedChange={(checked) => setVisibility("bonds", checked)}
+          />
+          <ComponentCheckboxRow
+            checked={false}
+            disabled
+            label="Polyhedra"
+            onCheckedChange={() => {}}
+          />
+        </div>
+      </section>
+
+      <Separator className="my-1" />
+
+      <section aria-labelledby="image-components-label">
+        <h2
+          id="image-components-label"
+          className="text-xs font-bold leading-tight text-muted-foreground"
+        >
+          Images
+        </h2>
+        <div className="mt-0.5 flex flex-col gap-0.5">
+          <ImageSwitchRow
+            checked={visibility.boundaryAtoms}
+            label="Cell-boundary atoms"
+            onCheckedChange={(checked) => setVisibility("boundaryAtoms", checked)}
+          />
+          <ImageSwitchRow
+            checked={visibility.oneHopBondedAtoms}
+            label="One-hop bonded atoms"
+            onCheckedChange={(checked) => setVisibility("oneHopBondedAtoms", checked)}
+          />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ComponentCheckboxRow({
+  checked,
+  disabled = false,
+  label,
+  onCheckedChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex h-6 min-w-0 items-center justify-between gap-1.5 rounded-md px-1.5 text-sm transition-colors",
+        disabled ? "cursor-not-allowed text-muted-foreground/55" : "hover:bg-accent/60",
+      )}
+    >
+      <span className="min-w-0 truncate leading-tight">{label}</span>
+      <Checkbox
+        checked={checked}
+        disabled={disabled}
+        aria-label={label}
+        className="size-3.5 rounded-[3px]"
+        iconClassName="size-3"
+        onCheckedChange={(value) => onCheckedChange(value === true)}
+      />
+    </label>
+  );
+}
+
+function ImageSwitchRow({
+  checked,
+  label,
+  onCheckedChange,
+}: {
+  checked: boolean;
+  label: string;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex h-6 items-center justify-between gap-1.5 rounded-md px-1.5 text-sm transition-colors hover:bg-accent/60">
+      <span className="min-w-0 truncate leading-tight">{label}</span>
+      <Switch
+        checked={checked}
+        aria-label={label}
+        className="h-4 w-7 p-0.5"
+        thumbClassName="size-3 data-[state=checked]:translate-x-3"
+        onCheckedChange={onCheckedChange}
+      />
+    </label>
   );
 }
 
@@ -617,7 +937,7 @@ function ViewControlRail({
       <aside
         aria-label="View controls"
         className={cn(
-          "absolute left-[340px] top-4 flex w-[42px] flex-col items-center max-[760px]:bottom-[8.5rem] max-[760px]:left-auto max-[760px]:right-4 max-[760px]:top-auto",
+          "absolute left-[328px] top-4 flex w-[42px] flex-col items-center max-[760px]:bottom-[8.5rem] max-[760px]:left-auto max-[760px]:right-4 max-[760px]:top-auto",
           className,
         )}
       >
@@ -757,7 +1077,7 @@ function SettingsTrigger({
             size="icon"
             aria-controls="settings-drawer"
             aria-expanded={isOpen}
-            aria-label="Open settings"
+            aria-label="Open advanced settings"
             className={cn(
               "absolute right-4 top-4 rounded-full shadow-xl shadow-foreground/10 transition-[opacity,translate] duration-200 ease-out hover:-translate-x-0.5",
               GLASS_SURFACE_CLASS,
@@ -768,26 +1088,28 @@ function SettingsTrigger({
             <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="left">Settings</TooltipContent>
+        <TooltipContent side="left">Advanced settings</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
 }
 
 function SettingsDrawer({
+  bondAlgorithm,
   interactionMode,
   isOpen,
+  isSceneLoading,
+  onBondAlgorithmChange,
   onInteractionModeChange,
   onOpenChange,
-  onShowBoundaryAtomsChange,
-  showBoundaryAtoms,
 }: {
+  bondAlgorithm: BondAlgorithm;
   interactionMode: InteractionMode;
   isOpen: boolean;
+  isSceneLoading: boolean;
+  onBondAlgorithmChange: (bondAlgorithm: BondAlgorithm) => void;
   onInteractionModeChange: (interactionMode: InteractionMode) => void;
   onOpenChange: (isOpen: boolean) => void;
-  onShowBoundaryAtomsChange: (showBoundaryAtoms: boolean) => void;
-  showBoundaryAtoms: boolean;
 }) {
   return (
     <>
@@ -804,33 +1126,13 @@ function SettingsDrawer({
       >
         <div className="flex h-16 shrink-0 items-center px-4 pr-16">
           <h2 id="settings-drawer-title" className="text-[0.95rem] font-semibold leading-tight">
-            Settings
+            Advanced Settings
           </h2>
         </div>
 
         <Separator />
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
-          <div
-            className={cn(
-              "flex items-center justify-between gap-3 rounded-md border px-3 py-2.5",
-              GLASS_SURFACE_CLASS,
-            )}
-          >
-            <label
-              htmlFor="boundary-atoms-switch"
-              className="min-w-0 truncate text-sm font-medium leading-tight"
-            >
-              Show boundary atom images
-            </label>
-            <Switch
-              id="boundary-atoms-switch"
-              checked={showBoundaryAtoms}
-              disabled={!isOpen}
-              onCheckedChange={onShowBoundaryAtomsChange}
-            />
-          </div>
-
           <section
             aria-labelledby="interaction-mode-label"
             className={cn("rounded-md border px-3 py-2.5", GLASS_SURFACE_CLASS)}
@@ -848,6 +1150,42 @@ function SettingsDrawer({
               interactionMode={interactionMode}
               onInteractionModeChange={onInteractionModeChange}
             />
+          </section>
+
+          <section
+            aria-labelledby="bond-algorithm-label"
+            className={cn("rounded-md border px-3 py-2.5", GLASS_SURFACE_CLASS)}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h3
+                id="bond-algorithm-label"
+                className="min-w-0 truncate text-sm font-medium leading-tight"
+              >
+                Bond algorithm
+              </h3>
+            </div>
+            <Select
+              value={bondAlgorithm}
+              disabled={!isOpen || isSceneLoading}
+              onValueChange={(value) => onBondAlgorithmChange(value as BondAlgorithm)}
+            >
+              <SelectTrigger
+                size="sm"
+                aria-label="Bond algorithm"
+                className="mt-2 w-full bg-background/70"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  {BOND_ALGORITHM_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </section>
         </div>
       </aside>
@@ -968,7 +1306,7 @@ function orientationGizmoContainerStyle(
   return {
     bottom: Math.max(16, safeArea.bottom - 100),
     height: size,
-    left: Math.max(16, safeArea.left - 58),
+    left: Math.max(16, safeArea.left - 78),
     width: size,
   };
 }

@@ -3,8 +3,20 @@ export interface SceneSpec {
     vectors: [number, number, number][];
   };
   atoms: AtomSpec[];
+  bonds: BondSpec[];
   summary: StructureSummary;
+  warnings?: AnalysisWarningSpec[];
 }
+
+export type BondAlgorithm = "crystal-nn" | "minimum-distance" | "voronoi-nn";
+
+export const DEFAULT_BOND_ALGORITHM: BondAlgorithm = "crystal-nn";
+
+export const BOND_ALGORITHM_OPTIONS: { label: string; value: BondAlgorithm }[] = [
+  { label: "CrystalNN", value: "crystal-nn" },
+  { label: "Minimum distance", value: "minimum-distance" },
+  { label: "VoronoiNN", value: "voronoi-nn" },
+];
 
 export interface StructureSummary {
   formula: string;
@@ -40,8 +52,28 @@ export interface AtomSpec {
   fractionalPosition: [number, number, number];
   imageOffset: [number, number, number];
   isPeriodicImage: boolean;
+  imageReasons: ImageReason[];
+  visibilityDependencies: VisibilityDependency[];
+  visibilityDependencyGroups: VisibilityDependency[][];
   radius: number;
   color: string;
+}
+
+export type ImageReason = "boundary" | "bonded";
+
+export type VisibilityDependency = "boundaryAtoms" | "oneHopBondedAtoms";
+
+export interface BondSpec {
+  id: string;
+  startAtomId: string;
+  endAtomId: string;
+  visibilityDependencies: VisibilityDependency[];
+  visibilityDependencyGroups: VisibilityDependency[][];
+}
+
+export interface AnalysisWarningSpec {
+  code: string;
+  message: string;
 }
 
 export class StructurePreviewError extends Error {
@@ -51,8 +83,12 @@ export class StructurePreviewError extends Error {
   }
 }
 
-export async function uploadStructurePreview(file: File): Promise<SceneSpec> {
-  const response = await fetch("/api/structure-preview", {
+export async function uploadStructurePreview(
+  file: File,
+  options: { bondAlgorithm?: BondAlgorithm } = {},
+): Promise<SceneSpec> {
+  const endpoint = previewEndpointForOptions(options);
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "content-type": file.type || "application/octet-stream",
@@ -66,6 +102,14 @@ export async function uploadStructurePreview(file: File): Promise<SceneSpec> {
   }
 
   return (await response.json()) as SceneSpec;
+}
+
+function previewEndpointForOptions(options: { bondAlgorithm?: BondAlgorithm }): string {
+  if (!options.bondAlgorithm || options.bondAlgorithm === DEFAULT_BOND_ALGORITHM) {
+    return "/api/structure-preview";
+  }
+
+  return `/api/structure-preview?bondAlgorithm=${encodeURIComponent(options.bondAlgorithm)}`;
 }
 
 async function readPreviewError(response: Response): Promise<string> {

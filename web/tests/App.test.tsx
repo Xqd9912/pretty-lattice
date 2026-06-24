@@ -107,11 +107,16 @@ describe("App", () => {
 
     expect(screen.getByText("No structure loaded").isConnected).toBe(true);
     expect(screen.queryByTestId("lattice-canvas")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Open settings" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open advanced settings" })).toBeNull();
 
     const structureCard = screen.getByRole("complementary", { name: "Current structure" });
     expect(within(structureCard).getByText("Pretty Lattice").isConnected).toBe(true);
-    expect(within(structureCard).getByText("No file selected").isConnected).toBe(true);
+    expect(within(structureCard).getByRole("button", { name: "Open structure" }).isConnected).toBe(
+      true,
+    );
+    expect(within(structureCard).queryByText("File")).toBeNull();
+    expect(within(structureCard).queryByText("No file selected")).toBeNull();
+    expect(structureCard.querySelector("[data-slot='separator']")).toBeNull();
   });
 
   test("uploads a structure and renders the summary, legend, and view controls", async () => {
@@ -138,6 +143,7 @@ describe("App", () => {
     expect(screen.getByTestId("mock-orientation-gizmo").isConnected).toBe(true);
 
     const structureCard = screen.getByRole("complementary", { name: "Current structure" });
+    expect(structureCard.querySelector("[data-slot='separator']")).not.toBeNull();
     expect(within(structureCard).getByText("NaCl.cif").isConnected).toBe(true);
     expect(within(structureCard).getByText("NaCl").isConnected).toBe(true);
     expect(within(structureCard).getByText("2").isConnected).toBe(true);
@@ -147,16 +153,22 @@ describe("App", () => {
     expect(within(legend).getByText("Na").isConnected).toBe(true);
     expect(within(legend).getByText("Cl").isConnected).toBe(true);
     expect(screen.getByRole("complementary", { name: "View controls" }).isConnected).toBe(true);
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    expect(within(commonControls).getByRole("tab", { name: "Display" }).isConnected).toBe(true);
+    expect(within(commonControls).queryByRole("heading", { name: "Display" })).toBeNull();
+    expect(within(commonControls).getByText("Images").isConnected).toBe(true);
+    expect(
+      commonControls.querySelector("[data-slot='common-controls-content']")?.className,
+    ).toContain("h-[144px]");
   });
 
-  test("lets settings change boundary atom visibility and rotation mode", async () => {
+  test("lets display controls change image visibility and advanced settings change rotation mode", async () => {
     const user = userEvent.setup();
 
     await renderLoadedStructure(user);
-    await user.click(screen.getByRole("button", { name: "Open settings" }));
 
     const boundaryAtomSwitch = screen.getByRole("switch", {
-      name: "Show boundary atom images",
+      name: "Cell-boundary atoms",
     });
     expect((boundaryAtomSwitch as HTMLButtonElement).disabled).toBe(false);
     expect(boundaryAtomSwitch.getAttribute("aria-checked")).toBe("true");
@@ -164,6 +176,17 @@ describe("App", () => {
     await user.click(boundaryAtomSwitch);
 
     expect(boundaryAtomSwitch.getAttribute("aria-checked")).toBe("false");
+
+    const oneHopSwitch = screen.getByRole("switch", {
+      name: "One-hop bonded atoms",
+    });
+    expect(oneHopSwitch.getAttribute("aria-checked")).toBe("true");
+
+    await user.click(oneHopSwitch);
+
+    expect(oneHopSwitch.getAttribute("aria-checked")).toBe("false");
+
+    await user.click(screen.getByRole("button", { name: "Open advanced settings" }));
 
     expect(screen.getByRole("radio", { name: "Trackball" }).getAttribute("aria-checked")).toBe(
       "true",
@@ -174,6 +197,55 @@ describe("App", () => {
     expect(screen.getByRole("radio", { name: "Orbit" }).getAttribute("aria-checked")).toBe(
       "true",
     );
+  });
+
+  test("uses smooth tab content and width animation in both directions", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    const content = commonControls.querySelector("[data-slot='common-controls-content']");
+    expect(content?.className).toContain("transition-[height]");
+    expect(content?.className).toContain("h-[144px]");
+    expect(content?.className).not.toContain("min-h");
+    const displayTab = within(commonControls).getByRole("tab", { name: "Display" });
+    const cameraTab = within(commonControls).getByRole("tab", { name: "Camera" });
+    expect(displayTab.style.flexGrow).toBe("2");
+    expect(cameraTab.style.flexGrow).toBe("0.9");
+    expect(cameraTab.className).toContain(
+      "transition-[flex-grow",
+    );
+    expect(cameraTab.textContent).toContain("Camera");
+
+    await user.click(cameraTab);
+
+    expect(content?.className).toContain("h-[76px]");
+    expect(within(commonControls).getByRole("tab", { name: "Camera" }).style.flexGrow).toBe("2");
+    expect(within(commonControls).getByRole("tab", { name: "Display" }).style.flexGrow).toBe(
+      "0.9",
+    );
+
+    await user.click(within(commonControls).getByRole("tab", { name: "Display" }));
+
+    expect(content?.className).toContain("h-[144px]");
+  });
+
+  test("reuploads the current file when the bond algorithm changes", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+    await user.click(screen.getByRole("button", { name: "Open advanced settings" }));
+    queueFetchResponse(jsonResponse(sceneWithPeriodicImages()));
+
+    await user.click(screen.getByRole("combobox", { name: "Bond algorithm" }));
+    await user.click(await screen.findByRole("option", { name: "Minimum distance" }));
+
+    await waitFor(() => expect(fetchCalls).toHaveLength(2));
+    expect(fetchCalls[1]?.input).toBe(
+      "/api/structure-preview?bondAlgorithm=minimum-distance",
+    );
+    expect(fetchCalls[1]?.init?.body).toBeInstanceOf(File);
   });
 
   test("keeps view controls wired to lock, zoom, and reset state", async () => {
@@ -211,7 +283,30 @@ describe("App", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("Could not parse CIF.");
     expect(screen.getByText("No structure loaded").isConnected).toBe(true);
     expect(screen.queryByTestId("lattice-canvas")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Open settings" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open advanced settings" })).toBeNull();
+  });
+
+  test("shows non-fatal analysis warnings while keeping the scene visible", async () => {
+    const user = userEvent.setup();
+    queueFetchResponse(
+      jsonResponse({
+        ...sceneWithPeriodicImages(),
+        warnings: [
+          {
+            code: "bond-analysis-failed",
+            message: "Bond analysis with CrystalNN failed: neighbor graph unavailable",
+          },
+        ],
+      }),
+    );
+
+    render(<App />);
+    await user.upload(getFileInput(), structureFile());
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Bond analysis with CrystalNN failed",
+    );
+    expect(screen.getByTestId("lattice-canvas").isConnected).toBe(true);
   });
 });
 
@@ -258,10 +353,32 @@ function structureFile(name = "NaCl.cif"): File {
 function sceneWithPeriodicImages(): SceneSpec {
   return {
     atoms: [
-      atom("Na-0", "Na", false),
-      atom("Na-0-image-1-0-0", "Na", true),
-      atom("Cl-1", "Cl", false),
-      atom("Cl-1-image-1-0-0", "Cl", true),
+      atom("Na-0", "Na", [0, 0, 0], [], []),
+      atom("Na-0-image-1-0-0", "Na", [1, 0, 0], ["boundary"], [["boundaryAtoms"]]),
+      atom("Cl-1", "Cl", [0, 0, 0], [], []),
+      atom(
+        "Cl-1-image-0--1-0",
+        "Cl",
+        [0, -1, 0],
+        ["bonded"],
+        [["oneHopBondedAtoms"]],
+      ),
+    ],
+    bonds: [
+      {
+        id: "bond-canonical",
+        startAtomId: "Na-0",
+        endAtomId: "Cl-1",
+        visibilityDependencies: [],
+        visibilityDependencyGroups: [],
+      },
+      {
+        id: "bond-one-hop",
+        startAtomId: "Na-0",
+        endAtomId: "Cl-1-image-0--1-0",
+        visibilityDependencies: ["oneHopBondedAtoms"],
+        visibilityDependencyGroups: [["oneHopBondedAtoms"]],
+      },
     ],
     cell: {
       vectors: [
@@ -294,18 +411,27 @@ function sceneWithPeriodicImages(): SceneSpec {
   };
 }
 
-function atom(id: string, element: string, isPeriodicImage: boolean): AtomSpec {
-  const vector: [number, number, number] = isPeriodicImage ? [1, 0, 0] : [0, 0, 0];
-
+function atom(
+  id: string,
+  element: string,
+  imageOffset: [number, number, number],
+  imageReasons: AtomSpec["imageReasons"],
+  visibilityDependencyGroups: AtomSpec["visibilityDependencyGroups"],
+): AtomSpec {
+  const isPeriodicImage = imageOffset.some((value) => value !== 0);
+  const visibilityDependencies = Array.from(new Set(visibilityDependencyGroups.flat()));
   return {
     color: element === "Na" ? "#fadd3d" : "#1ff01f",
     element,
-    fractionalPosition: vector,
+    fractionalPosition: imageOffset,
     id,
-    imageOffset: vector,
+    imageOffset,
     isPeriodicImage,
-    position: vector,
+    imageReasons,
+    visibilityDependencies,
+    visibilityDependencyGroups,
+    position: imageOffset,
     radius: 0.5,
-    siteId: id.replace("-image-1-0-0", ""),
+    siteId: id.split("-image-", 1)[0]!,
   };
 }

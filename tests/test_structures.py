@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from pymatgen.core import Lattice, Structure
 
+import pretty_lattice.structures.scene as scene_module
 from pretty_lattice.structures.colormaps import load_colormap
 from pretty_lattice.structures.elements import load_element_registry
 from pretty_lattice.structures.readers import (
@@ -12,7 +13,10 @@ from pretty_lattice.structures.readers import (
     read_structure,
     read_structure_bytes,
 )
-from pretty_lattice.structures.scene import build_scene_response
+from pretty_lattice.structures.scene import (
+    UnsupportedBondAlgorithmError,
+    build_scene_response,
+)
 from pretty_lattice.structures.symmetry import (
     POINT_GROUP_SCHOENFLIES,
     point_group_schoenflies_symbol,
@@ -164,6 +168,8 @@ def test_scene_response_shape_uses_radius_and_color_defaults() -> None:
     scene = build_scene_response(structure)
     canonical_atoms = [atom for atom in scene["atoms"] if not atom["isPeriodicImage"]]
     periodic_image_atoms = [atom for atom in scene["atoms"] if atom["isPeriodicImage"]]
+    boundary_image_atoms = [atom for atom in scene["atoms"] if "boundary" in atom["imageReasons"]]
+    bonded_image_atoms = [atom for atom in scene["atoms"] if "bonded" in atom["imageReasons"]]
 
     assert scene["cell"]["vectors"][0] == [3.91270131, 0.0, 0.0]
     assert canonical_atoms[0] == {
@@ -174,6 +180,9 @@ def test_scene_response_shape_uses_radius_and_color_defaults() -> None:
         "fractionalPosition": [0.0, 0.0, 0.0],
         "imageOffset": [0, 0, 0],
         "isPeriodicImage": False,
+        "imageReasons": [],
+        "visibilityDependencies": [],
+        "visibilityDependencyGroups": [],
         "radius": pytest.approx(0.50),
         "color": "#00ff27",
     }
@@ -184,7 +193,14 @@ def test_scene_response_shape_uses_radius_and_color_defaults() -> None:
         "O",
         "O",
     ]
-    assert len(periodic_image_atoms) == 10
+    assert len(periodic_image_atoms) > 10
+    assert len(boundary_image_atoms) == 10
+    assert len(bonded_image_atoms) > 0
+    assert scene["bonds"]
+    assert {
+        scene["bonds"][0]["startAtomId"],
+        scene["bonds"][0]["endAtomId"],
+    }.issubset({atom["id"] for atom in scene["atoms"]})
     assert scene["summary"] == {
         "formula": "SrTiO3",
         "atomCount": 5,
@@ -206,7 +222,7 @@ def test_scene_response_shape_uses_radius_and_color_defaults() -> None:
             "latticeSystem": "cubic",
         },
     }
-    assert scene.keys() == {"cell", "atoms", "summary"}
+    assert scene.keys() == {"cell", "atoms", "bonds", "summary"}
 
 
 @pytest.mark.parametrize(
@@ -236,10 +252,13 @@ def test_periodic_boundary_images_close_faces_edges_and_corners(
     structure = _structure_from_fractional_positions(["C"], [fractional_position])
 
     scene = build_scene_response(structure)
+    boundary_atoms = [atom for atom in scene["atoms"] if "boundary" in atom["imageReasons"]]
 
-    assert {tuple(atom["imageOffset"]) for atom in scene["atoms"]} == expected_offsets
-    assert {atom["siteId"] for atom in scene["atoms"]} == {"C-0"}
-    assert sum(atom["isPeriodicImage"] for atom in scene["atoms"]) == len(expected_offsets) - 1
+    assert {tuple(atom["imageOffset"]) for atom in boundary_atoms} == (
+        expected_offsets - {(0, 0, 0)}
+    )
+    assert {atom["siteId"] for atom in boundary_atoms} <= {"C-0"}
+    assert len(boundary_atoms) == len(expected_offsets) - 1
     assert scene["summary"]["atomCount"] == 1
 
 
@@ -256,6 +275,8 @@ def test_near_upper_boundary_canonicalizes_to_half_open_cell() -> None:
     assert image_atom["imageOffset"] == [1, 0, 0]
     assert image_atom["fractionalPosition"] == [1.0, 0.5, 0.5]
     assert image_atom["position"] == [1.0, 0.5, 0.5]
+    assert "boundary" in image_atom["imageReasons"]
+    assert "boundaryAtoms" in image_atom["visibilityDependencies"]
 
 
 def test_non_periodic_structure_keeps_only_canonical_atom_instances() -> None:
@@ -271,7 +292,108 @@ def test_non_periodic_structure_keeps_only_canonical_atom_instances() -> None:
     assert scene["atoms"][0]["siteId"] == "C-0"
     assert scene["atoms"][0]["imageOffset"] == [0, 0, 0]
     assert scene["atoms"][0]["isPeriodicImage"] is False
+    assert scene["atoms"][0]["imageReasons"] == []
+    assert scene["atoms"][0]["visibilityDependencies"] == []
+    assert scene["atoms"][0]["visibilityDependencyGroups"] == []
+    assert scene["bonds"] == []
     assert scene["summary"]["atomCount"] == 1
+
+
+def test_scene_response_supports_selected_bond_algorithms() -> None:
+    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
+
+    crystal_scene = build_scene_response(structure)
+    minimum_distance_scene = build_scene_response(structure, bond_algorithm="minimum-distance")
+
+    assert crystal_scene["bonds"]
+    assert minimum_distance_scene["bonds"]
+    assert "warnings" not in crystal_scene
+    assert "warnings" not in minimum_distance_scene
+
+
+def test_scene_response_rejects_unsupported_bond_algorithm() -> None:
+    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
+
+    with pytest.raises(UnsupportedBondAlgorithmError, match="Unsupported bond algorithm"):
+        build_scene_response(structure, bond_algorithm="custom-cutoff")
+
+
+def test_scene_response_marks_one_hop_bonded_images_without_recursive_expansion() -> None:
+    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
+
+    scene = build_scene_response(structure)
+    atom_by_id = {atom["id"]: atom for atom in scene["atoms"]}
+    bonded_image_atoms = [
+        atom
+        for atom in scene["atoms"]
+        if atom["imageReasons"] == ["bonded"]
+        and atom["visibilityDependencies"] == ["oneHopBondedAtoms"]
+    ]
+    boundary_source_bonds = [
+        bond
+        for bond in scene["bonds"]
+        if bond["visibilityDependencies"] == ["boundaryAtoms", "oneHopBondedAtoms"]
+    ]
+
+    assert bonded_image_atoms
+    assert boundary_source_bonds
+    assert all(
+        atom_by_id[bond["startAtomId"]]["imageReasons"] != ["bonded"]
+        for bond in boundary_source_bonds
+    )
+
+
+def test_scene_response_marks_boundary_bonds_independently_from_one_hop() -> None:
+    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
+
+    scene = build_scene_response(structure)
+    atom_by_id = {atom["id"]: atom for atom in scene["atoms"]}
+    boundary_only_bonds = [
+        bond for bond in scene["bonds"] if bond["visibilityDependencyGroups"] == [["boundaryAtoms"]]
+    ]
+
+    assert boundary_only_bonds
+    assert any(
+        (
+            "boundary" in atom_by_id[bond["startAtomId"]]["imageReasons"]
+            or "boundary" in atom_by_id[bond["endAtomId"]]["imageReasons"]
+        )
+        and (
+            "bonded" not in atom_by_id[bond["startAtomId"]]["imageReasons"]
+            or "bonded" not in atom_by_id[bond["endAtomId"]]["imageReasons"]
+        )
+        for bond in boundary_only_bonds
+    )
+
+
+def test_scene_response_returns_warning_when_bond_analysis_fails(monkeypatch) -> None:
+    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
+
+    def fail_bonds(**_kwargs: object) -> list[dict[str, object]]:
+        raise RuntimeError("neighbor graph unavailable")
+
+    monkeypatch.setattr(scene_module, "_build_bonds", fail_bonds)
+
+    scene = build_scene_response(structure)
+
+    assert scene["bonds"] == []
+    assert scene["warnings"] == [
+        {
+            "code": "bond-analysis-failed",
+            "message": "Bond analysis with CrystalNN failed: neighbor graph unavailable",
+        }
+    ]
+
+
+def test_empty_bond_result_is_not_a_warning(monkeypatch) -> None:
+    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
+
+    monkeypatch.setattr(scene_module, "_build_bonds", lambda **_kwargs: [])
+
+    scene = build_scene_response(structure)
+
+    assert scene["bonds"] == []
+    assert "warnings" not in scene
 
 
 def test_scene_summary_marks_non_periodic_symmetry_unavailable() -> None:

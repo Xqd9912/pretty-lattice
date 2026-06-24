@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+import pretty_lattice.structures.scene as scene_module
 from pretty_lattice.server.app import create_app
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "structures"
@@ -45,8 +46,14 @@ async def test_structure_preview_upload_endpoint_returns_scene() -> None:
         assert canonical_atoms[0]["siteId"] == "Sr-0"
         assert canonical_atoms[0]["fractionalPosition"] == [0.0, 0.0, 0.0]
         assert canonical_atoms[0]["imageOffset"] == [0, 0, 0]
-        assert len(periodic_image_atoms) == 10
+        assert canonical_atoms[0]["imageReasons"] == []
+        assert canonical_atoms[0]["visibilityDependencies"] == []
+        assert len(periodic_image_atoms) > 10
+        assert len([atom for atom in payload["atoms"] if "boundary" in atom["imageReasons"]]) == 10
+        assert len([atom for atom in payload["atoms"] if "bonded" in atom["imageReasons"]]) > 0
         assert "Sr-0" in {atom["siteId"] for atom in periodic_image_atoms}
+        assert payload["bonds"]
+        assert "warnings" not in payload
         assert payload["summary"] == {
             "formula": "SrTiO3",
             "atomCount": 5,
@@ -68,8 +75,71 @@ async def test_structure_preview_upload_endpoint_returns_scene() -> None:
                 "latticeSystem": "cubic",
             },
         }
-        assert "bonds" not in payload
         assert "view" not in payload
+
+
+@pytest.mark.anyio
+async def test_structure_preview_upload_endpoint_accepts_supported_bond_algorithm() -> None:
+    payload = (FIXTURE_DIR / "SrTiO3.cif").read_bytes()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app()), base_url="http://testserver"
+    ) as client:
+        response = await client.post(
+            "/api/structure-preview?bondAlgorithm=minimum-distance",
+            content=payload,
+            headers={"x-pretty-lattice-filename": "SrTiO3.cif"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["bonds"]
+
+
+@pytest.mark.anyio
+async def test_structure_preview_upload_endpoint_rejects_unsupported_bond_algorithm() -> None:
+    payload = (FIXTURE_DIR / "SrTiO3.cif").read_bytes()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app()), base_url="http://testserver"
+    ) as client:
+        response = await client.post(
+            "/api/structure-preview?bondAlgorithm=custom-cutoff",
+            content=payload,
+            headers={"x-pretty-lattice-filename": "SrTiO3.cif"},
+        )
+
+    assert response.status_code == 400
+    assert "Unsupported bond algorithm" in response.json()["detail"]["message"]
+
+
+@pytest.mark.anyio
+async def test_structure_preview_upload_endpoint_returns_bond_warning(monkeypatch) -> None:
+    payload = (FIXTURE_DIR / "SrTiO3.cif").read_bytes()
+
+    def fail_bonds(**_kwargs: object) -> list[dict[str, object]]:
+        raise RuntimeError("neighbor graph unavailable")
+
+    monkeypatch.setattr(scene_module, "_build_bonds", fail_bonds)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app()), base_url="http://testserver"
+    ) as client:
+        response = await client.post(
+            "/api/structure-preview",
+            content=payload,
+            headers={"x-pretty-lattice-filename": "SrTiO3.cif"},
+        )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["atoms"]
+    assert payload["bonds"] == []
+    assert payload["warnings"] == [
+        {
+            "code": "bond-analysis-failed",
+            "message": "Bond analysis with CrystalNN failed: neighbor graph unavailable",
+        }
+    ]
 
 
 @pytest.mark.anyio

@@ -7,7 +7,7 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 
-import type { AtomSpec, SceneSpec } from "../api/scene";
+import type { AtomSpec, BondSpec, SceneSpec } from "../api/scene";
 import { applyWheelZoomDelta, type InteractionMode } from "../app/viewState";
 import {
   applyOrthographicFrustum,
@@ -40,9 +40,11 @@ const NARROW_VIEWPORT_SAFE_AREA: PreviewSafeArea = {
   bottom: 132,
   left: 16,
   right: 88,
-  top: 384,
+  top: 476,
 };
 const CAMERA_TARGET = new Vector3(0, 0, 0);
+export const BOND_COLOR = "#c7cbd1";
+export const BOND_RADIUS = 0.12;
 const CELL_FRAME_COLOR = "#111111";
 export const CELL_FRAME_LINE_WIDTH_PIXELS = 1;
 
@@ -50,22 +52,29 @@ export function LatticeScene({
   cameraOrientationRef,
   interactionLocked,
   interactionMode,
+  layoutScene,
   onViewScaleChange,
   resetCounter,
   safeArea = EMPTY_SAFE_AREA,
   scene,
+  showAtoms = true,
+  showUnitCell = true,
   viewScale,
 }: {
   cameraOrientationRef?: CameraOrientationRef;
   interactionLocked: boolean;
   interactionMode: InteractionMode;
+  layoutScene?: SceneSpec;
   onViewScaleChange: (viewScale: number) => void;
   resetCounter: number;
   safeArea?: PreviewSafeArea;
   scene: SceneSpec;
+  showAtoms?: boolean;
+  showUnitCell?: boolean;
   viewScale: number;
 }) {
-  const layout = useMemo(() => computeSceneLayout(scene), [scene]);
+  const layoutSourceScene = layoutScene ?? scene;
+  const layout = useMemo(() => computeSceneLayout(layoutSourceScene), [layoutSourceScene]);
 
   return (
     <Canvas
@@ -87,6 +96,8 @@ export function LatticeScene({
         resetCounter={resetCounter}
         safeArea={safeArea}
         scene={scene}
+        showAtoms={showAtoms}
+        showUnitCell={showUnitCell}
         viewScale={viewScale}
       />
       <CameraOrientationTracker cameraOrientationRef={cameraOrientationRef} />
@@ -124,15 +135,20 @@ function SceneContent({
   resetCounter,
   safeArea,
   scene,
+  showAtoms,
+  showUnitCell,
   viewScale,
 }: {
   layout: SceneLayout;
   resetCounter: number;
   safeArea: PreviewSafeArea;
   scene: SceneSpec;
+  showAtoms: boolean;
+  showUnitCell: boolean;
   viewScale: number;
 }) {
   const { camera, size } = useThree();
+  const atomById = useMemo(() => new Map(scene.atoms.map((atom) => [atom.id, atom])), [scene]);
   const effectiveSafeArea = useMemo(
     () => previewSafeAreaForViewport(safeArea, size.width),
     [safeArea, size.width],
@@ -145,7 +161,7 @@ function SceneContent({
 
   useEffect(() => {
     applyStandardCameraPose(camera, layout.standardPose, layout.span);
-  }, [camera, resetCounter]);
+  }, [camera, layout.span, layout.standardPose, resetCounter]);
 
   useEffect(() => {
     if (camera instanceof OrthographicCamera) {
@@ -156,10 +172,13 @@ function SceneContent({
   return (
     <group>
       <group position={layout.groupPosition}>
-        <CellFrame vectors={scene.cell.vectors} />
-        {scene.atoms.map((atom) => (
-          <Atom key={atom.id} atom={atom} />
+        {showUnitCell ? <CellFrame vectors={scene.cell.vectors} /> : null}
+        {scene.bonds.map((bond) => (
+          <Bond key={bond.id} atomById={atomById} bond={bond} />
         ))}
+        {showAtoms
+          ? scene.atoms.map((atom) => <Atom key={atom.id} atom={atom} />)
+          : null}
       </group>
     </group>
   );
@@ -305,6 +324,50 @@ function Atom({ atom }: { atom: AtomSpec }) {
     <mesh position={atom.position}>
       <sphereGeometry args={[atom.radius, 48, 32]} />
       <meshStandardMaterial color={atom.color} roughness={0.42} metalness={0.04} />
+    </mesh>
+  );
+}
+
+function Bond({
+  atomById,
+  bond,
+}: {
+  atomById: Map<string, AtomSpec>;
+  bond: BondSpec;
+}) {
+  const geometry = useMemo(() => {
+    const startAtom = atomById.get(bond.startAtomId);
+    const endAtom = atomById.get(bond.endAtomId);
+    if (!startAtom || !endAtom) {
+      return null;
+    }
+
+    const start = new Vector3(...startAtom.position);
+    const end = new Vector3(...endAtom.position);
+    const direction = end.clone().sub(start);
+    const length = direction.length();
+    if (length <= 0) {
+      return null;
+    }
+
+    return {
+      length,
+      position: start.add(end).multiplyScalar(0.5),
+      quaternion: new Quaternion().setFromUnitVectors(
+        new Vector3(0, 1, 0),
+        direction.normalize(),
+      ),
+    };
+  }, [atomById, bond.endAtomId, bond.startAtomId]);
+
+  if (!geometry) {
+    return null;
+  }
+
+  return (
+    <mesh position={geometry.position} quaternion={geometry.quaternion}>
+      <cylinderGeometry args={[BOND_RADIUS, BOND_RADIUS, geometry.length, 24]} />
+      <meshStandardMaterial color={BOND_COLOR} roughness={0.42} metalness={0.04} />
     </mesh>
   );
 }
