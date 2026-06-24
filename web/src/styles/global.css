@@ -287,27 +287,38 @@
     background: color-mix(in srgb, var(--foreground) 45%, transparent);
   }
 
+  .opacity-slider-snap-marker {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    width: 2px;
+    height: 10px;
+    translate: -50% -50%;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--foreground) 32%, transparent);
+  }
+
   .opacity-slider-thumb {
     position: absolute;
     inset-inline-start: var(--opacity-slider-position);
     inset-block-start: 50%;
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     translate: -50% -50%;
     border: 3px solid color-mix(in srgb, var(--card) 92%, transparent);
     border-radius: 999px;
     background: var(--foreground);
-    box-shadow: 0 2px 7px rgb(0 0 0 / 16%);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
     transition:
-      box-shadow 180ms ease-out,
-      opacity 150ms ease-out,
-      background-color 150ms ease-out;
+      box-shadow 560ms cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 150ms ease-out;
   }
 
   .opacity-slider-shell:focus-within .opacity-slider-thumb {
     box-shadow:
-      0 0 0 3px color-mix(in srgb, var(--ring) 30%, transparent),
-      0 2px 7px rgb(0 0 0 / 16%);
+      0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent),
+      0 2px 8px rgb(0 0 0 / 18%);
+    transition-duration: 150ms;
   }
 
   .opacity-slider-shell[data-disabled="true"] .opacity-slider-track {

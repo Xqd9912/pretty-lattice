@@ -42,6 +42,7 @@ import {
 import {
   createDefaultComponentOpacity,
   createDefaultComponentVisibility,
+  createDefaultStyleScale,
   hasPolyhedra,
   previewSafeAreaForSettings,
   visibleSceneForComponents,
@@ -78,6 +79,7 @@ export function App() {
     createDefaultComponentVisibility,
   );
   const [componentOpacity, setComponentOpacity] = useState(createDefaultComponentOpacity);
+  const [styleScale, setStyleScale] = useState(createDefaultStyleScale);
   const [viewState, setViewState] = useState(createPreviewViewState);
   const [lockedInteractionFeedbackCount, setLockedInteractionFeedbackCount] = useState(0);
   const [isStructureSummaryCollapsed, setIsStructureSummaryCollapsed] = useState(false);
@@ -125,6 +127,7 @@ export function App() {
     setBondAlgorithm(DEFAULT_BOND_ALGORITHM);
     setComponentVisibility(createDefaultComponentVisibility());
     setComponentOpacity(createDefaultComponentOpacity());
+    setStyleScale(createDefaultStyleScale());
     setViewState(createPreviewViewState());
     setIsStructureSummaryCollapsed(false);
 
@@ -354,6 +357,7 @@ export function App() {
             safeArea={previewSafeArea}
             scene={visibleScene}
             componentOpacity={componentOpacity}
+            styleScale={styleScale}
             showAtoms={componentVisibility.atoms}
             showUnitCell={componentVisibility.unitCell}
             viewScale={viewState.viewScale}
@@ -405,9 +409,11 @@ export function App() {
           <div ref={commonControlsPanelRef}>
             <CommonControlsPanel
               componentOpacity={componentOpacity}
+              styleScale={styleScale}
               componentVisibility={componentVisibility}
               hasPolyhedra={hasPolyhedra(scene)}
               onComponentOpacityChange={setComponentOpacity}
+              onStyleScaleChange={setStyleScale}
               onComponentVisibilityChange={setComponentVisibility}
             />
           </div>

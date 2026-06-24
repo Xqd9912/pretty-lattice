@@ -26,9 +26,13 @@ import { cn } from "@/lib/utils";
 
 import {
   COMPONENT_OPACITY_MAX,
+  STYLE_SCALE_MAX,
+  STYLE_SCALE_MIN,
   createDefaultComponentOpacity,
+  createDefaultStyleScale,
   type ComponentOpacityState,
   type ComponentVisibilityState,
+  type StyleScaleState,
 } from "../settings";
 import { GLASS_SURFACE_CLASS } from "../surface";
 
@@ -52,6 +56,9 @@ const COMMON_PANEL_TABS: {
 const RESET_OPACITY_FEEDBACK_ANIMATION_MS = 150;
 const OPAQUE_OPACITY_VALUE = 100;
 const OPAQUE_SLIDER_SNAP_DISTANCE = 2;
+const LOG_SCALE_SLIDER_STEPS = 1000;
+const LOG_SCALE_SLIDER_SNAP_POSITION = 0.5;
+const LOG_SCALE_SLIDER_SNAP_THRESHOLD = 0.03;
 
 export function CommonControlsPanel({
   componentOpacity,
@@ -59,12 +66,16 @@ export function CommonControlsPanel({
   hasPolyhedra,
   onComponentOpacityChange,
   onComponentVisibilityChange,
+  onStyleScaleChange,
+  styleScale,
 }: {
   componentOpacity: ComponentOpacityState;
   componentVisibility: ComponentVisibilityState;
   hasPolyhedra: boolean;
   onComponentOpacityChange: Dispatch<SetStateAction<ComponentOpacityState>>;
   onComponentVisibilityChange: Dispatch<SetStateAction<ComponentVisibilityState>>;
+  onStyleScaleChange: Dispatch<SetStateAction<StyleScaleState>>;
+  styleScale: StyleScaleState;
 }) {
   const tabTriggerRefs = useRef<Record<CommonPanelTab, HTMLButtonElement | null>>({
     camera: null,
@@ -267,7 +278,10 @@ export function CommonControlsPanel({
               />
             </TabsContent>
             <TabsContent value="style" className="pt-1.5">
-              <ReservedTabContent />
+              <StyleTabContent
+                onStyleScaleChange={onStyleScaleChange}
+                styleScale={styleScale}
+              />
             </TabsContent>
             <TabsContent value="export" className="pt-1.5">
               <ReservedTabContent />
@@ -276,6 +290,102 @@ export function CommonControlsPanel({
         </Tabs>
       </aside>
     </TooltipProvider>
+  );
+}
+
+function StyleTabContent({
+  onStyleScaleChange,
+  styleScale,
+}: {
+  onStyleScaleChange: Dispatch<SetStateAction<StyleScaleState>>;
+  styleScale: StyleScaleState;
+}) {
+  function setStyleScale(key: keyof StyleScaleState, value: number) {
+    onStyleScaleChange((currentStyleScale) => ({
+      ...currentStyleScale,
+      [key]: clampPercentValue(value, STYLE_SCALE_MIN[key], STYLE_SCALE_MAX[key]),
+    }));
+  }
+
+  const [resetFeedbackPhase, setResetFeedbackPhase] = useState<"a" | "b" | null>(null);
+  const resetFeedbackTickRef = useRef(0);
+  const resetFeedbackTimeoutRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (resetFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(resetFeedbackTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  function handleResetScaleClick() {
+    onStyleScaleChange(createDefaultStyleScale());
+
+    if (resetFeedbackTimeoutRef.current !== null) {
+      window.clearTimeout(resetFeedbackTimeoutRef.current);
+    }
+
+    resetFeedbackTickRef.current += 1;
+    setResetFeedbackPhase(resetFeedbackTickRef.current % 2 === 0 ? "b" : "a");
+    resetFeedbackTimeoutRef.current = window.setTimeout(() => {
+      setResetFeedbackPhase(null);
+      resetFeedbackTimeoutRef.current = null;
+    }, RESET_OPACITY_FEEDBACK_ANIMATION_MS);
+  }
+
+  return (
+    <section aria-labelledby="style-size-label">
+      <div className="grid grid-cols-[minmax(5.5rem,1fr)_6.75rem_2.35rem] items-center gap-2 px-1.5">
+        <h2
+          id="style-size-label"
+          className="text-xs font-bold leading-tight text-muted-foreground"
+        >
+          Size
+        </h2>
+        <span className="text-right text-xs font-bold leading-tight text-muted-foreground">
+          Scale
+        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Reset scale"
+                className={cn(
+                  "view-rail-button size-7 rounded-[10px] border border-transparent bg-transparent text-muted-foreground shadow-none transition-[background-color,border-color,color,box-shadow] duration-150 [&_svg]:size-3.5",
+                  resetFeedbackPhase === "a" ? "view-rail-button-reset-feedback-a" : null,
+                  resetFeedbackPhase === "b" ? "view-rail-button-reset-feedback-b" : null,
+                )}
+                onClick={handleResetScaleClick}
+              >
+                <RotateCcw aria-hidden="true" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">Reset scale</TooltipContent>
+        </Tooltip>
+      </div>
+
+      <div className="mt-1 flex flex-col gap-1">
+        <PercentSliderRow
+          label="Atom"
+          max={STYLE_SCALE_MAX.atomRadius}
+          min={STYLE_SCALE_MIN.atomRadius}
+          value={styleScale.atomRadius}
+          onValueChange={(value) => setStyleScale("atomRadius", value)}
+        />
+        <PercentSliderRow
+          label="Bond"
+          max={STYLE_SCALE_MAX.bondThickness}
+          min={STYLE_SCALE_MIN.bondThickness}
+          value={styleScale.bondThickness}
+          onValueChange={(value) => setStyleScale("bondThickness", value)}
+        />
+      </div>
+    </section>
   );
 }
 
@@ -530,7 +640,7 @@ function ComponentOpacityRow({
       </label>
 
       <div
-        className="opacity-slider-shell relative h-5"
+        className="opacity-slider-shell relative mr-3 h-5"
         data-disabled={inputDisabled ? "true" : "false"}
         style={sliderStyle}
       >
@@ -542,7 +652,7 @@ function ComponentOpacityRow({
           value={value}
           disabled={inputDisabled}
           aria-label={`${label} opacity`}
-          aria-valuetext={formatOpacityValue(value)}
+          aria-valuetext={`${formatOpacityValue(value)}%`}
           className="opacity-slider absolute inset-0 z-10 h-full w-full"
           onChange={(event) =>
             onOpacityChange(snapSliderOpacityValue(Number(event.target.value), max))
@@ -554,7 +664,7 @@ function ComponentOpacityRow({
       </div>
 
       <label
-        className="opacity-value-control group flex h-[22px] items-center justify-center rounded-md border px-0.5 transition-[background-color,border-color,box-shadow] duration-150"
+        className="opacity-value-control group flex h-[22px] items-baseline justify-center gap-0 rounded-md border px-0.5 transition-[background-color,border-color,box-shadow] duration-150"
         data-disabled={inputDisabled ? "true" : "false"}
       >
         <span className="sr-only">{label} opacity value</span>
@@ -564,11 +674,138 @@ function ComponentOpacityRow({
           value={opacityText}
           disabled={inputDisabled}
           aria-label={`${label} opacity value`}
-          className="opacity-value-input h-full w-full border-0 bg-transparent px-0 text-center font-mono text-[0.68rem] leading-none tabular-nums outline-none"
+          className="opacity-value-input h-full w-[1.35rem] border-0 bg-transparent px-0 text-center font-mono text-[0.68rem] leading-none tabular-nums outline-none"
           onBlur={commitOpacityText}
           onChange={(event) => setOpacityText(event.target.value)}
           onKeyDown={handleOpacityKeyDown}
         />
+        <span
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none font-mono text-[0.68rem] font-normal leading-none text-muted-foreground",
+            inputDisabled ? "text-muted-foreground/60" : null,
+          )}
+        >
+          %
+        </span>
+      </label>
+    </div>
+  );
+}
+
+function PercentSliderRow({
+  label,
+  max,
+  min,
+  onValueChange,
+  value,
+}: {
+  label: string;
+  max: number;
+  min: number;
+  onValueChange: (value: number) => void;
+  value: number;
+}) {
+  const [valueText, setValueText] = useState(formatPercentValue(value));
+  const sliderPosition = percentValueToLogSliderPosition(value, min, max);
+  const sliderValue = Math.round(sliderPosition * LOG_SCALE_SLIDER_STEPS);
+  const sliderStyle = {
+    "--opacity-slider-position": `${Math.min(100, Math.max(0, sliderPosition * 100))}%`,
+  } as CSSProperties;
+
+  useEffect(() => {
+    setValueText(formatPercentValue(value));
+  }, [value]);
+
+  function commitValueText() {
+    const nextValue = parsePercentInput(valueText);
+    if (nextValue === null) {
+      setValueText(formatPercentValue(value));
+      return;
+    }
+
+    onValueChange(clampPercentValue(nextValue, min, max));
+  }
+
+  function handleValueKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.currentTarget.blur();
+      commitValueText();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      setValueText(formatPercentValue(value));
+      event.currentTarget.blur();
+      return;
+    }
+
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      const direction = event.key === "ArrowUp" ? 1 : -1;
+      onValueChange(clampPercentValue(value + direction, min, max));
+    }
+  }
+
+  return (
+    <div className="grid h-7 min-w-0 grid-cols-[minmax(5.5rem,1fr)_6.75rem_2.35rem] items-center gap-2 rounded-md px-1.5 text-sm transition-colors hover:bg-accent/60">
+      <span className="min-w-0 truncate leading-tight">{label}</span>
+
+      <div
+        className="opacity-slider-shell relative mr-3 h-5"
+        data-disabled="false"
+        style={sliderStyle}
+      >
+        <input
+          type="range"
+          min={0}
+          max={LOG_SCALE_SLIDER_STEPS}
+          step={1}
+          value={sliderValue}
+          aria-label={`${label} scale`}
+          aria-valuetext={`${formatPercentValue(value)}%`}
+          className="opacity-slider absolute inset-0 z-10 h-full w-full"
+          onChange={(event) => {
+            const snappedPosition = snapLogScaleSliderPosition(
+              Number(event.target.value) / LOG_SCALE_SLIDER_STEPS,
+            );
+
+            onValueChange(
+              logSliderPositionToPercentValue(
+                snappedPosition,
+                min,
+                max,
+              ),
+            );
+          }}
+        />
+        <span aria-hidden="true" className="opacity-slider-track pointer-events-none" />
+        <span aria-hidden="true" className="opacity-slider-snap-marker pointer-events-none" />
+        <span aria-hidden="true" className="opacity-slider-fill pointer-events-none" />
+        <span aria-hidden="true" className="opacity-slider-thumb pointer-events-none" />
+      </div>
+
+      <label
+        className="opacity-value-control group flex h-[22px] items-baseline justify-center gap-0 rounded-md border px-0.5 transition-[background-color,border-color,box-shadow] duration-150"
+        data-disabled="false"
+      >
+        <span className="sr-only">{label} scale value</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={valueText}
+          aria-label={`${label} scale value`}
+          className="opacity-value-input h-full w-[1.35rem] border-0 bg-transparent px-0 text-center font-mono text-[0.68rem] leading-none tabular-nums outline-none"
+          onBlur={commitValueText}
+          onChange={(event) => setValueText(event.target.value)}
+          onKeyDown={handleValueKeyDown}
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none font-mono text-[0.68rem] font-normal leading-none text-muted-foreground"
+        >
+          %
+        </span>
       </label>
     </div>
   );
@@ -599,7 +836,57 @@ function formatOpacityValue(value: number): string {
 }
 
 function parseOpacityInput(value: string): number | null {
-  const trimmedValue = value.trim();
+  return parsePercentNumberInput(value);
+}
+
+function clampPercentValue(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function percentValueToLogSliderPosition(value: number, min: number, max: number): number {
+  if (min <= 0 || max <= min) {
+    return 0;
+  }
+
+  const clampedValue = clampPercentValue(value, min, max);
+  return (Math.log(clampedValue) - Math.log(min)) / (Math.log(max) - Math.log(min));
+}
+
+function logSliderPositionToPercentValue(position: number, min: number, max: number): number {
+  if (min <= 0 || max <= min || !Number.isFinite(position)) {
+    return min;
+  }
+
+  const clampedPosition = Math.min(1, Math.max(0, position));
+  return clampPercentValue(
+    Math.exp(Math.log(min) + clampedPosition * (Math.log(max) - Math.log(min))),
+    min,
+    max,
+  );
+}
+
+function snapLogScaleSliderPosition(position: number): number {
+  if (Math.abs(position - LOG_SCALE_SLIDER_SNAP_POSITION) <= LOG_SCALE_SLIDER_SNAP_THRESHOLD) {
+    return LOG_SCALE_SLIDER_SNAP_POSITION;
+  }
+
+  return position;
+}
+
+function formatPercentValue(value: number): string {
+  return String(Math.round(value));
+}
+
+function parsePercentInput(value: string): number | null {
+  return parsePercentNumberInput(value);
+}
+
+function parsePercentNumberInput(value: string): number | null {
+  const trimmedValue = value.trim().replace(/%$/, "").trim();
   if (trimmedValue === "") {
     return null;
   }

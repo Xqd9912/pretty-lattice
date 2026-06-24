@@ -98,6 +98,12 @@ describe("computeSceneLayout", () => {
     expect(positions.slice(-6)).toEqual([1, 3, 2, 5, 3, 2]);
   });
 
+  test("fits the preview layout from raw scene atom radii", () => {
+    const scene = sceneWithOffCenterAtoms();
+
+    expect(computeSceneLayout(scene).span).toBeCloseTo(6);
+  });
+
   test("uses fixed first-version bond styling", () => {
     expect(BOND_COLOR).toBe("#c7cbd1");
     expect(BOND_RADIUS).toBe(0.12);

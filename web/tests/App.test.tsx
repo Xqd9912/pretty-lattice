@@ -292,6 +292,7 @@ describe("App", () => {
 
     expect(resetOpacityButton.disabled).toBe(false);
     expect(atomsOpacityInput.value).toBe("100");
+    expect(atomsOpacityInput.parentElement?.textContent).toContain("%");
     expect(bondsOpacityInput.value).toBe("80");
     expect(polyhedraOpacityInput.value).toBe("25");
     expect(polyhedraOpacitySlider.max).toBe("50");
@@ -319,7 +320,7 @@ describe("App", () => {
     expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("true");
 
     await user.clear(polyhedraOpacityInput);
-    await user.type(polyhedraOpacityInput, "80{Enter}");
+    await user.type(polyhedraOpacityInput, "80%{Enter}");
 
     expect(polyhedraOpacityInput.value).toBe("50");
     expect(polyhedraOpacitySlider.value).toBe("50");
@@ -343,6 +344,67 @@ describe("App", () => {
       expect(resetOpacityButton.className).not.toContain("view-rail-button-reset-feedback"),
     );
     expect(resetOpacityButton.disabled).toBe(false);
+  });
+
+  test("lets style controls scale atom radius and bond thickness", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    await user.click(within(commonControls).getByRole("tab", { name: "Style" }));
+
+    expect(within(commonControls).getByText("Size").isConnected).toBe(true);
+    expect(within(commonControls).getByText("Atom").isConnected).toBe(true);
+    expect(within(commonControls).getByText("Bond").isConnected).toBe(true);
+    const atomRadiusSlider = within(commonControls).getByRole("slider", {
+      name: "Atom scale",
+    }) as HTMLInputElement;
+    const atomRadiusInput = within(commonControls).getByRole("textbox", {
+      name: "Atom scale value",
+    }) as HTMLInputElement;
+    const bondThicknessSlider = within(commonControls).getByRole("slider", {
+      name: "Bond scale",
+    }) as HTMLInputElement;
+    const bondThicknessInput = within(commonControls).getByRole("textbox", {
+      name: "Bond scale value",
+    }) as HTMLInputElement;
+
+    expect(atomRadiusSlider.min).toBe("0");
+    expect(atomRadiusSlider.max).toBe("1000");
+    expect(atomRadiusSlider.value).toBe("500");
+    expect(atomRadiusInput.value).toBe("100");
+    expect(atomRadiusInput.parentElement?.textContent).toContain("%");
+    expect(bondThicknessSlider.value).toBe("500");
+    expect(bondThicknessInput.value).toBe("100");
+    expect(commonControls.querySelectorAll(".opacity-slider-snap-marker")).toHaveLength(2);
+
+    fireEvent.change(atomRadiusSlider, { target: { value: "1000" } });
+
+    expect(atomRadiusInput.value).toBe("200");
+    expect(atomRadiusSlider.value).toBe("1000");
+
+    fireEvent.change(atomRadiusSlider, { target: { value: "520" } });
+
+    expect(atomRadiusInput.value).toBe("100");
+    expect(atomRadiusSlider.value).toBe("500");
+
+    await user.clear(bondThicknessInput);
+    await user.type(bondThicknessInput, "240{Enter}");
+
+    expect(bondThicknessInput.value).toBe("200");
+    expect(bondThicknessSlider.value).toBe("1000");
+
+    const resetScaleButton = within(commonControls).getByRole("button", {
+      name: "Reset scale",
+    }) as HTMLButtonElement;
+    await user.click(resetScaleButton);
+
+    expect(resetScaleButton.className).toContain("view-rail-button-reset-feedback");
+    expect(atomRadiusInput.value).toBe("100");
+    expect(atomRadiusSlider.value).toBe("500");
+    expect(bondThicknessInput.value).toBe("100");
+    expect(bondThicknessSlider.value).toBe("500");
   });
 
   test("uses a single sliding active indicator for tab animation", async () => {

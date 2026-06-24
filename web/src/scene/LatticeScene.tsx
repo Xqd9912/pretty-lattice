@@ -18,7 +18,7 @@ import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 
 import type { AtomSpec, BondSpec, PolyhedronSpec, SceneSpec } from "../api/scene";
-import type { ComponentOpacityState } from "../app/settings";
+import type { ComponentOpacityState, StyleScaleState } from "../app/settings";
 import { applyWheelZoomDelta, type InteractionMode } from "../app/viewState";
 import { CameraHeadlight } from "./CameraHeadlight";
 import { PREVIEW_AMBIENT_LIGHT_INTENSITY } from "./renderAppearance";
@@ -78,6 +78,7 @@ export function LatticeScene({
   scene,
   showAtoms = true,
   showUnitCell = true,
+  styleScale,
   viewScale,
 }: {
   cameraOrientationRef?: CameraOrientationRef;
@@ -91,6 +92,7 @@ export function LatticeScene({
   scene: SceneSpec;
   showAtoms?: boolean;
   showUnitCell?: boolean;
+  styleScale: StyleScaleState;
   viewScale: number;
 }) {
   const layoutSourceScene = layoutScene ?? scene;
@@ -118,6 +120,7 @@ export function LatticeScene({
         scene={scene}
         showAtoms={showAtoms}
         showUnitCell={showUnitCell}
+        styleScale={styleScale}
         viewScale={viewScale}
       />
       <CameraOrientationTracker cameraOrientationRef={cameraOrientationRef} />
@@ -158,6 +161,7 @@ function SceneContent({
   scene,
   showAtoms,
   showUnitCell,
+  styleScale,
   viewScale,
 }: {
   componentOpacity: ComponentOpacityState;
@@ -167,6 +171,7 @@ function SceneContent({
   scene: SceneSpec;
   showAtoms: boolean;
   showUnitCell: boolean;
+  styleScale: StyleScaleState;
   viewScale: number;
 }) {
   const { camera, size } = useThree();
@@ -213,6 +218,7 @@ function SceneContent({
             key={bond.id}
             atomById={atomById}
             bond={bond}
+            thicknessScale={styleScale.bondThickness / 100}
             opacity={componentOpacity.bonds / 100}
           />
         ))}
@@ -221,6 +227,7 @@ function SceneContent({
               <Atom
                 key={atom.id}
                 atom={atom}
+                radiusScale={styleScale.atomRadius / 100}
                 opacity={componentOpacity.atoms / 100}
               />
             ))
@@ -365,12 +372,20 @@ function applyStandardCameraPose(
   camera.position.set(...standardPose.cameraPosition);
 }
 
-function Atom({ atom, opacity }: { atom: AtomSpec; opacity: number }) {
+function Atom({
+  atom,
+  opacity,
+  radiusScale,
+}: {
+  atom: AtomSpec;
+  opacity: number;
+  radiusScale: number;
+}) {
   const isTransparent = opacity < 1;
 
   return (
     <mesh position={atom.position}>
-      <sphereGeometry args={[atom.radius, 48, 32]} />
+      <sphereGeometry args={[atom.radius * radiusScale, 48, 32]} />
       <meshLambertMaterial
         key={isTransparent ? "transparent" : "opaque"}
         color={atom.color}
@@ -386,10 +401,12 @@ function Bond({
   atomById,
   bond,
   opacity,
+  thicknessScale,
 }: {
   atomById: Map<string, AtomSpec>;
   bond: BondSpec;
   opacity: number;
+  thicknessScale: number;
 }) {
   const geometry = useMemo(() => {
     const startAtom = atomById.get(bond.startAtomId);
@@ -424,7 +441,14 @@ function Bond({
 
   return (
     <mesh position={geometry.position} quaternion={geometry.quaternion}>
-      <cylinderGeometry args={[BOND_RADIUS, BOND_RADIUS, geometry.length, 24]} />
+      <cylinderGeometry
+        args={[
+          BOND_RADIUS * thicknessScale,
+          BOND_RADIUS * thicknessScale,
+          geometry.length,
+          24,
+        ]}
+      />
       <meshLambertMaterial
         key={isTransparent ? "transparent" : "opaque"}
         color={BOND_COLOR}

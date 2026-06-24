@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test";
 
 import type { AtomSpec, SceneSpec } from "../src/api/scene";
 import {
+  STYLE_SCALE_MAX,
+  STYLE_SCALE_MIN,
+  createDefaultStyleScale,
   createDefaultComponentVisibility,
   SETTINGS_PREVIEW_SAFE_AREA,
   countPeriodicImageAtoms,
@@ -12,6 +15,15 @@ import {
 } from "../src/app/settings";
 
 describe("settings", () => {
+  test("defaults style scale controls to global 100 percent", () => {
+    expect(createDefaultStyleScale()).toEqual({
+      atomRadius: 100,
+      bondThickness: 100,
+    });
+    expect(STYLE_SCALE_MIN.atomRadius).toBe(50);
+    expect(STYLE_SCALE_MAX.bondThickness).toBe(200);
+  });
+
   test("detects periodic image atoms", () => {
     const scene = sceneWithPeriodicImages();
 

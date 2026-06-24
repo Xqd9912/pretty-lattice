@@ -53,6 +53,26 @@ export const COMPONENT_OPACITY_MAX: ComponentOpacityState = {
   polyhedra: 50,
 };
 
+export interface StyleScaleState {
+  atomRadius: number;
+  bondThickness: number;
+}
+
+export const DEFAULT_STYLE_SCALE: StyleScaleState = {
+  atomRadius: 100,
+  bondThickness: 100,
+};
+
+export const STYLE_SCALE_MIN: StyleScaleState = {
+  atomRadius: 50,
+  bondThickness: 50,
+};
+
+export const STYLE_SCALE_MAX: StyleScaleState = {
+  atomRadius: 200,
+  bondThickness: 200,
+};
+
 export function createDefaultComponentVisibility(
   _scene: SceneSpec | null = null,
 ): ComponentVisibilityState {
@@ -61,6 +81,10 @@ export function createDefaultComponentVisibility(
 
 export function createDefaultComponentOpacity(): ComponentOpacityState {
   return { ...DEFAULT_COMPONENT_OPACITY };
+}
+
+export function createDefaultStyleScale(): StyleScaleState {
+  return { ...DEFAULT_STYLE_SCALE };
 }
 
 export function componentOpacityEquals(
