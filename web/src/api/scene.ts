@@ -10,6 +10,7 @@ export interface SceneSpec {
 }
 
 export type BondAlgorithm = "crystal-nn" | "minimum-distance" | "voronoi-nn";
+export type AtomRadiusModel = "uniform" | "atomic" | "vdw" | "ionic";
 
 export const DEFAULT_BOND_ALGORITHM: BondAlgorithm = "crystal-nn";
 
@@ -57,8 +58,11 @@ export interface AtomSpec {
   visibilityDependencies: VisibilityDependency[];
   visibilityDependencyGroups: VisibilityDependency[][];
   radius: number;
+  radii?: AtomRadii;
   color: string;
 }
+
+export type AtomRadii = Record<AtomRadiusModel, number>;
 
 export type ImageReason = "boundary" | "bonded";
 
@@ -116,11 +120,17 @@ export async function uploadStructurePreview(
 }
 
 function previewEndpointForOptions(options: { bondAlgorithm?: BondAlgorithm }): string {
-  if (!options.bondAlgorithm || options.bondAlgorithm === DEFAULT_BOND_ALGORITHM) {
+  const params = new URLSearchParams();
+  if (options.bondAlgorithm && options.bondAlgorithm !== DEFAULT_BOND_ALGORITHM) {
+    params.set("bondAlgorithm", options.bondAlgorithm);
+  }
+
+  const query = params.toString();
+  if (!query) {
     return "/api/structure-preview";
   }
 
-  return `/api/structure-preview?bondAlgorithm=${encodeURIComponent(options.bondAlgorithm)}`;
+  return `/api/structure-preview?${query}`;
 }
 
 async function readPreviewError(response: Response): Promise<string> {

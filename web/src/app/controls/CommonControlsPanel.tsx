@@ -10,6 +10,7 @@ import {
   type CSSProperties,
   type Dispatch,
   type KeyboardEvent,
+  type ReactNode,
   type SetStateAction,
   useEffect,
   useRef,
@@ -18,21 +19,32 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
+import type { AtomRadiusModel } from "../../api/scene";
 import {
   COMPONENT_OPACITY_MAX,
   STYLE_SCALE_MAX,
   STYLE_SCALE_MIN,
   createDefaultComponentOpacity,
-  createDefaultStyleScale,
+  createDefaultStyle,
+  type BondColorMode,
   type ComponentOpacityState,
   type ComponentVisibilityState,
-  type StyleScaleState,
+  type StyleState,
 } from "../settings";
 import { GLASS_SURFACE_CLASS } from "../surface";
 
@@ -56,9 +68,25 @@ const COMMON_PANEL_TABS: {
 const RESET_OPACITY_FEEDBACK_ANIMATION_MS = 150;
 const OPAQUE_OPACITY_VALUE = 100;
 const OPAQUE_SLIDER_SNAP_DISTANCE = 2;
-const LOG_SCALE_SLIDER_STEPS = 1000;
-const LOG_SCALE_SLIDER_SNAP_POSITION = 0.5;
-const LOG_SCALE_SLIDER_SNAP_THRESHOLD = 0.03;
+const STYLE_SCALE_DEFAULT_VALUE = 100;
+const STYLE_SCALE_SLIDER_SNAP_DISTANCE = 4;
+const BOND_COLOR_OPTIONS: { label: string; value: BondColorMode }[] = [
+  { label: "Unicolor", value: "neutral" },
+  { label: "Bicolor", value: "by-atom" },
+];
+const ATOM_RADIUS_MODEL_OPTIONS: {
+  menuLabel: string;
+  triggerLabel: string;
+  value: AtomRadiusModel;
+}[] = [
+  { menuLabel: "Uniform", triggerLabel: "Uniform", value: "uniform" },
+  { menuLabel: "Atomic", triggerLabel: "Atomic", value: "atomic" },
+  { menuLabel: "Van der Waals", triggerLabel: "vdW", value: "vdw" },
+  { menuLabel: "Ionic", triggerLabel: "Ionic", value: "ionic" },
+];
+const BICOLOR_TOKEN_STYLE = {
+  background: "linear-gradient(90deg, #f58c9a 0 50%, #78a7ff 50% 100%)",
+} as const;
 
 export function CommonControlsPanel({
   componentOpacity,
@@ -66,16 +94,18 @@ export function CommonControlsPanel({
   hasPolyhedra,
   onComponentOpacityChange,
   onComponentVisibilityChange,
-  onStyleScaleChange,
-  styleScale,
+  onAtomRadiusModelChange,
+  onStyleChange,
+  style,
 }: {
   componentOpacity: ComponentOpacityState;
   componentVisibility: ComponentVisibilityState;
   hasPolyhedra: boolean;
+  onAtomRadiusModelChange: (atomRadiusModel: AtomRadiusModel) => void;
   onComponentOpacityChange: Dispatch<SetStateAction<ComponentOpacityState>>;
   onComponentVisibilityChange: Dispatch<SetStateAction<ComponentVisibilityState>>;
-  onStyleScaleChange: Dispatch<SetStateAction<StyleScaleState>>;
-  styleScale: StyleScaleState;
+  onStyleChange: Dispatch<SetStateAction<StyleState>>;
+  style: StyleState;
 }) {
   const tabTriggerRefs = useRef<Record<CommonPanelTab, HTMLButtonElement | null>>({
     camera: null,
@@ -268,7 +298,7 @@ export function CommonControlsPanel({
             <TabsContent value="camera" className="pt-1.5">
               <ReservedTabContent />
             </TabsContent>
-            <TabsContent value="display" className="pt-1.5">
+            <TabsContent value="display">
               <DisplayTabContent
                 hasPolyhedra={hasPolyhedra}
                 opacity={componentOpacity}
@@ -277,10 +307,11 @@ export function CommonControlsPanel({
                 onVisibilityChange={onComponentVisibilityChange}
               />
             </TabsContent>
-            <TabsContent value="style" className="pt-1.5">
+            <TabsContent value="style">
               <StyleTabContent
-                onStyleScaleChange={onStyleScaleChange}
-                styleScale={styleScale}
+                onAtomRadiusModelChange={onAtomRadiusModelChange}
+                onStyleChange={onStyleChange}
+                style={style}
               />
             </TabsContent>
             <TabsContent value="export" className="pt-1.5">
@@ -294,16 +325,29 @@ export function CommonControlsPanel({
 }
 
 function StyleTabContent({
-  onStyleScaleChange,
-  styleScale,
+  onAtomRadiusModelChange,
+  onStyleChange,
+  style,
 }: {
-  onStyleScaleChange: Dispatch<SetStateAction<StyleScaleState>>;
-  styleScale: StyleScaleState;
+  onAtomRadiusModelChange: (atomRadiusModel: AtomRadiusModel) => void;
+  onStyleChange: Dispatch<SetStateAction<StyleState>>;
+  style: StyleState;
 }) {
-  function setStyleScale(key: keyof StyleScaleState, value: number) {
-    onStyleScaleChange((currentStyleScale) => ({
-      ...currentStyleScale,
+  function setStyleScale(key: keyof typeof STYLE_SCALE_MIN, value: number) {
+    onStyleChange((currentStyle) => ({
+      ...currentStyle,
       [key]: clampPercentValue(value, STYLE_SCALE_MIN[key], STYLE_SCALE_MAX[key]),
+    }));
+  }
+
+  function setAtomRadiusModel(atomRadiusModel: AtomRadiusModel) {
+    onAtomRadiusModelChange(atomRadiusModel);
+  }
+
+  function setBondColorMode(bondColorMode: BondColorMode) {
+    onStyleChange((currentStyle) => ({
+      ...currentStyle,
+      bondColorMode,
     }));
   }
 
@@ -321,7 +365,11 @@ function StyleTabContent({
   );
 
   function handleResetScaleClick() {
-    onStyleScaleChange(createDefaultStyleScale());
+    onStyleChange((currentStyle) => ({
+      ...currentStyle,
+      atomRadius: createDefaultStyle().atomRadius,
+      bondThickness: createDefaultStyle().bondThickness,
+    }));
 
     if (resetFeedbackTimeoutRef.current !== null) {
       window.clearTimeout(resetFeedbackTimeoutRef.current);
@@ -336,56 +384,168 @@ function StyleTabContent({
   }
 
   return (
-    <section aria-labelledby="style-size-label">
-      <div className="grid grid-cols-[minmax(5.5rem,1fr)_6.75rem_2.35rem] items-center gap-2 px-1.5">
-        <h2
-          id="style-size-label"
-          className="text-xs font-bold leading-tight text-muted-foreground"
-        >
-          Size
-        </h2>
-        <span className="text-right text-xs font-bold leading-tight text-muted-foreground">
-          Scale
-        </span>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="flex justify-end">
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Reset scale"
-                className={cn(
-                  "view-rail-button size-7 rounded-[10px] border border-transparent bg-transparent text-muted-foreground shadow-none transition-[background-color,border-color,color,box-shadow] duration-150 [&_svg]:size-3.5",
-                  resetFeedbackPhase === "a" ? "view-rail-button-reset-feedback-a" : null,
-                  resetFeedbackPhase === "b" ? "view-rail-button-reset-feedback-b" : null,
-                )}
-                onClick={handleResetScaleClick}
-              >
-                <RotateCcw aria-hidden="true" />
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="top">Reset scale</TooltipContent>
-        </Tooltip>
-      </div>
+    <div className="flex flex-col gap-2.5">
+      <section aria-labelledby="style-size-label">
+        <div className="grid grid-cols-[minmax(5.5rem,1fr)_6.75rem_2.35rem] items-center gap-2 px-1.5">
+          <h2
+            id="style-size-label"
+            className="text-xs font-bold leading-tight text-muted-foreground"
+          >
+            Radius
+          </h2>
+          <span aria-hidden="true" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Reset scale"
+                  className={cn(
+                    "view-rail-button size-7 rounded-[10px] border border-transparent bg-transparent text-muted-foreground shadow-none transition-[background-color,border-color,color,box-shadow] duration-150 [&_svg]:size-3.5",
+                    resetFeedbackPhase === "a" ? "view-rail-button-reset-feedback-a" : null,
+                    resetFeedbackPhase === "b" ? "view-rail-button-reset-feedback-b" : null,
+                  )}
+                  onClick={handleResetScaleClick}
+                >
+                  <RotateCcw aria-hidden="true" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">Reset scale</TooltipContent>
+          </Tooltip>
+        </div>
 
-      <div className="mt-1 flex flex-col gap-1">
-        <PercentSliderRow
-          label="Atom"
-          max={STYLE_SCALE_MAX.atomRadius}
-          min={STYLE_SCALE_MIN.atomRadius}
-          value={styleScale.atomRadius}
-          onValueChange={(value) => setStyleScale("atomRadius", value)}
-        />
-        <PercentSliderRow
-          label="Bond"
-          max={STYLE_SCALE_MAX.bondThickness}
-          min={STYLE_SCALE_MIN.bondThickness}
-          value={styleScale.bondThickness}
-          onValueChange={(value) => setStyleScale("bondThickness", value)}
-        />
+        <div className="mt-1 flex flex-col gap-1">
+          <PercentSliderRow
+            accessibleLabel="Atom"
+            label={(
+              <AtomRadiusModelSelect
+                value={style.atomRadiusModel}
+                onValueChange={setAtomRadiusModel}
+              />
+            )}
+            max={STYLE_SCALE_MAX.atomRadius}
+            min={STYLE_SCALE_MIN.atomRadius}
+            value={style.atomRadius}
+            onValueChange={(value) => setStyleScale("atomRadius", value)}
+          />
+          <PercentSliderRow
+            accessibleLabel="Bond"
+            label="Bond"
+            max={STYLE_SCALE_MAX.bondThickness}
+            min={STYLE_SCALE_MIN.bondThickness}
+            value={style.bondThickness}
+            onValueChange={(value) => setStyleScale("bondThickness", value)}
+          />
+        </div>
+      </section>
+
+      <Separator />
+
+      <div className="grid min-h-8 grid-cols-[minmax(5.5rem,1fr)_9.5rem] items-center gap-2 rounded-md px-1.5 text-sm">
+        <span className="min-w-0 truncate leading-tight">Bond style</span>
+        <Select
+          value={style.bondColorMode}
+          onValueChange={(value) => setBondColorMode(value as BondColorMode)}
+        >
+          <SelectTrigger
+            size="sm"
+            aria-label="Bond style"
+            className="!h-6 w-full !px-2 !py-0"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent
+            position="popper"
+            className="!bg-background !text-foreground"
+          >
+            <SelectGroup>
+              {BOND_COLOR_OPTIONS.map((option) => (
+                <SelectItem
+                  key={option.value}
+                  value={option.value}
+                  textValue={option.label}
+                  className="min-h-6 py-0.5 text-sm"
+                >
+                  <BondStyleOptionLabel
+                    label={option.label}
+                    value={option.value}
+                  />
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
-    </section>
+    </div>
+  );
+}
+
+function AtomRadiusModelSelect({
+  onValueChange,
+  value,
+}: {
+  onValueChange: (value: AtomRadiusModel) => void;
+  value: AtomRadiusModel;
+}) {
+  const selectedOption = ATOM_RADIUS_MODEL_OPTIONS.find((option) => option.value === value);
+
+  return (
+    <Select
+      value={value}
+      onValueChange={(nextValue) => onValueChange(nextValue as AtomRadiusModel)}
+    >
+      <SelectTrigger
+        size="sm"
+        aria-label="Atom radius model"
+        className="-ml-1.5 !h-6 w-20 gap-0.5 !py-0 !pr-0.5 !pl-1.5 [&_svg]:size-3.5"
+      >
+        <span data-slot="select-value" className="min-w-0 truncate">
+          {selectedOption?.triggerLabel}
+        </span>
+      </SelectTrigger>
+      <SelectContent
+        position="popper"
+        className="!bg-background !text-foreground"
+      >
+        <SelectGroup>
+          <SelectLabel className="py-1 text-xs font-medium">Atom radius model</SelectLabel>
+          {ATOM_RADIUS_MODEL_OPTIONS.map((option) => (
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              textValue={option.menuLabel}
+              className="min-h-6 py-0.5 text-sm"
+            >
+              {option.menuLabel}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
+
+function BondStyleOptionLabel({
+  label,
+  value,
+}: {
+  label: string;
+  value: BondColorMode;
+}) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-2">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "size-3.5 shrink-0 rounded-full border border-border",
+          value === "neutral" ? "bg-[#8f96a3]" : null,
+        )}
+        style={value === "by-atom" ? BICOLOR_TOKEN_STYLE : undefined}
+      />
+      <span className="min-w-0 truncate">{label}</span>
+    </span>
   );
 }
 
@@ -531,9 +691,9 @@ function DisplayTabContent({
           id="image-components-label"
           className="text-xs font-bold leading-tight text-muted-foreground"
         >
-          Images
+          Periodic images
         </h2>
-        <div className="mt-0.5 flex flex-col gap-0.5">
+        <div className="mt-1.5 flex flex-col gap-1">
           <ImageSwitchRow
             checked={visibility.boundaryAtoms}
             label="Cell-boundary atoms"
@@ -694,21 +854,22 @@ function ComponentOpacityRow({
 }
 
 function PercentSliderRow({
+  accessibleLabel,
   label,
   max,
   min,
   onValueChange,
   value,
 }: {
-  label: string;
+  accessibleLabel: string;
+  label: ReactNode;
   max: number;
   min: number;
   onValueChange: (value: number) => void;
   value: number;
 }) {
   const [valueText, setValueText] = useState(formatPercentValue(value));
-  const sliderPosition = percentValueToLogSliderPosition(value, min, max);
-  const sliderValue = Math.round(sliderPosition * LOG_SCALE_SLIDER_STEPS);
+  const sliderPosition = percentValueToLinearSliderPosition(value, min, max);
   const sliderStyle = {
     "--opacity-slider-position": `${Math.min(100, Math.max(0, sliderPosition * 100))}%`,
   } as CSSProperties;
@@ -748,8 +909,8 @@ function PercentSliderRow({
   }
 
   return (
-    <div className="grid h-7 min-w-0 grid-cols-[minmax(5.5rem,1fr)_6.75rem_2.35rem] items-center gap-2 rounded-md px-1.5 text-sm transition-colors hover:bg-accent/60">
-      <span className="min-w-0 truncate leading-tight">{label}</span>
+    <div className="grid h-7 min-w-0 grid-cols-[minmax(5.5rem,1fr)_6.75rem_2.35rem] items-center gap-2 rounded-md px-1.5 text-sm">
+      <div className="min-w-0 overflow-visible leading-tight">{label}</div>
 
       <div
         className="opacity-slider-shell relative mr-3 h-5"
@@ -758,26 +919,16 @@ function PercentSliderRow({
       >
         <input
           type="range"
-          min={0}
-          max={LOG_SCALE_SLIDER_STEPS}
+          min={min}
+          max={max}
           step={1}
-          value={sliderValue}
-          aria-label={`${label} scale`}
+          value={clampPercentValue(value, min, max)}
+          aria-label={`${accessibleLabel} scale`}
           aria-valuetext={`${formatPercentValue(value)}%`}
           className="opacity-slider absolute inset-0 z-10 h-full w-full"
-          onChange={(event) => {
-            const snappedPosition = snapLogScaleSliderPosition(
-              Number(event.target.value) / LOG_SCALE_SLIDER_STEPS,
-            );
-
-            onValueChange(
-              logSliderPositionToPercentValue(
-                snappedPosition,
-                min,
-                max,
-              ),
-            );
-          }}
+          onChange={(event) =>
+            onValueChange(snapSliderPercentValue(Number(event.target.value), min, max))
+          }
         />
         <span aria-hidden="true" className="opacity-slider-track pointer-events-none" />
         <span aria-hidden="true" className="opacity-slider-snap-marker pointer-events-none" />
@@ -789,12 +940,12 @@ function PercentSliderRow({
         className="opacity-value-control group flex h-[22px] items-baseline justify-center gap-0 rounded-md border px-0.5 transition-[background-color,border-color,box-shadow] duration-150"
         data-disabled="false"
       >
-        <span className="sr-only">{label} scale value</span>
+        <span className="sr-only">{accessibleLabel} scale value</span>
         <input
           type="text"
           inputMode="numeric"
           value={valueText}
-          aria-label={`${label} scale value`}
+          aria-label={`${accessibleLabel} scale value`}
           className="opacity-value-input h-full w-[1.35rem] border-0 bg-transparent px-0 text-center font-mono text-[0.68rem] leading-none tabular-nums outline-none"
           onBlur={commitValueText}
           onChange={(event) => setValueText(event.target.value)}
@@ -847,34 +998,25 @@ function clampPercentValue(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)));
 }
 
-function percentValueToLogSliderPosition(value: number, min: number, max: number): number {
-  if (min <= 0 || max <= min) {
+function snapSliderPercentValue(value: number, min: number, max: number): number {
+  const clampedValue = clampPercentValue(value, min, max);
+  if (
+    min <= STYLE_SCALE_DEFAULT_VALUE &&
+    max >= STYLE_SCALE_DEFAULT_VALUE &&
+    Math.abs(clampedValue - STYLE_SCALE_DEFAULT_VALUE) <= STYLE_SCALE_SLIDER_SNAP_DISTANCE
+  ) {
+    return STYLE_SCALE_DEFAULT_VALUE;
+  }
+
+  return clampedValue;
+}
+
+function percentValueToLinearSliderPosition(value: number, min: number, max: number): number {
+  if (max <= min) {
     return 0;
   }
 
-  const clampedValue = clampPercentValue(value, min, max);
-  return (Math.log(clampedValue) - Math.log(min)) / (Math.log(max) - Math.log(min));
-}
-
-function logSliderPositionToPercentValue(position: number, min: number, max: number): number {
-  if (min <= 0 || max <= min || !Number.isFinite(position)) {
-    return min;
-  }
-
-  const clampedPosition = Math.min(1, Math.max(0, position));
-  return clampPercentValue(
-    Math.exp(Math.log(min) + clampedPosition * (Math.log(max) - Math.log(min))),
-    min,
-    max,
-  );
-}
-
-function snapLogScaleSliderPosition(position: number): number {
-  if (Math.abs(position - LOG_SCALE_SLIDER_SNAP_POSITION) <= LOG_SCALE_SLIDER_SNAP_THRESHOLD) {
-    return LOG_SCALE_SLIDER_SNAP_POSITION;
-  }
-
-  return position;
+  return (clampPercentValue(value, min, max) - min) / (max - min);
 }
 
 function formatPercentValue(value: number): string {

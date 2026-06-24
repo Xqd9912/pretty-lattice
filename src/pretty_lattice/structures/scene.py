@@ -13,7 +13,11 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from scipy.spatial import Delaunay, QhullError
 
 from pretty_lattice.structures.colormaps import Colormap, load_colormap
-from pretty_lattice.structures.elements import ElementRegistry, load_element_registry
+from pretty_lattice.structures.elements import (
+    ElementRecord,
+    ElementRegistry,
+    load_element_registry,
+)
 from pretty_lattice.structures.symmetry import point_group_schoenflies_symbol
 
 _BOUNDARY_TOLERANCE = 1e-6
@@ -22,6 +26,7 @@ _FLOAT_ZERO_TOLERANCE = 1e-12
 DEFAULT_BOND_ALGORITHM = "crystal-nn"
 
 BondAlgorithm = Literal["crystal-nn", "minimum-distance", "voronoi-nn"]
+AtomRadiusModel = Literal["uniform", "atomic", "vdw", "ionic"]
 ImageReason = Literal["boundary", "bonded"]
 VisibilityDependency = Literal["boundaryAtoms", "oneHopBondedAtoms"]
 type _AtomKey = tuple[int, tuple[int, int, int]]
@@ -84,7 +89,15 @@ class AtomSpec(TypedDict):
     visibilityDependencies: list[VisibilityDependency]
     visibilityDependencyGroups: list[list[VisibilityDependency]]
     radius: float
+    radii: AtomRadiiSpec
     color: str
+
+
+class AtomRadiiSpec(TypedDict):
+    uniform: float
+    atomic: float
+    vdw: float
+    ionic: float
 
 
 class BondSpec(TypedDict):
@@ -126,6 +139,7 @@ class _SiteRenderData:
     element_symbol: str
     fractional_position: list[float]
     radius: float
+    radii: AtomRadiiSpec
     color: str
 
 
@@ -200,6 +214,7 @@ def build_scene_response(
             element_symbol=element.symbol,
             fractional_position=canonical_fractional_position,
             radius=element.uniform_radius,
+            radii=_element_radii(element),
             color=color,
         )
         site_render_data.append(site_data)
@@ -317,6 +332,15 @@ def normalize_bond_algorithm(value: str | None) -> BondAlgorithm:
     )
 
 
+def _element_radii(element: ElementRecord) -> AtomRadiiSpec:
+    return {
+        "uniform": element.uniform_radius,
+        "atomic": element.atomic_radius,
+        "vdw": element.vdw_radius,
+        "ionic": element.ionic_radius,
+    }
+
+
 def _vector3(values: Sequence[float]) -> list[float]:
     return [_clean_float(values[0]), _clean_float(values[1]), _clean_float(values[2])]
 
@@ -392,6 +416,7 @@ def _atom_record_to_spec(
             atom.visibility_dependency_groups
         ),
         "radius": atom.site.radius,
+        "radii": atom.site.radii,
         "color": atom.site.color,
     }
 

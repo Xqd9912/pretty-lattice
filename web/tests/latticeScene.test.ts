@@ -102,11 +102,12 @@ describe("computeSceneLayout", () => {
     const scene = sceneWithOffCenterAtoms();
 
     expect(computeSceneLayout(scene).span).toBeCloseTo(6);
+    expect(computeSceneLayout(scene, "vdw").span).toBeCloseTo(8);
   });
 
   test("uses fixed first-version bond styling", () => {
     expect(BOND_COLOR).toBe("#c7cbd1");
-    expect(BOND_RADIUS).toBe(0.12);
+    expect(BOND_RADIUS).toBe(0.14);
   });
 
   test("builds polyhedron geometry from returned hull atoms and faces", () => {
@@ -249,6 +250,12 @@ function atom(id: string, position: [number, number, number]): AtomSpec {
     visibilityDependencyGroups: [],
     position,
     radius: 0.5,
+    radii: {
+      atomic: 0.7,
+      ionic: 1,
+      uniform: 0.5,
+      vdw: 1.5,
+    },
     siteId: id,
   };
 }

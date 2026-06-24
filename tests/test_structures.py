@@ -184,6 +184,12 @@ def test_scene_response_shape_uses_radius_and_color_defaults() -> None:
         "visibilityDependencies": [],
         "visibilityDependencyGroups": [],
         "radius": pytest.approx(0.50),
+        "radii": {
+            "uniform": pytest.approx(0.50),
+            "atomic": pytest.approx(2.15),
+            "vdw": pytest.approx(2.02),
+            "ionic": pytest.approx(1.26),
+        },
         "color": "#00ff27",
     }
     assert [atom["element"] for atom in canonical_atoms] == [
@@ -224,6 +230,23 @@ def test_scene_response_shape_uses_radius_and_color_defaults() -> None:
         },
     }
     assert scene.keys() == {"cell", "atoms", "bonds", "polyhedra", "summary"}
+
+
+def test_scene_response_includes_all_atom_radius_models() -> None:
+    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
+
+    scene = build_scene_response(structure)
+    oxygen = next(
+        atom for atom in scene["atoms"] if atom["element"] == "O" and not atom["isPeriodicImage"]
+    )
+
+    assert oxygen["radius"] == pytest.approx(0.50)
+    assert oxygen["radii"] == {
+        "uniform": pytest.approx(0.50),
+        "atomic": pytest.approx(0.74),
+        "vdw": pytest.approx(1.52),
+        "ionic": pytest.approx(1.40),
+    }
 
 
 @pytest.mark.parametrize(

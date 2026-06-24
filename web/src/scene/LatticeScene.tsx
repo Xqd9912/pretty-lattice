@@ -17,8 +17,14 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 
-import type { AtomSpec, BondSpec, PolyhedronSpec, SceneSpec } from "../api/scene";
-import type { ComponentOpacityState, StyleScaleState } from "../app/settings";
+import type {
+  AtomRadiusModel,
+  AtomSpec,
+  BondSpec,
+  PolyhedronSpec,
+  SceneSpec,
+} from "../api/scene";
+import type { BondColorMode, ComponentOpacityState, StyleState } from "../app/settings";
 import { applyWheelZoomDelta, type InteractionMode } from "../app/viewState";
 import { CameraHeadlight } from "./CameraHeadlight";
 import { PREVIEW_AMBIENT_LIGHT_INTENSITY } from "./renderAppearance";
@@ -57,7 +63,7 @@ const NARROW_VIEWPORT_SAFE_AREA: PreviewSafeArea = {
 };
 const CAMERA_TARGET = new Vector3(0, 0, 0);
 export const BOND_COLOR = "#c7cbd1";
-export const BOND_RADIUS = 0.12;
+export const BOND_RADIUS = 0.14;
 const CELL_FRAME_COLOR = "#111111";
 export const CELL_FRAME_LINE_WIDTH_PIXELS = 1;
 export const POLYHEDRON_SURFACE_OPACITY = 0.25;
@@ -78,7 +84,7 @@ export function LatticeScene({
   scene,
   showAtoms = true,
   showUnitCell = true,
-  styleScale,
+  style,
   viewScale,
 }: {
   cameraOrientationRef?: CameraOrientationRef;
@@ -92,11 +98,14 @@ export function LatticeScene({
   scene: SceneSpec;
   showAtoms?: boolean;
   showUnitCell?: boolean;
-  styleScale: StyleScaleState;
+  style: StyleState;
   viewScale: number;
 }) {
   const layoutSourceScene = layoutScene ?? scene;
-  const layout = useMemo(() => computeSceneLayout(layoutSourceScene), [layoutSourceScene]);
+  const layout = useMemo(
+    () => computeSceneLayout(layoutSourceScene, style.atomRadiusModel),
+    [layoutSourceScene, style.atomRadiusModel],
+  );
 
   return (
     <Canvas
@@ -120,7 +129,7 @@ export function LatticeScene({
         scene={scene}
         showAtoms={showAtoms}
         showUnitCell={showUnitCell}
-        styleScale={styleScale}
+        style={style}
         viewScale={viewScale}
       />
       <CameraOrientationTracker cameraOrientationRef={cameraOrientationRef} />
@@ -161,7 +170,7 @@ function SceneContent({
   scene,
   showAtoms,
   showUnitCell,
-  styleScale,
+  style,
   viewScale,
 }: {
   componentOpacity: ComponentOpacityState;
@@ -171,7 +180,7 @@ function SceneContent({
   scene: SceneSpec;
   showAtoms: boolean;
   showUnitCell: boolean;
-  styleScale: StyleScaleState;
+  style: StyleState;
   viewScale: number;
 }) {
   const { camera, size } = useThree();
@@ -218,7 +227,8 @@ function SceneContent({
             key={bond.id}
             atomById={atomById}
             bond={bond}
-            thicknessScale={styleScale.bondThickness / 100}
+            colorMode={style.bondColorMode}
+            thicknessScale={style.bondThickness / 100}
             opacity={componentOpacity.bonds / 100}
           />
         ))}
@@ -227,7 +237,8 @@ function SceneContent({
               <Atom
                 key={atom.id}
                 atom={atom}
-                radiusScale={styleScale.atomRadius / 100}
+                radiusModel={style.atomRadiusModel}
+                radiusScale={style.atomRadius / 100}
                 opacity={componentOpacity.atoms / 100}
               />
             ))
@@ -375,17 +386,20 @@ function applyStandardCameraPose(
 function Atom({
   atom,
   opacity,
+  radiusModel,
   radiusScale,
 }: {
   atom: AtomSpec;
   opacity: number;
+  radiusModel: AtomRadiusModel;
   radiusScale: number;
 }) {
   const isTransparent = opacity < 1;
+  const radius = atomRadiusForModel(atom, radiusModel);
 
   return (
     <mesh position={atom.position}>
-      <sphereGeometry args={[atom.radius * radiusScale, 48, 32]} />
+      <sphereGeometry args={[radius * radiusScale, 48, 32]} />
       <meshLambertMaterial
         key={isTransparent ? "transparent" : "opaque"}
         color={atom.color}
@@ -400,11 +414,13 @@ function Atom({
 function Bond({
   atomById,
   bond,
+  colorMode,
   opacity,
   thicknessScale,
 }: {
   atomById: Map<string, AtomSpec>;
   bond: BondSpec;
+  colorMode: BondColorMode;
   opacity: number;
   thicknessScale: number;
 }) {
@@ -423,13 +439,22 @@ function Bond({
       return null;
     }
 
+    const center = start.clone().add(end).multiplyScalar(0.5);
+    const startSegmentCenter = start.clone().add(direction.clone().multiplyScalar(0.25));
+    const endSegmentCenter = start.clone().add(direction.clone().multiplyScalar(0.75));
+    const quaternion = new Quaternion().setFromUnitVectors(
+      new Vector3(0, 1, 0),
+      direction.clone().normalize(),
+    );
+
     return {
+      center,
+      endColor: endAtom.color,
+      endSegmentCenter,
       length,
-      position: start.add(end).multiplyScalar(0.5),
-      quaternion: new Quaternion().setFromUnitVectors(
-        new Vector3(0, 1, 0),
-        direction.normalize(),
-      ),
+      quaternion,
+      startColor: startAtom.color,
+      startSegmentCenter,
     };
   }, [atomById, bond.endAtomId, bond.startAtomId]);
 
@@ -438,20 +463,76 @@ function Bond({
   }
 
   const isTransparent = opacity < 1;
+  const radius = BOND_RADIUS * thicknessScale;
+
+  if (colorMode === "by-atom") {
+    return (
+      <>
+        <BondCylinder
+          color={geometry.startColor}
+          isTransparent={isTransparent}
+          length={geometry.length / 2}
+          opacity={opacity}
+          position={geometry.startSegmentCenter}
+          quaternion={geometry.quaternion}
+          radius={radius}
+        />
+        <BondCylinder
+          color={geometry.endColor}
+          isTransparent={isTransparent}
+          length={geometry.length / 2}
+          opacity={opacity}
+          position={geometry.endSegmentCenter}
+          quaternion={geometry.quaternion}
+          radius={radius}
+        />
+      </>
+    );
+  }
 
   return (
-    <mesh position={geometry.position} quaternion={geometry.quaternion}>
+    <BondCylinder
+      color={BOND_COLOR}
+      isTransparent={isTransparent}
+      length={geometry.length}
+      opacity={opacity}
+      position={geometry.center}
+      quaternion={geometry.quaternion}
+      radius={radius}
+    />
+  );
+}
+
+function BondCylinder({
+  color,
+  isTransparent,
+  length,
+  opacity,
+  position,
+  quaternion,
+  radius,
+}: {
+  color: string;
+  isTransparent: boolean;
+  length: number;
+  opacity: number;
+  position: Vector3;
+  quaternion: Quaternion;
+  radius: number;
+}) {
+  return (
+    <mesh position={position} quaternion={quaternion}>
       <cylinderGeometry
         args={[
-          BOND_RADIUS * thicknessScale,
-          BOND_RADIUS * thicknessScale,
-          geometry.length,
+          radius,
+          radius,
+          length,
           24,
         ]}
       />
       <meshLambertMaterial
         key={isTransparent ? "transparent" : "opaque"}
-        color={BOND_COLOR}
+        color={color}
         depthWrite={!isTransparent}
         opacity={opacity}
         transparent={isTransparent}
@@ -611,13 +692,19 @@ interface SceneLayout {
   standardPose: StandardCameraPose;
 }
 
-export function computeSceneLayout(scene: SceneSpec): SceneLayout {
+export function computeSceneLayout(
+  scene: SceneSpec,
+  atomRadiusModel: AtomRadiusModel = "uniform",
+): SceneLayout {
   const points = [
     ...cellCorners(scene.cell.vectors),
     ...scene.atoms.map((atom) => new Vector3(...atom.position)),
   ];
   const box = new Box3().setFromPoints(points);
-  const maxRadius = Math.max(0, ...scene.atoms.map((atom) => atom.radius));
+  const maxRadius = Math.max(
+    0,
+    ...scene.atoms.map((atom) => atomRadiusForModel(atom, atomRadiusModel)),
+  );
   box.expandByScalar(maxRadius);
   const center = cellCenter(scene.cell.vectors);
   const size = box.getSize(new Vector3());
@@ -629,6 +716,10 @@ export function computeSceneLayout(scene: SceneSpec): SceneLayout {
     span,
     standardPose,
   };
+}
+
+function atomRadiusForModel(atom: AtomSpec, model: AtomRadiusModel): number {
+  return atom.radii?.[model] ?? atom.radius;
 }
 
 export function previewSafeAreaForViewport(

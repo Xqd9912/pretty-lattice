@@ -4,7 +4,7 @@ import type { AtomSpec, SceneSpec } from "../src/api/scene";
 import {
   STYLE_SCALE_MAX,
   STYLE_SCALE_MIN,
-  createDefaultStyleScale,
+  createDefaultStyle,
   createDefaultComponentVisibility,
   SETTINGS_PREVIEW_SAFE_AREA,
   countPeriodicImageAtoms,
@@ -15,12 +15,14 @@ import {
 } from "../src/app/settings";
 
 describe("settings", () => {
-  test("defaults style scale controls to global 100 percent", () => {
-    expect(createDefaultStyleScale()).toEqual({
+  test("defaults style controls to global 100 percent and neutral bonds", () => {
+    expect(createDefaultStyle()).toEqual({
       atomRadius: 100,
+      atomRadiusModel: "uniform",
+      bondColorMode: "neutral",
       bondThickness: 100,
     });
-    expect(STYLE_SCALE_MIN.atomRadius).toBe(50);
+    expect(STYLE_SCALE_MIN.atomRadius).toBe(0);
     expect(STYLE_SCALE_MAX.bondThickness).toBe(200);
   });
 

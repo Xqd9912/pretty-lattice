@@ -42,7 +42,7 @@ import {
 import {
   createDefaultComponentOpacity,
   createDefaultComponentVisibility,
-  createDefaultStyleScale,
+  createDefaultStyle,
   hasPolyhedra,
   previewSafeAreaForSettings,
   visibleSceneForComponents,
@@ -79,7 +79,7 @@ export function App() {
     createDefaultComponentVisibility,
   );
   const [componentOpacity, setComponentOpacity] = useState(createDefaultComponentOpacity);
-  const [styleScale, setStyleScale] = useState(createDefaultStyleScale);
+  const [style, setStyle] = useState(createDefaultStyle);
   const [viewState, setViewState] = useState(createPreviewViewState);
   const [lockedInteractionFeedbackCount, setLockedInteractionFeedbackCount] = useState(0);
   const [isStructureSummaryCollapsed, setIsStructureSummaryCollapsed] = useState(false);
@@ -127,7 +127,7 @@ export function App() {
     setBondAlgorithm(DEFAULT_BOND_ALGORITHM);
     setComponentVisibility(createDefaultComponentVisibility());
     setComponentOpacity(createDefaultComponentOpacity());
-    setStyleScale(createDefaultStyleScale());
+    setStyle(createDefaultStyle());
     setViewState(createPreviewViewState());
     setIsStructureSummaryCollapsed(false);
 
@@ -357,7 +357,7 @@ export function App() {
             safeArea={previewSafeArea}
             scene={visibleScene}
             componentOpacity={componentOpacity}
-            styleScale={styleScale}
+            style={style}
             showAtoms={componentVisibility.atoms}
             showUnitCell={componentVisibility.unitCell}
             viewScale={viewState.viewScale}
@@ -409,11 +409,14 @@ export function App() {
           <div ref={commonControlsPanelRef}>
             <CommonControlsPanel
               componentOpacity={componentOpacity}
-              styleScale={styleScale}
+              style={style}
               componentVisibility={componentVisibility}
               hasPolyhedra={hasPolyhedra(scene)}
+              onAtomRadiusModelChange={(atomRadiusModel) => {
+                setStyle((currentStyle) => ({ ...currentStyle, atomRadiusModel }));
+              }}
               onComponentOpacityChange={setComponentOpacity}
-              onStyleScaleChange={setStyleScale}
+              onStyleChange={setStyle}
               onComponentVisibilityChange={setComponentVisibility}
             />
           </div>

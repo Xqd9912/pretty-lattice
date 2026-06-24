@@ -1,4 +1,5 @@
 import type {
+  AtomRadiusModel,
   AtomSpec,
   BondSpec,
   PolyhedronSpec,
@@ -42,7 +43,7 @@ export interface ComponentOpacityState {
 export const DEFAULT_COMPONENT_OPACITY: ComponentOpacityState = {
   atoms: 100,
   unitCell: 100,
-  bonds: 80,
+  bonds: 100,
   polyhedra: 25,
 };
 
@@ -53,22 +54,27 @@ export const COMPONENT_OPACITY_MAX: ComponentOpacityState = {
   polyhedra: 50,
 };
 
-export interface StyleScaleState {
+export type BondColorMode = "neutral" | "by-atom";
+export interface StyleState {
   atomRadius: number;
+  atomRadiusModel: AtomRadiusModel;
+  bondColorMode: BondColorMode;
   bondThickness: number;
 }
 
-export const DEFAULT_STYLE_SCALE: StyleScaleState = {
+export const DEFAULT_STYLE: StyleState = {
   atomRadius: 100,
+  atomRadiusModel: "uniform",
+  bondColorMode: "neutral",
   bondThickness: 100,
 };
 
-export const STYLE_SCALE_MIN: StyleScaleState = {
-  atomRadius: 50,
-  bondThickness: 50,
+export const STYLE_SCALE_MIN: Pick<StyleState, "atomRadius" | "bondThickness"> = {
+  atomRadius: 0,
+  bondThickness: 0,
 };
 
-export const STYLE_SCALE_MAX: StyleScaleState = {
+export const STYLE_SCALE_MAX: Pick<StyleState, "atomRadius" | "bondThickness"> = {
   atomRadius: 200,
   bondThickness: 200,
 };
@@ -83,8 +89,8 @@ export function createDefaultComponentOpacity(): ComponentOpacityState {
   return { ...DEFAULT_COMPONENT_OPACITY };
 }
 
-export function createDefaultStyleScale(): StyleScaleState {
-  return { ...DEFAULT_STYLE_SCALE };
+export function createDefaultStyle(): StyleState {
+  return { ...DEFAULT_STYLE };
 }
 
 export function componentOpacityEquals(

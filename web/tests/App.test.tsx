@@ -156,7 +156,7 @@ describe("App", () => {
     const commonControls = screen.getByRole("complementary", { name: "Common controls" });
     expect(within(commonControls).getByRole("tab", { name: "Display" }).isConnected).toBe(true);
     expect(within(commonControls).queryByRole("heading", { name: "Display" })).toBeNull();
-    expect(within(commonControls).getByText("Images").isConnected).toBe(true);
+    expect(within(commonControls).getByText("Periodic images").isConnected).toBe(true);
     expect(
       commonControls.querySelector("[data-slot='common-controls-content']")?.className,
     ).not.toContain("h-[");
@@ -293,7 +293,7 @@ describe("App", () => {
     expect(resetOpacityButton.disabled).toBe(false);
     expect(atomsOpacityInput.value).toBe("100");
     expect(atomsOpacityInput.parentElement?.textContent).toContain("%");
-    expect(bondsOpacityInput.value).toBe("80");
+    expect(bondsOpacityInput.value).toBe("100");
     expect(polyhedraOpacityInput.value).toBe("25");
     expect(polyhedraOpacitySlider.max).toBe("50");
 
@@ -337,7 +337,7 @@ describe("App", () => {
 
     expect(atomsCheckbox.getAttribute("aria-checked")).toBe("false");
     expect(unitCellOpacityInput.value).toBe("100");
-    expect(bondsOpacityInput.value).toBe("80");
+    expect(bondsOpacityInput.value).toBe("100");
     expect(polyhedraOpacityInput.value).toBe("25");
     expect(resetOpacityButton.className).toContain("view-rail-button-reset-feedback");
     await waitFor(() =>
@@ -346,7 +346,7 @@ describe("App", () => {
     expect(resetOpacityButton.disabled).toBe(false);
   });
 
-  test("lets style controls scale atom radius and bond thickness", async () => {
+  test("lets style controls scale sizes and choose bond color mode", async () => {
     const user = userEvent.setup();
 
     await renderLoadedStructure(user);
@@ -354,9 +354,10 @@ describe("App", () => {
     const commonControls = screen.getByRole("complementary", { name: "Common controls" });
     await user.click(within(commonControls).getByRole("tab", { name: "Style" }));
 
-    expect(within(commonControls).getByText("Size").isConnected).toBe(true);
-    expect(within(commonControls).getByText("Atom").isConnected).toBe(true);
-    expect(within(commonControls).getByText("Bond").isConnected).toBe(true);
+    expect(within(commonControls).getByText("Radius").isConnected).toBe(true);
+    const atomRadiusModelSelect = within(commonControls).getByRole("combobox", {
+      name: "Atom radius model",
+    });
     const atomRadiusSlider = within(commonControls).getByRole("slider", {
       name: "Atom scale",
     }) as HTMLInputElement;
@@ -369,31 +370,48 @@ describe("App", () => {
     const bondThicknessInput = within(commonControls).getByRole("textbox", {
       name: "Bond scale value",
     }) as HTMLInputElement;
+    const bondStyleSelect = within(commonControls).getByRole("combobox", {
+      name: "Bond style",
+    });
 
     expect(atomRadiusSlider.min).toBe("0");
-    expect(atomRadiusSlider.max).toBe("1000");
-    expect(atomRadiusSlider.value).toBe("500");
+    expect(atomRadiusSlider.max).toBe("200");
+    expect(atomRadiusSlider.value).toBe("100");
     expect(atomRadiusInput.value).toBe("100");
     expect(atomRadiusInput.parentElement?.textContent).toContain("%");
-    expect(bondThicknessSlider.value).toBe("500");
+    expect(bondThicknessSlider.value).toBe("100");
     expect(bondThicknessInput.value).toBe("100");
     expect(commonControls.querySelectorAll(".opacity-slider-snap-marker")).toHaveLength(2);
+    expect(atomRadiusModelSelect.textContent).toContain("Uniform");
+    expect(bondStyleSelect.textContent).toContain("Unicolor");
 
-    fireEvent.change(atomRadiusSlider, { target: { value: "1000" } });
+    await user.click(atomRadiusModelSelect);
+    expect(await screen.findByText("Atom radius model")).toBeTruthy();
+    await user.click(await screen.findByRole("option", { name: "Van der Waals" }));
+
+    expect(fetchCalls).toHaveLength(1);
+    expect(atomRadiusModelSelect.textContent).toContain("vdW");
+
+    await user.click(bondStyleSelect);
+    await user.click(await screen.findByRole("option", { name: "Bicolor" }));
+
+    expect(bondStyleSelect.textContent).toContain("Bicolor");
+
+    fireEvent.change(atomRadiusSlider, { target: { value: "200" } });
 
     expect(atomRadiusInput.value).toBe("200");
-    expect(atomRadiusSlider.value).toBe("1000");
+    expect(atomRadiusSlider.value).toBe("200");
 
-    fireEvent.change(atomRadiusSlider, { target: { value: "520" } });
+    fireEvent.change(atomRadiusSlider, { target: { value: "104" } });
 
     expect(atomRadiusInput.value).toBe("100");
-    expect(atomRadiusSlider.value).toBe("500");
+    expect(atomRadiusSlider.value).toBe("100");
 
     await user.clear(bondThicknessInput);
     await user.type(bondThicknessInput, "240{Enter}");
 
     expect(bondThicknessInput.value).toBe("200");
-    expect(bondThicknessSlider.value).toBe("1000");
+    expect(bondThicknessSlider.value).toBe("200");
 
     const resetScaleButton = within(commonControls).getByRole("button", {
       name: "Reset scale",
@@ -402,9 +420,11 @@ describe("App", () => {
 
     expect(resetScaleButton.className).toContain("view-rail-button-reset-feedback");
     expect(atomRadiusInput.value).toBe("100");
-    expect(atomRadiusSlider.value).toBe("500");
+    expect(atomRadiusSlider.value).toBe("100");
     expect(bondThicknessInput.value).toBe("100");
-    expect(bondThicknessSlider.value).toBe("500");
+    expect(bondThicknessSlider.value).toBe("100");
+    expect(atomRadiusModelSelect.textContent).toContain("vdW");
+    expect(bondStyleSelect.textContent).toContain("Bicolor");
   });
 
   test("uses a single sliding active indicator for tab animation", async () => {
@@ -504,7 +524,7 @@ describe("App", () => {
     expect(detailsRegion?.style.height).not.toBe("0px");
   });
 
-  test("reuploads the current file when the bond algorithm changes", async () => {
+  test("keeps atom radius model local and reuploads when the bond algorithm changes", async () => {
     const user = userEvent.setup();
 
     await renderLoadedStructure(user);
@@ -513,6 +533,15 @@ describe("App", () => {
       name: "Polyhedra",
     });
     await user.click(polyhedraCheckbox);
+    await user.click(within(commonControls).getByRole("tab", { name: "Style" }));
+    const atomRadiusModelSelect = within(commonControls).getByRole("combobox", {
+      name: "Atom radius model",
+    });
+    await user.click(atomRadiusModelSelect);
+    await user.click(await screen.findByRole("option", { name: "Van der Waals" }));
+
+    expect(fetchCalls).toHaveLength(1);
+
     await user.click(screen.getByRole("button", { name: "Open advanced settings" }));
     queueFetchResponse(jsonResponse(sceneWithPeriodicImages()));
 
@@ -733,6 +762,12 @@ function atom(
     visibilityDependencyGroups,
     position: imageOffset,
     radius: 0.5,
+    radii: {
+      atomic: 0.7,
+      ionic: 0.9,
+      uniform: 0.5,
+      vdw: 1.4,
+    },
     siteId: id.split("-image-", 1)[0]!,
   };
 }
