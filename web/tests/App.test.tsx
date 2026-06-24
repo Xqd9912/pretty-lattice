@@ -160,6 +160,11 @@ describe("App", () => {
     expect(
       commonControls.querySelector("[data-slot='common-controls-content']")?.className,
     ).toContain("h-[144px]");
+    const polyhedraCheckbox = within(commonControls).getByRole("checkbox", {
+      name: "Polyhedra",
+    }) as HTMLButtonElement;
+    expect(polyhedraCheckbox.disabled).toBe(false);
+    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("true");
   });
 
   test("lets display controls change image visibility and advanced settings change rotation mode", async () => {
@@ -197,6 +202,52 @@ describe("App", () => {
     expect(screen.getByRole("radio", { name: "Orbit" }).getAttribute("aria-checked")).toBe(
       "true",
     );
+  });
+
+  test("toggles polyhedra independently from atoms, bonds, and unit cell", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    const atomsCheckbox = within(commonControls).getByRole("checkbox", {
+      name: "Atoms",
+    });
+    const bondsCheckbox = within(commonControls).getByRole("checkbox", {
+      name: "Bonds",
+    });
+    const unitCellCheckbox = within(commonControls).getByRole("checkbox", {
+      name: "Unit cell",
+    });
+    const polyhedraCheckbox = within(commonControls).getByRole("checkbox", {
+      name: "Polyhedra",
+    });
+
+    await user.click(atomsCheckbox);
+    expect(atomsCheckbox.getAttribute("aria-checked")).toBe("false");
+    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("true");
+
+    await user.click(polyhedraCheckbox);
+    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("false");
+    expect(atomsCheckbox.getAttribute("aria-checked")).toBe("false");
+
+    await user.click(bondsCheckbox);
+    await user.click(unitCellCheckbox);
+    expect(bondsCheckbox.getAttribute("aria-checked")).toBe("false");
+    expect(unitCellCheckbox.getAttribute("aria-checked")).toBe("false");
+    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("false");
+  });
+
+  test("shows disabled unchecked Polyhedra control when the scene has no polyhedra", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user, sceneWithPeriodicImages({ polyhedra: false }));
+
+    const polyhedraCheckbox = screen.getByRole("checkbox", {
+      name: "Polyhedra",
+    }) as HTMLButtonElement;
+    expect(polyhedraCheckbox.disabled).toBe(true);
+    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("false");
   });
 
   test("uses a single sliding active indicator for tab animation", async () => {
@@ -265,6 +316,11 @@ describe("App", () => {
     const user = userEvent.setup();
 
     await renderLoadedStructure(user);
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    const polyhedraCheckbox = within(commonControls).getByRole("checkbox", {
+      name: "Polyhedra",
+    });
+    await user.click(polyhedraCheckbox);
     await user.click(screen.getByRole("button", { name: "Open advanced settings" }));
     queueFetchResponse(jsonResponse(sceneWithPeriodicImages()));
 
@@ -276,6 +332,7 @@ describe("App", () => {
       "/api/structure-preview?bondAlgorithm=minimum-distance",
     );
     expect(fetchCalls[1]?.init?.body).toBeInstanceOf(File);
+    expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("false");
   });
 
   test("keeps view controls wired to lock, zoom, and reset state", async () => {
@@ -340,8 +397,8 @@ describe("App", () => {
   });
 });
 
-async function renderLoadedStructure(user: UserEvent) {
-  queueFetchResponse(jsonResponse(sceneWithPeriodicImages()));
+async function renderLoadedStructure(user: UserEvent, scene = sceneWithPeriodicImages()) {
+  queueFetchResponse(jsonResponse(scene));
 
   render(<App />);
   await user.upload(getFileInput(), structureFile());
@@ -380,7 +437,11 @@ function structureFile(name = "NaCl.cif"): File {
   return new File(["data_NaCl"], name, { type: "chemical/x-cif" });
 }
 
-function sceneWithPeriodicImages(): SceneSpec {
+function sceneWithPeriodicImages({
+  polyhedra = true,
+}: {
+  polyhedra?: boolean;
+} = {}): SceneSpec {
   return {
     atoms: [
       atom("Na-0", "Na", [0, 0, 0], [], []),
@@ -410,6 +471,12 @@ function sceneWithPeriodicImages(): SceneSpec {
         visibilityDependencyGroups: [["oneHopBondedAtoms"]],
       },
     ],
+    polyhedra: polyhedra
+      ? [
+          polyhedron("polyhedron-canonical", ["Na-0", "Cl-1"]),
+          polyhedron("polyhedron-one-hop", ["Na-0", "Cl-1-image-0--1-0", "Cl-1"]),
+        ]
+      : [],
     cell: {
       vectors: [
         [1, 0, 0],
@@ -438,6 +505,18 @@ function sceneWithPeriodicImages(): SceneSpec {
         spaceGroupNumber: null,
       },
     },
+  };
+}
+
+function polyhedron(id: string, hullAtomIds: string[]): SceneSpec["polyhedra"][number] {
+  return {
+    id,
+    centerAtomId: hullAtomIds[0]!,
+    hullAtomIds,
+    faces: hullAtomIds.length >= 3 ? [[0, 1, 2]] : [],
+    color: "#fadd3d",
+    visibilityDependencies: [],
+    visibilityDependencyGroups: [],
   };
 }
 

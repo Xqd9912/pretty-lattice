@@ -52,7 +52,6 @@ interface PolyhedronSpec {
   hullAtomIds: string[];
   faces: [number, number, number][];
   color: string;
-  opacity: number;
   visibilityDependencies: VisibilityDependency[];
   visibilityDependencyGroups: VisibilityDependency[][];
 }
@@ -70,7 +69,7 @@ Turning off `Atoms` should hide atom spheres only; it should not force polyhedra
 
 ### Render Simply
 
-The frontend should render polyhedra as translucent surfaces with edge outlines. Color should come from the center atom color, matching Crystal Toolkit and VESTA-like practice. The first opacity can be fixed in the scene contract or frontend defaults; style controls are deferred.
+The frontend should render polyhedra as translucent surfaces with edge outlines. Color should come from the center atom color, matching Crystal Toolkit and VESTA-like practice. Surface opacity and edge styling are frontend renderer defaults; style controls are deferred.
 
 Transparent polyhedra should be rendered before atom spheres and bonds so atoms and bonds remain legible. The implementation may need conservative Three.js material settings such as disabled depth writing for the translucent surface.
 

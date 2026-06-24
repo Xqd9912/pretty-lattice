@@ -1,13 +1,23 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
-import { Box3, MOUSE, OrthographicCamera, Quaternion, TOUCH, Vector3 } from "three";
+import {
+  Box3,
+  BufferGeometry,
+  DoubleSide,
+  Float32BufferAttribute,
+  MOUSE,
+  OrthographicCamera,
+  Quaternion,
+  TOUCH,
+  Vector3,
+} from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TrackballControls } from "three/examples/jsm/controls/TrackballControls.js";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 
-import type { AtomSpec, BondSpec, SceneSpec } from "../api/scene";
+import type { AtomSpec, BondSpec, PolyhedronSpec, SceneSpec } from "../api/scene";
 import { applyWheelZoomDelta, type InteractionMode } from "../app/viewState";
 import {
   applyOrthographicFrustum,
@@ -47,6 +57,9 @@ export const BOND_COLOR = "#c7cbd1";
 export const BOND_RADIUS = 0.12;
 const CELL_FRAME_COLOR = "#111111";
 export const CELL_FRAME_LINE_WIDTH_PIXELS = 1;
+export const POLYHEDRON_SURFACE_OPACITY = 0.28;
+export const POLYHEDRON_EDGE_COLOR = "#525866";
+export const POLYHEDRON_EDGE_OPACITY = 0.42;
 
 export function LatticeScene({
   cameraOrientationRef,
@@ -173,6 +186,9 @@ function SceneContent({
     <group>
       <group position={layout.groupPosition}>
         {showUnitCell ? <CellFrame vectors={scene.cell.vectors} /> : null}
+        {scene.polyhedra.map((polyhedron) => (
+          <Polyhedron key={polyhedron.id} atomById={atomById} polyhedron={polyhedron} />
+        ))}
         {scene.bonds.map((bond) => (
           <Bond key={bond.id} atomById={atomById} bond={bond} />
         ))}
@@ -370,6 +386,97 @@ function Bond({
       <meshStandardMaterial color={BOND_COLOR} roughness={0.42} metalness={0.04} />
     </mesh>
   );
+}
+
+function Polyhedron({
+  atomById,
+  polyhedron,
+}: {
+  atomById: Map<string, AtomSpec>;
+  polyhedron: PolyhedronSpec;
+}) {
+  const geometry = useMemo(
+    () => polyhedronGeometryFromAtoms(polyhedron, atomById),
+    [atomById, polyhedron],
+  );
+
+  useEffect(() => {
+    return () => {
+      geometry?.dispose();
+    };
+  }, [geometry]);
+
+  if (!geometry) {
+    return null;
+  }
+
+  return (
+    <group>
+      <mesh geometry={geometry}>
+        <meshStandardMaterial
+          color={polyhedron.color}
+          depthWrite={false}
+          metalness={0}
+          opacity={POLYHEDRON_SURFACE_OPACITY}
+          roughness={0.68}
+          side={DoubleSide}
+          transparent
+        />
+      </mesh>
+      <lineSegments>
+        <edgesGeometry args={[geometry]} />
+        <lineBasicMaterial
+          color={POLYHEDRON_EDGE_COLOR}
+          depthWrite={false}
+          opacity={POLYHEDRON_EDGE_OPACITY}
+          transparent
+        />
+      </lineSegments>
+    </group>
+  );
+}
+
+export function polyhedronGeometryFromAtoms(
+  polyhedron: PolyhedronSpec,
+  atomById: Map<string, AtomSpec>,
+): BufferGeometry | null {
+  const positions: number[] = [];
+  for (const atomId of polyhedron.hullAtomIds) {
+    const atom = atomById.get(atomId);
+    if (!atom) {
+      return null;
+    }
+
+    positions.push(...atom.position);
+  }
+
+  const indices: number[] = [];
+  for (const face of polyhedron.faces) {
+    if (
+      face.length !== 3 ||
+      new Set(face).size !== 3 ||
+      face.some(
+        (vertexIndex) =>
+          !Number.isInteger(vertexIndex) ||
+          vertexIndex < 0 ||
+          vertexIndex >= polyhedron.hullAtomIds.length,
+      )
+    ) {
+      return null;
+    }
+
+    indices.push(...face);
+  }
+
+  if (indices.length === 0) {
+    return null;
+  }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function CellFrame({ vectors }: { vectors: VectorTuple[] }) {

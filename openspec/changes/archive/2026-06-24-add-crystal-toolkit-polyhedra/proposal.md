@@ -8,7 +8,7 @@ Pretty Lattice already computes pymatgen-backed bonds and keeps complete one-hop
 - Use the selected bond algorithm's connectivity for both bonds and polyhedra.
 - Generate polyhedra only for centers that pass Crystal Toolkit's conditions: more than three drawn connected sites, no missing connected sites, and center species lower in pymatgen's electronegativity ordering than every connected neighbor.
 - Build a closed convex hull from the center atom plus connected neighbor positions, matching Crystal Toolkit's position set semantics.
-- Extend the scene response with project-owned polyhedron records, including center atom, hull atom IDs, faces, color, opacity, and visibility-dependency metadata.
+- Extend the scene response with project-owned polyhedron records, including center atom, hull atom IDs, faces, color, and visibility-dependency metadata.
 - Render polyhedra as translucent surfaces with edge outlines in the Three.js preview.
 - Enable the existing `Polyhedra` display row when the loaded scene includes polyhedra, while preserving independent atoms, bonds, unit-cell, cell-boundary atom, and one-hop bonded atom controls.
 - Treat polyhedra generation failures as non-fatal analysis warnings when the structure itself still parses.

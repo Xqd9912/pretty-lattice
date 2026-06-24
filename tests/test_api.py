@@ -53,6 +53,7 @@ async def test_structure_preview_upload_endpoint_returns_scene() -> None:
         assert len([atom for atom in payload["atoms"] if "bonded" in atom["imageReasons"]]) > 0
         assert "Sr-0" in {atom["siteId"] for atom in periodic_image_atoms}
         assert payload["bonds"]
+        assert payload["polyhedra"]
         assert "warnings" not in payload
         assert payload["summary"] == {
             "formula": "SrTiO3",
@@ -93,6 +94,7 @@ async def test_structure_preview_upload_endpoint_accepts_supported_bond_algorith
 
     assert response.status_code == 200
     assert response.json()["bonds"]
+    assert "polyhedra" in response.json()
 
 
 @pytest.mark.anyio
@@ -134,6 +136,7 @@ async def test_structure_preview_upload_endpoint_returns_bond_warning(monkeypatc
     assert response.status_code == 200
     assert payload["atoms"]
     assert payload["bonds"] == []
+    assert "polyhedra" in payload
     assert payload["warnings"] == [
         {
             "code": "bond-analysis-failed",

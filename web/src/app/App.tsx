@@ -41,6 +41,7 @@ import {
 } from "./settings/SettingsDrawer";
 import {
   createDefaultComponentVisibility,
+  hasPolyhedra,
   previewSafeAreaForSettings,
   visibleSceneForComponents,
 } from "./settings";
@@ -123,6 +124,7 @@ export function App() {
     try {
       const nextScene = await uploadStructurePreview(file);
       setScene(nextScene);
+      setComponentVisibility(createDefaultComponentVisibility(nextScene));
       setPreviewStatus("ready");
     } catch (error) {
       setScene(null);
@@ -341,6 +343,7 @@ export function App() {
         {scene ? (
           <CommonControlsPanel
             componentVisibility={componentVisibility}
+            hasPolyhedra={hasPolyhedra(scene)}
             onComponentVisibilityChange={setComponentVisibility}
           />
         ) : null}

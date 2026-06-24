@@ -10,6 +10,7 @@ from pymatgen.analysis.local_env import CrystalNN, MinimumDistanceNN, VoronoiNN
 from pymatgen.core import Structure
 from pymatgen.core.sites import PeriodicSite
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from scipy.spatial import Delaunay, QhullError
 
 from pretty_lattice.structures.colormaps import Colormap, load_colormap
 from pretty_lattice.structures.elements import ElementRegistry, load_element_registry
@@ -23,6 +24,7 @@ DEFAULT_BOND_ALGORITHM = "crystal-nn"
 BondAlgorithm = Literal["crystal-nn", "minimum-distance", "voronoi-nn"]
 ImageReason = Literal["boundary", "bonded"]
 VisibilityDependency = Literal["boundaryAtoms", "oneHopBondedAtoms"]
+type _AtomKey = tuple[int, tuple[int, int, int]]
 
 _BOND_ALGORITHM_LABELS: dict[BondAlgorithm, str] = {
     "crystal-nn": "CrystalNN",
@@ -93,6 +95,16 @@ class BondSpec(TypedDict):
     visibilityDependencyGroups: list[list[VisibilityDependency]]
 
 
+class PolyhedronSpec(TypedDict):
+    id: str
+    centerAtomId: str
+    hullAtomIds: list[str]
+    faces: list[list[int]]
+    color: str
+    visibilityDependencies: list[VisibilityDependency]
+    visibilityDependencyGroups: list[list[VisibilityDependency]]
+
+
 class AnalysisWarningSpec(TypedDict):
     code: str
     message: str
@@ -102,6 +114,7 @@ class SceneSpec(TypedDict):
     cell: CellSpec
     atoms: list[AtomSpec]
     bonds: list[BondSpec]
+    polyhedra: list[PolyhedronSpec]
     summary: StructureSummarySpec
     warnings: NotRequired[list[AnalysisWarningSpec]]
 
@@ -137,6 +150,20 @@ class _BondRecord:
     )
 
 
+@dataclass(frozen=True)
+class _ConnectedAtom:
+    source_key: _AtomKey
+    target_key: _AtomKey
+    source_atom_id: str
+    target_atom_id: str
+
+
+@dataclass(frozen=True)
+class _ConnectivityResult:
+    bonds: list[BondSpec]
+    connections_by_source: dict[_AtomKey, list[_ConnectedAtom]]
+
+
 def build_scene_response(
     structure: Structure,
     *,
@@ -151,8 +178,8 @@ def build_scene_response(
     can_generate_periodic_images = _has_valid_3d_periodic_cell(structure)
 
     site_render_data: list[_SiteRenderData] = []
-    atom_records: dict[tuple[int, tuple[int, int, int]], _AtomRecord] = {}
-    canonical_source_keys: list[tuple[int, tuple[int, int, int]]] = []
+    atom_records: dict[_AtomKey, _AtomRecord] = {}
+    canonical_source_keys: list[_AtomKey] = []
     for index, site in enumerate(structure):
         symbol = _site_element_symbol(site)
         fractional_position = _vector3(site.frac_coords)
@@ -206,13 +233,14 @@ def build_scene_response(
         canonical_source_keys.append((index, _CANONICAL_IMAGE_OFFSET))
 
     bonds: list[BondSpec] = []
+    polyhedra: list[PolyhedronSpec] = []
     warnings: list[AnalysisWarningSpec] = []
     if can_generate_periodic_images:
         boundary_source_keys = [
             key for key, atom in atom_records.items() if "boundary" in atom.image_reasons
         ]
         try:
-            bonds = _build_bonds(
+            connectivity = _build_connectivity(
                 atom_records=atom_records,
                 bond_algorithm=normalized_bond_algorithm,
                 canonical_source_keys=canonical_source_keys,
@@ -230,11 +258,43 @@ def build_scene_response(
                     ),
                 }
             )
+        else:
+            try:
+                bonds = _build_bonds(connectivity=connectivity)
+            except Exception as exc:
+                warnings.append(
+                    {
+                        "code": "bond-analysis-failed",
+                        "message": (
+                            "Bond analysis with "
+                            f"{_BOND_ALGORITHM_LABELS[normalized_bond_algorithm]} failed: {exc}"
+                        ),
+                    }
+                )
+
+            try:
+                polyhedra = _build_polyhedra(
+                    atom_records=atom_records,
+                    cell_vectors=cell_vectors,
+                    connectivity=connectivity,
+                    structure=structure,
+                )
+            except Exception as exc:
+                warnings.append(
+                    {
+                        "code": "polyhedra-analysis-failed",
+                        "message": (
+                            "Polyhedra analysis with "
+                            f"{_BOND_ALGORITHM_LABELS[normalized_bond_algorithm]} failed: {exc}"
+                        ),
+                    }
+                )
 
     scene: SceneSpec = {
         "cell": {"vectors": cell_vectors},
         "atoms": [_atom_record_to_spec(atom, cell_vectors) for atom in atom_records.values()],
         "bonds": bonds,
+        "polyhedra": polyhedra,
         "summary": _build_structure_summary(structure),
     }
     if warnings:
@@ -269,17 +329,20 @@ def _clean_float(value: float) -> float:
 
 
 def _site_element_symbol(site: PeriodicSite) -> str:
-    try:
-        specie = site.specie
-    except AttributeError:
-        specie = max(site.species.items(), key=lambda item: float(item[1]))[0]
-
+    specie = _site_specie(site)
     symbol = getattr(specie, "symbol", str(specie))
     return str(symbol)
 
 
+def _site_specie(site: PeriodicSite):
+    try:
+        return site.specie
+    except AttributeError:
+        return max(site.species.items(), key=lambda item: float(item[1]))[0]
+
+
 def _ensure_atom_record(
-    records: dict[tuple[int, tuple[int, int, int]], _AtomRecord],
+    records: dict[_AtomKey, _AtomRecord],
     *,
     image_offset: tuple[int, int, int],
     image_reasons: Sequence[ImageReason],
@@ -314,14 +377,12 @@ def _atom_record_to_spec(
     atom: _AtomRecord,
     cell_vectors: list[list[float]],
 ) -> AtomSpec:
-    shifted_fractional_position = [
-        atom.site.fractional_position[axis] + atom.image_offset[axis] for axis in range(3)
-    ]
+    shifted_fractional_position = _atom_record_fractional_position(atom)
     return {
         "id": _atom_instance_id(atom.site.site_id, atom.image_offset),
         "siteId": atom.site.site_id,
         "element": atom.site.element_symbol,
-        "position": _fractional_to_cartesian(shifted_fractional_position, cell_vectors),
+        "position": _atom_record_cartesian_position(atom, cell_vectors),
         "fractionalPosition": shifted_fractional_position,
         "imageOffset": [int(value) for value in atom.image_offset],
         "isPeriodicImage": atom.image_offset != _CANONICAL_IMAGE_OFFSET,
@@ -341,20 +402,24 @@ def _atom_instance_id(site_id: str, image_offset: tuple[int, int, int]) -> str:
     return f"{site_id}-image-{image_offset[0]}-{image_offset[1]}-{image_offset[2]}"
 
 
-def _build_bonds(
+def _build_connectivity(
     *,
-    atom_records: dict[tuple[int, tuple[int, int, int]], _AtomRecord],
+    atom_records: dict[_AtomKey, _AtomRecord],
     bond_algorithm: BondAlgorithm,
-    canonical_source_keys: list[tuple[int, tuple[int, int, int]]],
-    boundary_source_keys: list[tuple[int, tuple[int, int, int]]],
+    canonical_source_keys: list[_AtomKey],
+    boundary_source_keys: list[_AtomKey],
     site_render_data: list[_SiteRenderData],
     structure: Structure,
-) -> list[BondSpec]:
+) -> _ConnectivityResult:
     neighbor_analyzer = _neighbor_analyzer_for_bond_algorithm(bond_algorithm)
     source_keys = [*canonical_source_keys, *boundary_source_keys]
     bond_records: dict[tuple[str, str], _BondRecord] = {}
+    connections_by_source: dict[_AtomKey, list[_ConnectedAtom]] = {
+        source_key: [] for source_key in source_keys
+    }
 
     for source_site_index, source_image_offset in source_keys:
+        source_key = (source_site_index, source_image_offset)
         source_site = site_render_data[source_site_index]
         source_atom_id = _atom_instance_id(source_site.site_id, source_image_offset)
         source_is_boundary_image = source_image_offset != _CANONICAL_IMAGE_OFFSET
@@ -369,6 +434,7 @@ def _build_bonds(
             target_atom_id = _atom_instance_id(target_site.site_id, target_image_offset)
             if target_atom_id == source_atom_id:
                 continue
+            target_key = (target_site_index, target_image_offset)
 
             if target_image_offset != _CANONICAL_IMAGE_OFFSET:
                 visibility_dependencies: tuple[VisibilityDependency, ...] = (
@@ -384,6 +450,15 @@ def _build_bonds(
                     visibility_dependencies=visibility_dependencies,
                 )
 
+            connections_by_source[source_key].append(
+                _ConnectedAtom(
+                    source_key=source_key,
+                    target_key=target_key,
+                    source_atom_id=source_atom_id,
+                    target_atom_id=target_atom_id,
+                )
+            )
+
             endpoint_key = tuple(sorted((source_atom_id, target_atom_id)))
             bond_record = bond_records.get(endpoint_key)
             if bond_record is None:
@@ -394,26 +469,168 @@ def _build_bonds(
                 bond_records[endpoint_key] = bond_record
 
             source_atom = atom_records[(source_site_index, source_image_offset)]
-            target_atom = atom_records[(target_site_index, target_image_offset)]
+            target_atom = atom_records[target_key]
             for dependency_group in _combined_visibility_dependency_groups(
                 source_atom, target_atom
             ):
                 _merge_bond_visibility_dependency_group(bond_record, dependency_group)
 
-    return [
-        {
-            "id": f"bond-{bond.start_atom_id}--{bond.end_atom_id}",
-            "startAtomId": bond.start_atom_id,
-            "endAtomId": bond.end_atom_id,
-            "visibilityDependencies": _ordered_visibility_dependencies(
-                bond.visibility_dependencies
-            ),
-            "visibilityDependencyGroups": _ordered_visibility_dependency_groups(
-                bond.visibility_dependency_groups
-            ),
-        }
-        for bond in bond_records.values()
-    ]
+    return _ConnectivityResult(
+        bonds=[
+            {
+                "id": f"bond-{bond.start_atom_id}--{bond.end_atom_id}",
+                "startAtomId": bond.start_atom_id,
+                "endAtomId": bond.end_atom_id,
+                "visibilityDependencies": _ordered_visibility_dependencies(
+                    bond.visibility_dependencies
+                ),
+                "visibilityDependencyGroups": _ordered_visibility_dependency_groups(
+                    bond.visibility_dependency_groups
+                ),
+            }
+            for bond in bond_records.values()
+        ],
+        connections_by_source=connections_by_source,
+    )
+
+
+def _build_bonds(*, connectivity: _ConnectivityResult) -> list[BondSpec]:
+    return connectivity.bonds
+
+
+def _build_polyhedra(
+    *,
+    atom_records: dict[_AtomKey, _AtomRecord],
+    cell_vectors: list[list[float]],
+    connectivity: _ConnectivityResult,
+    structure: Structure,
+) -> list[PolyhedronSpec]:
+    polyhedra: list[PolyhedronSpec] = []
+
+    for source_key, connected_atoms in connectivity.connections_by_source.items():
+        center_atom = atom_records.get(source_key)
+        if center_atom is None:
+            continue
+
+        drawn_connected_atoms, has_missing_connected_atom = _drawn_connected_atoms(
+            atom_records, connected_atoms
+        )
+        if has_missing_connected_atom or len(drawn_connected_atoms) <= 3:
+            continue
+
+        if not _is_crystal_toolkit_polyhedron_center(
+            structure,
+            center_site_index=source_key[0],
+            connected_atoms=drawn_connected_atoms,
+        ):
+            continue
+
+        hull_atoms = [center_atom, *(atom for _, atom in drawn_connected_atoms)]
+        hull_atom_ids = [
+            _atom_instance_id(atom.site.site_id, atom.image_offset) for atom in hull_atoms
+        ]
+        positions = [
+            _atom_record_cartesian_position(atom, cell_vectors) for atom in hull_atoms
+        ]
+        faces = _polyhedron_faces_from_positions(positions)
+        if not faces:
+            continue
+
+        visibility_dependency_groups = [
+            dependency_group
+            for dependency_group in _combined_visibility_dependency_groups_for_records(hull_atoms)
+            if dependency_group
+        ]
+        visibility_dependencies = (
+            set().union(*visibility_dependency_groups)
+            if visibility_dependency_groups
+            else set()
+        )
+        center_atom_id = hull_atom_ids[0]
+        polyhedra.append(
+            {
+                "id": f"polyhedron-{center_atom_id}",
+                "centerAtomId": center_atom_id,
+                "hullAtomIds": hull_atom_ids,
+                "faces": faces,
+                "color": center_atom.site.color,
+                "visibilityDependencies": _ordered_visibility_dependencies(
+                    visibility_dependencies
+                ),
+                "visibilityDependencyGroups": _ordered_visibility_dependency_groups(
+                    visibility_dependency_groups
+                ),
+            }
+        )
+
+    return polyhedra
+
+
+def _drawn_connected_atoms(
+    atom_records: dict[_AtomKey, _AtomRecord],
+    connected_atoms: list[_ConnectedAtom],
+) -> tuple[list[tuple[_ConnectedAtom, _AtomRecord]], bool]:
+    drawn_connected_atoms: list[tuple[_ConnectedAtom, _AtomRecord]] = []
+    seen_atom_ids: set[str] = set()
+    has_missing_connected_atom = False
+
+    for connected_atom in connected_atoms:
+        target_atom = atom_records.get(connected_atom.target_key)
+        if target_atom is None:
+            has_missing_connected_atom = True
+            continue
+
+        if connected_atom.target_atom_id in seen_atom_ids:
+            continue
+
+        seen_atom_ids.add(connected_atom.target_atom_id)
+        drawn_connected_atoms.append((connected_atom, target_atom))
+
+    return drawn_connected_atoms, has_missing_connected_atom
+
+
+def _is_crystal_toolkit_polyhedron_center(
+    structure: Structure,
+    *,
+    center_site_index: int,
+    connected_atoms: list[tuple[_ConnectedAtom, _AtomRecord]],
+) -> bool:
+    center_specie = _site_specie(structure[center_site_index])
+    for connected_atom, _atom_record in connected_atoms:
+        connected_specie = _site_specie(structure[connected_atom.target_key[0]])
+        try:
+            if connected_specie < center_specie or connected_specie == center_specie:
+                return False
+        except TypeError:
+            return False
+
+    return True
+
+
+def _polyhedron_faces_from_positions(positions: list[list[float]]) -> list[list[int]]:
+    if len(positions) < 4:
+        return []
+
+    try:
+        hull_faces = Delaunay(positions).convex_hull
+    except (QhullError, ValueError):
+        return []
+
+    faces: list[list[int]] = []
+    seen_faces: set[tuple[int, int, int]] = set()
+    for face in hull_faces:
+        face_indices = tuple(int(index) for index in face)
+        if len(set(face_indices)) != 3:
+            continue
+
+        face_key = tuple(sorted(face_indices))
+        if face_key in seen_faces:
+            continue
+
+        seen_faces.add(face_key)
+        faces.append([face_indices[0], face_indices[1], face_indices[2]])
+
+    return faces
 
 
 def _neighbor_analyzer_for_bond_algorithm(bond_algorithm: BondAlgorithm):
@@ -438,6 +655,22 @@ def _combined_visibility_dependency_groups(
         frozenset(left_group | right_group)
         for left_group, right_group in product(left_groups, right_groups)
     )
+
+
+def _combined_visibility_dependency_groups_for_records(
+    records: list[_AtomRecord],
+) -> list[frozenset[VisibilityDependency]]:
+    dependency_groups = [frozenset()]
+    for record in records:
+        dependency_groups = _minimal_visibility_dependency_groups(
+            frozenset(left_group | right_group)
+            for left_group, right_group in product(
+                dependency_groups,
+                _record_visibility_dependency_groups(record),
+            )
+        )
+
+    return dependency_groups
 
 
 def _record_visibility_dependency_groups(
@@ -505,6 +738,19 @@ def _ordered_visibility_dependency_groups(
         _ordered_visibility_dependencies(set(dependency_group))
         for dependency_group in dependency_groups
     ]
+
+
+def _atom_record_fractional_position(atom: _AtomRecord) -> list[float]:
+    return [
+        atom.site.fractional_position[axis] + atom.image_offset[axis] for axis in range(3)
+    ]
+
+
+def _atom_record_cartesian_position(
+    atom: _AtomRecord,
+    cell_vectors: list[list[float]],
+) -> list[float]:
+    return _fractional_to_cartesian(_atom_record_fractional_position(atom), cell_vectors)
 
 
 def _canonicalize_fractional_position(

@@ -4,6 +4,7 @@ export interface SceneSpec {
   };
   atoms: AtomSpec[];
   bonds: BondSpec[];
+  polyhedra: PolyhedronSpec[];
   summary: StructureSummary;
   warnings?: AnalysisWarningSpec[];
 }
@@ -67,6 +68,16 @@ export interface BondSpec {
   id: string;
   startAtomId: string;
   endAtomId: string;
+  visibilityDependencies: VisibilityDependency[];
+  visibilityDependencyGroups: VisibilityDependency[][];
+}
+
+export interface PolyhedronSpec {
+  id: string;
+  centerAtomId: string;
+  hullAtomIds: string[];
+  faces: [number, number, number][];
+  color: string;
   visibilityDependencies: VisibilityDependency[];
   visibilityDependencyGroups: VisibilityDependency[][];
 }

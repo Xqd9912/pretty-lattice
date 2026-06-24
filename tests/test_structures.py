@@ -197,6 +197,7 @@ def test_scene_response_shape_uses_radius_and_color_defaults() -> None:
     assert len(boundary_image_atoms) == 10
     assert len(bonded_image_atoms) > 0
     assert scene["bonds"]
+    assert scene["polyhedra"]
     assert {
         scene["bonds"][0]["startAtomId"],
         scene["bonds"][0]["endAtomId"],
@@ -222,7 +223,7 @@ def test_scene_response_shape_uses_radius_and_color_defaults() -> None:
             "latticeSystem": "cubic",
         },
     }
-    assert scene.keys() == {"cell", "atoms", "bonds", "summary"}
+    assert scene.keys() == {"cell", "atoms", "bonds", "polyhedra", "summary"}
 
 
 @pytest.mark.parametrize(
@@ -311,6 +312,55 @@ def test_scene_response_supports_selected_bond_algorithms() -> None:
     assert "warnings" not in minimum_distance_scene
 
 
+def test_scene_response_generates_polyhedra_for_complete_coordination_environment() -> None:
+    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
+
+    scene = build_scene_response(structure)
+    atom_ids = {atom["id"] for atom in scene["atoms"]}
+    ti_polyhedron = next(
+        polyhedron
+        for polyhedron in scene["polyhedra"]
+        if polyhedron["centerAtomId"] == "Ti-1"
+    )
+
+    assert ti_polyhedron["hullAtomIds"][0] == "Ti-1"
+    assert len(ti_polyhedron["hullAtomIds"]) == 7
+    assert len(ti_polyhedron["faces"]) == 8
+    assert ti_polyhedron["color"] == "#78caff"
+    assert set(ti_polyhedron["hullAtomIds"]).issubset(atom_ids)
+    assert all(len(face) == 3 for face in ti_polyhedron["faces"])
+    assert all(
+        0 <= vertex_index < len(ti_polyhedron["hullAtomIds"])
+        for face in ti_polyhedron["faces"]
+        for vertex_index in face
+    )
+
+
+def test_scene_response_suppresses_reverse_and_same_species_polyhedron_centers() -> None:
+    sr_tio3_scene = build_scene_response(read_structure(FIXTURE_DIR / "SrTiO3.cif"))
+    si_scene = build_scene_response(read_structure(FIXTURE_DIR / "Si.cif"))
+
+    sr_tio3_centers = {polyhedron["centerAtomId"] for polyhedron in sr_tio3_scene["polyhedra"]}
+
+    assert "Ti-1" in sr_tio3_centers
+    assert all(not center.startswith("O-") for center in sr_tio3_centers)
+    assert si_scene["polyhedra"] == []
+    assert "warnings" not in si_scene
+
+
+def test_scene_response_polyhedra_follow_selected_bond_algorithm() -> None:
+    structure = read_structure(FIXTURE_DIR / "Al2O3.cif")
+
+    crystal_scene = build_scene_response(structure, bond_algorithm="crystal-nn")
+    voronoi_scene = build_scene_response(structure, bond_algorithm="voronoi-nn")
+
+    assert len(crystal_scene["polyhedra"]) == 24
+    assert len(voronoi_scene["bonds"]) != len(crystal_scene["bonds"])
+    assert voronoi_scene["polyhedra"] == []
+    assert "warnings" not in crystal_scene
+    assert "warnings" not in voronoi_scene
+
+
 def test_scene_response_rejects_unsupported_bond_algorithm() -> None:
     structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
 
@@ -385,6 +435,26 @@ def test_scene_response_returns_warning_when_bond_analysis_fails(monkeypatch) ->
     ]
 
 
+def test_scene_response_returns_warning_when_polyhedra_analysis_fails(monkeypatch) -> None:
+    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
+
+    def fail_polyhedra(**_kwargs: object) -> list[dict[str, object]]:
+        raise RuntimeError("polyhedra hull unavailable")
+
+    monkeypatch.setattr(scene_module, "_build_polyhedra", fail_polyhedra)
+
+    scene = build_scene_response(structure)
+
+    assert scene["bonds"]
+    assert scene["polyhedra"] == []
+    assert scene["warnings"] == [
+        {
+            "code": "polyhedra-analysis-failed",
+            "message": "Polyhedra analysis with CrystalNN failed: polyhedra hull unavailable",
+        }
+    ]
+
+
 def test_empty_bond_result_is_not_a_warning(monkeypatch) -> None:
     structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
 
@@ -393,6 +463,28 @@ def test_empty_bond_result_is_not_a_warning(monkeypatch) -> None:
     scene = build_scene_response(structure)
 
     assert scene["bonds"] == []
+    assert "warnings" not in scene
+
+
+def test_empty_polyhedra_result_is_not_a_warning() -> None:
+    structure = read_structure(FIXTURE_DIR / "Si.cif")
+
+    scene = build_scene_response(structure)
+
+    assert scene["bonds"]
+    assert scene["polyhedra"] == []
+    assert "warnings" not in scene
+
+
+def test_degenerate_polyhedron_centers_are_skipped_without_warning(monkeypatch) -> None:
+    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
+
+    monkeypatch.setattr(scene_module, "_polyhedron_faces_from_positions", lambda _positions: [])
+
+    scene = build_scene_response(structure)
+
+    assert scene["bonds"]
+    assert scene["polyhedra"] == []
     assert "warnings" not in scene
 
 

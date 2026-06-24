@@ -5,6 +5,7 @@ import {
   createDefaultComponentVisibility,
   SETTINGS_PREVIEW_SAFE_AREA,
   countPeriodicImageAtoms,
+  hasPolyhedra,
   hasPeriodicImageAtoms,
   previewSafeAreaForSettings,
   visibleSceneForComponents,
@@ -20,9 +21,20 @@ describe("settings", () => {
     expect(hasPeriodicImageAtoms(null)).toBe(false);
   });
 
-  test("filters image atoms and bonds locally without mutating the loaded scene", () => {
+  test("detects polyhedra and defaults polyhedra visibility from scene data", () => {
     const scene = sceneWithPeriodicImages();
-    const defaultVisibility = createDefaultComponentVisibility();
+
+    expect(hasPolyhedra(scene)).toBe(true);
+    expect(hasPolyhedra({ ...scene, polyhedra: [] })).toBe(false);
+    expect(hasPolyhedra(null)).toBe(false);
+    expect(createDefaultComponentVisibility(scene).polyhedra).toBe(true);
+    expect(createDefaultComponentVisibility({ ...scene, polyhedra: [] }).polyhedra).toBe(false);
+    expect(createDefaultComponentVisibility().polyhedra).toBe(false);
+  });
+
+  test("filters image atoms, bonds, and polyhedra locally without mutating the loaded scene", () => {
+    const scene = sceneWithPeriodicImages();
+    const defaultVisibility = createDefaultComponentVisibility(scene);
 
     const visibleScene = visibleSceneForComponents(scene, defaultVisibility);
 
@@ -39,6 +51,12 @@ describe("settings", () => {
       "bond-one-hop",
       "bond-boundary-source",
     ]);
+    expect(visibleScene?.polyhedra.map((polyhedron) => polyhedron.id)).toEqual([
+      "polyhedron-canonical",
+      "polyhedron-boundary",
+      "polyhedron-one-hop",
+      "polyhedron-boundary-one-hop",
+    ]);
 
     const withoutBoundary = visibleSceneForComponents(scene, {
       ...defaultVisibility,
@@ -52,6 +70,10 @@ describe("settings", () => {
     expect(withoutBoundary?.bonds.map((bond) => bond.id)).toEqual([
       "bond-canonical",
       "bond-one-hop",
+    ]);
+    expect(withoutBoundary?.polyhedra.map((polyhedron) => polyhedron.id)).toEqual([
+      "polyhedron-canonical",
+      "polyhedron-one-hop",
     ]);
 
     const withoutOneHop = visibleSceneForComponents(scene, {
@@ -67,6 +89,10 @@ describe("settings", () => {
       "bond-canonical",
       "bond-boundary-canonical",
     ]);
+    expect(withoutOneHop?.polyhedra.map((polyhedron) => polyhedron.id)).toEqual([
+      "polyhedron-canonical",
+      "polyhedron-boundary",
+    ]);
 
     const withoutBonds = visibleSceneForComponents(scene, {
       ...defaultVisibility,
@@ -74,12 +100,22 @@ describe("settings", () => {
     });
     expect(withoutBonds?.atoms).toHaveLength(5);
     expect(withoutBonds?.bonds).toEqual([]);
+    expect(withoutBonds?.polyhedra).toHaveLength(4);
+
+    const withoutPolyhedra = visibleSceneForComponents(scene, {
+      ...defaultVisibility,
+      polyhedra: false,
+    });
+    expect(withoutPolyhedra?.atoms).toHaveLength(5);
+    expect(withoutPolyhedra?.bonds).toHaveLength(4);
+    expect(withoutPolyhedra?.polyhedra).toEqual([]);
 
     const withoutAtomSpheres = visibleSceneForComponents(scene, {
       ...defaultVisibility,
       atoms: false,
     });
     expect(withoutAtomSpheres?.atoms).toHaveLength(5);
+    expect(withoutAtomSpheres?.polyhedra).toHaveLength(4);
     expect(scene.atoms.map((atom) => atom.id)).toEqual([
       "Na-0",
       "Na-0-image-1-0-0",
@@ -87,6 +123,7 @@ describe("settings", () => {
       "Cl-1-image-0--1-0",
       "Cl-1-image-1-1-0",
     ]);
+    expect(scene.polyhedra).toHaveLength(4);
   });
 
   test("uses a stable right safe area regardless of drawer state", () => {
@@ -150,6 +187,16 @@ function sceneWithPeriodicImages(): SceneSpec {
         visibilityDependencyGroups: [["boundaryAtoms", "oneHopBondedAtoms"]],
       },
     ],
+    polyhedra: [
+      polyhedron("polyhedron-canonical", ["Na-0", "Cl-1"]),
+      polyhedron("polyhedron-boundary", ["Na-0", "Na-0-image-1-0-0", "Cl-1"]),
+      polyhedron("polyhedron-one-hop", ["Na-0", "Cl-1-image-0--1-0", "Cl-1"]),
+      polyhedron("polyhedron-boundary-one-hop", [
+        "Na-0-image-1-0-0",
+        "Cl-1-image-1-1-0",
+        "Cl-1",
+      ]),
+    ],
     cell: {
       vectors: [
         [1, 0, 0],
@@ -178,6 +225,18 @@ function sceneWithPeriodicImages(): SceneSpec {
         spaceGroupNumber: null,
       },
     },
+  };
+}
+
+function polyhedron(id: string, hullAtomIds: string[]): SceneSpec["polyhedra"][number] {
+  return {
+    id,
+    centerAtomId: hullAtomIds[0]!,
+    hullAtomIds,
+    faces: hullAtomIds.length >= 3 ? [[0, 1, 2]] : [],
+    color: "#fadd3d",
+    visibilityDependencies: [],
+    visibilityDependencyGroups: [],
   };
 }
 

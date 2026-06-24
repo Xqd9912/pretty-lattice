@@ -43,9 +43,11 @@ const COMMON_PANEL_TABS: {
 
 export function CommonControlsPanel({
   componentVisibility,
+  hasPolyhedra,
   onComponentVisibilityChange,
 }: {
   componentVisibility: ComponentVisibilityState;
+  hasPolyhedra: boolean;
   onComponentVisibilityChange: Dispatch<SetStateAction<ComponentVisibilityState>>;
 }) {
   const tabTriggerRefs = useRef<Record<CommonPanelTab, HTMLButtonElement | null>>({
@@ -185,6 +187,7 @@ export function CommonControlsPanel({
             </TabsContent>
             <TabsContent value="display" className="mt-1.5">
               <DisplayTabContent
+                hasPolyhedra={hasPolyhedra}
                 visibility={componentVisibility}
                 onVisibilityChange={onComponentVisibilityChange}
               />
@@ -211,9 +214,11 @@ function ReservedTabContent() {
 }
 
 function DisplayTabContent({
+  hasPolyhedra,
   onVisibilityChange,
   visibility,
 }: {
+  hasPolyhedra: boolean;
   onVisibilityChange: Dispatch<SetStateAction<ComponentVisibilityState>>;
   visibility: ComponentVisibilityState;
 }) {
@@ -244,10 +249,10 @@ function DisplayTabContent({
             onCheckedChange={(checked) => setVisibility("bonds", checked)}
           />
           <ComponentCheckboxRow
-            checked={false}
-            disabled
+            checked={hasPolyhedra && visibility.polyhedra}
+            disabled={!hasPolyhedra}
             label="Polyhedra"
-            onCheckedChange={() => {}}
+            onCheckedChange={(checked) => setVisibility("polyhedra", checked)}
           />
         </div>
       </section>

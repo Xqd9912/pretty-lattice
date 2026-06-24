@@ -1,4 +1,10 @@
-import type { AtomSpec, BondSpec, SceneSpec, VisibilityDependency } from "../api/scene";
+import type {
+  AtomSpec,
+  BondSpec,
+  PolyhedronSpec,
+  SceneSpec,
+  VisibilityDependency,
+} from "../api/scene";
 import type { PreviewSafeArea } from "../scene/LatticeScene";
 
 export const SETTINGS_PREVIEW_SAFE_AREA: PreviewSafeArea = {
@@ -12,6 +18,7 @@ export interface ComponentVisibilityState {
   atoms: boolean;
   unitCell: boolean;
   bonds: boolean;
+  polyhedra: boolean;
   boundaryAtoms: boolean;
   oneHopBondedAtoms: boolean;
 }
@@ -20,12 +27,18 @@ export const DEFAULT_COMPONENT_VISIBILITY: ComponentVisibilityState = {
   atoms: true,
   unitCell: true,
   bonds: true,
+  polyhedra: false,
   boundaryAtoms: true,
   oneHopBondedAtoms: true,
 };
 
-export function createDefaultComponentVisibility(): ComponentVisibilityState {
-  return { ...DEFAULT_COMPONENT_VISIBILITY };
+export function createDefaultComponentVisibility(
+  scene: SceneSpec | null = null,
+): ComponentVisibilityState {
+  return {
+    ...DEFAULT_COMPONENT_VISIBILITY,
+    polyhedra: hasPolyhedra(scene),
+  };
 }
 
 export function countPeriodicImageAtoms(scene: SceneSpec | null): number {
@@ -38,6 +51,10 @@ export function countPeriodicImageAtoms(scene: SceneSpec | null): number {
 
 export function hasPeriodicImageAtoms(scene: SceneSpec | null): boolean {
   return countPeriodicImageAtoms(scene) > 0;
+}
+
+export function hasPolyhedra(scene: SceneSpec | null): boolean {
+  return (scene?.polyhedra.length ?? 0) > 0;
 }
 
 export function visibleSceneForComponents(
@@ -53,11 +70,15 @@ export function visibleSceneForComponents(
   const bonds = visibility.bonds
     ? scene.bonds.filter((bond) => isBondAvailable(bond, visibleAtomIds))
     : [];
+  const polyhedra = visibility.polyhedra
+    ? scene.polyhedra.filter((polyhedron) => isPolyhedronAvailable(polyhedron, visibleAtomIds))
+    : [];
 
   return {
     ...scene,
     atoms,
     bonds,
+    polyhedra,
   };
 }
 
@@ -81,6 +102,13 @@ function isBondAvailable(
     visibleAtomIds.has(bond.startAtomId) &&
     visibleAtomIds.has(bond.endAtomId)
   );
+}
+
+function isPolyhedronAvailable(
+  polyhedron: PolyhedronSpec,
+  visibleAtomIds: Set<string>,
+): boolean {
+  return polyhedron.hullAtomIds.every((atomId) => visibleAtomIds.has(atomId));
 }
 
 function dependencyGroupsAllow(

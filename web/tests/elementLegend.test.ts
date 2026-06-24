@@ -69,6 +69,7 @@ function sceneWithAtoms(atoms: TestAtom[]): SceneSpec {
       radius: 1,
     })),
     bonds: [],
+    polyhedra: [],
     cell: {
       vectors: [
         [1, 0, 0],
