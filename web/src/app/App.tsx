@@ -88,9 +88,10 @@ interface LockedInteractionPointer {
 }
 
 export function App() {
+  const isStaticScenePreview = hasStaticScenePreview();
   const [scene, setScene] = useState<SceneSpec | null>(null);
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>(() =>
-    hasStaticScenePreview() ? "loading" : "idle",
+    isStaticScenePreview ? "loading" : "idle",
   );
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -143,7 +144,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!hasStaticScenePreview()) {
+    if (!isStaticScenePreview) {
       return;
     }
 
@@ -178,12 +179,12 @@ export function App() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [isStaticScenePreview]);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) {
+    if (isStaticScenePreview || !file) {
       return;
     }
 
@@ -301,6 +302,7 @@ export function App() {
     [scene, style.colorScheme],
   );
   const hasVisibleScene = visibleScene !== null;
+  const isOpenStructureDisabled = isStaticScenePreview || previewStatus === "loading";
   const errorTitle =
     errorMessage === BACKEND_UNAVAILABLE_MESSAGE
       ? BACKEND_UNAVAILABLE_TITLE
@@ -518,6 +520,7 @@ export function App() {
         type="file"
         className="hidden"
         tabIndex={-1}
+        disabled={isStaticScenePreview}
         onChange={(event) => void handleFileChange(event)}
       />
 
@@ -584,9 +587,13 @@ export function App() {
       >
         <StructureSummaryCard
           isCollapsed={isStructureSummaryCollapsed}
+          isOpenStructureDisabled={isOpenStructureDisabled}
           onCollapsedChange={setIsStructureSummaryCollapsed}
-          onOpenStructure={() => fileInputRef.current?.click()}
-          previewStatus={previewStatus}
+          onOpenStructure={() => {
+            if (!isOpenStructureDisabled) {
+              fileInputRef.current?.click();
+            }
+          }}
           scene={scene}
           selectedFileName={selectedFileName}
         />

@@ -144,6 +144,10 @@ export async function uploadStructurePreview(
   file: File,
   options: { bondAlgorithm?: BondAlgorithm } = {},
 ): Promise<SceneSpec> {
+  if (hasStaticScenePreview()) {
+    throw new StructurePreviewError(BACKEND_UNAVAILABLE_MESSAGE, "backend-unavailable");
+  }
+
   const endpoint = previewEndpointForOptions(options);
   let response: Response;
   try {

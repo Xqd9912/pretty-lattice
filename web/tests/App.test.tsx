@@ -148,9 +148,9 @@ describe("App", () => {
 
     const structureCard = screen.getByRole("complementary", { name: "Current structure" });
     expect(within(structureCard).getByText("Pretty Lattice").isConnected).toBe(true);
-    expect(within(structureCard).getByRole("button", { name: "Open structure" }).isConnected).toBe(
-      true,
-    );
+    const openButton = within(structureCard).getByRole("button", { name: "Open structure" });
+    expect(openButton.isConnected).toBe(true);
+    expect((openButton as HTMLButtonElement).disabled).toBe(false);
     expect(within(structureCard).queryByText("File")).toBeNull();
     expect(within(structureCard).queryByText("No file selected")).toBeNull();
     expect(structureCard.querySelector("[data-slot='separator']")).toBeNull();

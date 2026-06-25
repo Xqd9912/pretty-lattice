@@ -18,21 +18,21 @@ import {
   renderPointGroup,
   renderSpaceGroup,
 } from "./structureSummaryFormatting";
-import { summarizeScene, type PreviewStatus } from "../previewState";
+import { summarizeScene } from "../previewState";
 import { GLASS_SURFACE_CLASS, TOOL_ICON_BUTTON_CLASS } from "../surface";
 
 export function StructureSummaryCard({
   isCollapsed,
+  isOpenStructureDisabled,
   onCollapsedChange,
   onOpenStructure,
-  previewStatus,
   scene,
   selectedFileName,
 }: {
   isCollapsed: boolean;
+  isOpenStructureDisabled: boolean;
   onCollapsedChange: (isCollapsed: boolean) => void;
   onOpenStructure: () => void;
-  previewStatus: PreviewStatus;
   scene: SceneSpec | null;
   selectedFileName: string | null;
 }) {
@@ -139,7 +139,7 @@ export function StructureSummaryCard({
           size="sm"
           aria-label="Open structure"
           className="h-7 gap-1.5 rounded-full px-2.5 text-xs transition-colors duration-150 ease-out active:bg-primary/80 [&_svg]:size-3.5"
-          disabled={previewStatus === "loading"}
+          disabled={isOpenStructureDisabled}
           onClick={onOpenStructure}
         >
           <FolderOpen data-icon="inline-start" aria-hidden="true" />
