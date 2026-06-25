@@ -11,7 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-import { GLASS_SURFACE_CLASS } from "../surface";
+import {
+  GLASS_SURFACE_CLASS,
+  TOOL_ICON_BUTTON_ACTIVE_CLASS,
+  TOOL_ICON_BUTTON_CLASS,
+  TOOL_ICON_BUTTON_LOCK_FEEDBACK_A_CLASS,
+  TOOL_ICON_BUTTON_LOCK_FEEDBACK_B_CLASS,
+  TOOL_ICON_BUTTON_RESET_FEEDBACK_A_CLASS,
+  TOOL_ICON_BUTTON_RESET_FEEDBACK_B_CLASS,
+} from "../surface";
 import {
   formatZoomPercent,
   parseZoomPercentInput,
@@ -200,9 +208,9 @@ export function ViewControlRail({
                 size="icon"
                 aria-label="Reset view"
                 className={cn(
-                  "view-rail-button size-7 rounded-[10px] border border-transparent bg-transparent text-muted-foreground shadow-none transition-[background-color,border-color,color,box-shadow] duration-150 [&_svg]:size-3.5",
-                  resetFeedbackPhase === "a" ? "view-rail-button-reset-feedback-a" : null,
-                  resetFeedbackPhase === "b" ? "view-rail-button-reset-feedback-b" : null,
+                  TOOL_ICON_BUTTON_CLASS,
+                  resetFeedbackPhase === "a" ? TOOL_ICON_BUTTON_RESET_FEEDBACK_A_CLASS : null,
+                  resetFeedbackPhase === "b" ? TOOL_ICON_BUTTON_RESET_FEEDBACK_B_CLASS : null,
                 )}
                 onClick={handleResetClick}
               >
@@ -222,12 +230,12 @@ export function ViewControlRail({
                   interactionLocked ? "Unlock mouse interaction" : "Lock mouse interaction"
                 }
                 className={cn(
-                  "view-rail-button size-7 rounded-[10px] border border-transparent bg-transparent shadow-none transition-[background-color,border-color,color,box-shadow] duration-100 ease-out motion-reduce:transition-none [&_svg]:size-3.5",
+                  TOOL_ICON_BUTTON_CLASS,
                   interactionLocked
-                    ? "view-rail-button-active"
+                    ? TOOL_ICON_BUTTON_ACTIVE_CLASS
                     : "text-muted-foreground",
-                  lockFeedbackPhase === "a" ? "view-rail-button-lock-feedback-a" : null,
-                  lockFeedbackPhase === "b" ? "view-rail-button-lock-feedback-b" : null,
+                  lockFeedbackPhase === "a" ? TOOL_ICON_BUTTON_LOCK_FEEDBACK_A_CLASS : null,
+                  lockFeedbackPhase === "b" ? TOOL_ICON_BUTTON_LOCK_FEEDBACK_B_CLASS : null,
                 )}
                 onClick={() => onInteractionLockedChange(!interactionLocked)}
               >

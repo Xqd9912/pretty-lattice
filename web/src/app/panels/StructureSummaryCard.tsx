@@ -19,7 +19,7 @@ import {
   renderSpaceGroup,
 } from "./structureSummaryFormatting";
 import { summarizeScene, type PreviewStatus } from "../previewState";
-import { GLASS_SURFACE_CLASS } from "../surface";
+import { GLASS_SURFACE_CLASS, TOOL_ICON_BUTTON_CLASS } from "../surface";
 
 export function StructureSummaryCard({
   isCollapsed,
@@ -122,7 +122,7 @@ export function StructureSummaryCard({
                       aria-controls={expandableContentId}
                       aria-expanded={!isCollapsed}
                       aria-label={toggleDetailsLabel}
-                      className="view-rail-button size-6 rounded-[9px] border border-transparent bg-transparent text-muted-foreground shadow-none transition-[background-color,border-color,color,box-shadow] duration-150 [&_svg]:size-3.25"
+                      className={cn(TOOL_ICON_BUTTON_CLASS, "size-6 rounded-[9px] [&_svg]:size-3.25")}
                       onClick={() => onCollapsedChange(!isCollapsed)}
                     >
                       {isCollapsed ? <ChevronDown aria-hidden="true" /> : <ChevronUp aria-hidden="true" />}

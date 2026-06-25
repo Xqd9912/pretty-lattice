@@ -9,12 +9,14 @@ import type {
 import type { ColorScheme } from "./colorSchemes";
 import type { PreviewSafeArea } from "../scene/LatticeScene";
 
-export const SETTINGS_PREVIEW_SAFE_AREA: PreviewSafeArea = {
+export const INSPECTOR_PREVIEW_SAFE_AREA: PreviewSafeArea = {
   bottom: 132,
   left: 420,
   right: 176,
   top: 24,
 };
+export const INSPECTOR_OPEN_SCENE_OFFSET_X_PX = -112;
+export const INSPECTOR_SCENE_OFFSET_BREAKPOINT_PX = 760;
 
 export interface ComponentVisibilityState {
   atoms: boolean;
@@ -82,6 +84,46 @@ export const STYLE_SCALE_MAX: Pick<StyleState, "atomRadius" | "bondThickness"> =
   bondThickness: 200,
 };
 
+export type ExportFormat = "png" | "pdf";
+export type ExportMeshQuality = "low" | "medium" | "high" | "xhigh";
+export type ExportSupersampling = 1 | 2 | 3 | 4;
+
+export interface ExportSettingsState {
+  aspectRatioLocked: boolean;
+  format: ExportFormat;
+  height: number;
+  meshQuality: ExportMeshQuality;
+  supersampling: ExportSupersampling;
+  width: number;
+}
+
+export interface ExportSettingsValidation {
+  message: string | null;
+  valid: boolean;
+}
+
+export const EXPORT_DIMENSION_MIN = 64;
+export const EXPORT_DIMENSION_MAX = 6000;
+export const EXPORT_RENDER_DIMENSION_MAX = 8192;
+export const EXPORT_RENDER_PIXEL_MAX = 48_000_000;
+export const EXPORT_SUPERSAMPLING_OPTIONS: readonly ExportSupersampling[] = [1, 2, 3, 4];
+export const EXPORT_FORMAT_OPTIONS: readonly ExportFormat[] = ["png", "pdf"];
+export const EXPORT_MESH_QUALITY_OPTIONS: readonly ExportMeshQuality[] = [
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+];
+
+export const DEFAULT_EXPORT_SETTINGS: ExportSettingsState = {
+  aspectRatioLocked: true,
+  format: "png",
+  height: 1800,
+  meshQuality: "high",
+  supersampling: 2,
+  width: 2400,
+};
+
 export function createDefaultComponentVisibility(
   _scene: SceneSpec | null = null,
 ): ComponentVisibilityState {
@@ -94,6 +136,131 @@ export function createDefaultComponentOpacity(): ComponentOpacityState {
 
 export function createDefaultStyle(): StyleState {
   return { ...DEFAULT_STYLE };
+}
+
+export function createDefaultExportSettings(): ExportSettingsState {
+  return { ...DEFAULT_EXPORT_SETTINGS };
+}
+
+export function setExportDimension(
+  settings: ExportSettingsState,
+  dimension: "height" | "width",
+  value: number,
+): ExportSettingsState {
+  const nextValue = clampExportDimension(value);
+  if (!settings.aspectRatioLocked) {
+    return {
+      ...settings,
+      [dimension]: nextValue,
+    };
+  }
+
+  const aspectRatio = exportAspectRatio(settings);
+  if (dimension === "width") {
+    return {
+      ...settings,
+      width: nextValue,
+      height: clampExportDimension(Math.round(nextValue / aspectRatio)),
+    };
+  }
+
+  return {
+    ...settings,
+    height: nextValue,
+    width: clampExportDimension(Math.round(nextValue * aspectRatio)),
+  };
+}
+
+export function setExportAspectRatioLocked(
+  settings: ExportSettingsState,
+  aspectRatioLocked: boolean,
+): ExportSettingsState {
+  return {
+    ...settings,
+    aspectRatioLocked,
+  };
+}
+
+export function setExportFormat(
+  settings: ExportSettingsState,
+  format: ExportFormat,
+): ExportSettingsState {
+  return {
+    ...settings,
+    format,
+  };
+}
+
+export function setExportMeshQuality(
+  settings: ExportSettingsState,
+  meshQuality: ExportMeshQuality,
+): ExportSettingsState {
+  return {
+    ...settings,
+    meshQuality,
+  };
+}
+
+export function setExportSupersampling(
+  settings: ExportSettingsState,
+  supersampling: number,
+): ExportSettingsState {
+  return {
+    ...settings,
+    supersampling: clampExportSupersampling(supersampling),
+  };
+}
+
+export function parseExportDimensionInput(value: string): number | null {
+  const parsedValue = parsePositiveIntegerInput(value);
+  if (parsedValue === null) {
+    return null;
+  }
+
+  return clampExportDimension(parsedValue);
+}
+
+export function validateExportSettings(
+  settings: ExportSettingsState,
+): ExportSettingsValidation {
+  if (
+    !Number.isInteger(settings.width) ||
+    !Number.isInteger(settings.height) ||
+    settings.width < EXPORT_DIMENSION_MIN ||
+    settings.height < EXPORT_DIMENSION_MIN ||
+    settings.width > EXPORT_DIMENSION_MAX ||
+    settings.height > EXPORT_DIMENSION_MAX
+  ) {
+    return {
+      valid: false,
+      message: `Size must be ${EXPORT_DIMENSION_MIN}-${EXPORT_DIMENSION_MAX} px.`,
+    };
+  }
+
+  if (!EXPORT_SUPERSAMPLING_OPTIONS.includes(settings.supersampling)) {
+    return {
+      valid: false,
+      message: "Supersampling must be 1x, 2x, 3x, or 4x.",
+    };
+  }
+
+  const renderWidth = settings.width * settings.supersampling;
+  const renderHeight = settings.height * settings.supersampling;
+  if (
+    renderWidth > EXPORT_RENDER_DIMENSION_MAX ||
+    renderHeight > EXPORT_RENDER_DIMENSION_MAX ||
+    renderWidth * renderHeight > EXPORT_RENDER_PIXEL_MAX
+  ) {
+    return {
+      valid: false,
+      message: "Size and supersampling are too large for this browser export.",
+    };
+  }
+
+  return {
+    valid: true,
+    message: null,
+  };
 }
 
 export function componentOpacityEquals(
@@ -149,8 +316,19 @@ export function visibleSceneForComponents(
   };
 }
 
-export function previewSafeAreaForSettings(): PreviewSafeArea {
-  return SETTINGS_PREVIEW_SAFE_AREA;
+export function previewSafeAreaForInspector(): PreviewSafeArea {
+  return INSPECTOR_PREVIEW_SAFE_AREA;
+}
+
+export function sceneOffsetXForInspector(
+  isInspectorOpen: boolean,
+  viewportWidth: number,
+): number {
+  if (!isInspectorOpen || viewportWidth <= INSPECTOR_SCENE_OFFSET_BREAKPOINT_PX) {
+    return 0;
+  }
+
+  return INSPECTOR_OPEN_SCENE_OFFSET_X_PX;
 }
 
 function isAtomAvailable(atom: AtomSpec, visibility: ComponentVisibilityState): boolean {
@@ -200,4 +378,47 @@ function dependencyEnabled(
   }
 
   return visibility.oneHopBondedAtoms;
+}
+
+function clampExportDimension(value: number): number {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_EXPORT_SETTINGS.width;
+  }
+
+  return Math.min(EXPORT_DIMENSION_MAX, Math.max(EXPORT_DIMENSION_MIN, Math.round(value)));
+}
+
+function clampExportSupersampling(value: number): ExportSupersampling {
+  const roundedValue = Math.round(value);
+  if (EXPORT_SUPERSAMPLING_OPTIONS.includes(roundedValue as ExportSupersampling)) {
+    return roundedValue as ExportSupersampling;
+  }
+
+  if (roundedValue <= EXPORT_SUPERSAMPLING_OPTIONS[0]) {
+    return EXPORT_SUPERSAMPLING_OPTIONS[0];
+  }
+
+  return EXPORT_SUPERSAMPLING_OPTIONS[EXPORT_SUPERSAMPLING_OPTIONS.length - 1];
+}
+
+function exportAspectRatio(settings: ExportSettingsState): number {
+  if (settings.width > 0 && settings.height > 0) {
+    return settings.width / settings.height;
+  }
+
+  return DEFAULT_EXPORT_SETTINGS.width / DEFAULT_EXPORT_SETTINGS.height;
+}
+
+function parsePositiveIntegerInput(value: string): number | null {
+  const trimmedValue = value.trim().replace(/px$/, "").trim();
+  if (trimmedValue === "") {
+    return null;
+  }
+
+  const parsedValue = Number(trimmedValue);
+  if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+    return null;
+  }
+
+  return Math.round(parsedValue);
 }

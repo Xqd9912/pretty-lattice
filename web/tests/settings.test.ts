@@ -6,11 +6,13 @@ import {
   STYLE_SCALE_MIN,
   createDefaultStyle,
   createDefaultComponentVisibility,
-  SETTINGS_PREVIEW_SAFE_AREA,
+  INSPECTOR_OPEN_SCENE_OFFSET_X_PX,
+  INSPECTOR_PREVIEW_SAFE_AREA,
   countPeriodicImageAtoms,
   hasPolyhedra,
   hasPeriodicImageAtoms,
-  previewSafeAreaForSettings,
+  previewSafeAreaForInspector,
+  sceneOffsetXForInspector,
   visibleSceneForComponents,
 } from "../src/app/settings";
 
@@ -170,13 +172,16 @@ describe("settings", () => {
     expect(scene.polyhedra).toHaveLength(4);
   });
 
-  test("uses a stable right safe area regardless of drawer state", () => {
-    const safeArea = previewSafeAreaForSettings();
+  test("uses a stable right safe area and a small inspector scene offset", () => {
+    const safeArea = previewSafeAreaForInspector();
 
-    expect(safeArea).toBe(SETTINGS_PREVIEW_SAFE_AREA);
+    expect(safeArea).toBe(INSPECTOR_PREVIEW_SAFE_AREA);
     expect(safeArea.right).toBe(176);
     expect(safeArea.left).toBe(420);
     expect(safeArea.bottom).toBe(132);
+    expect(sceneOffsetXForInspector(false, 1200)).toBe(0);
+    expect(sceneOffsetXForInspector(true, 760)).toBe(0);
+    expect(sceneOffsetXForInspector(true, 1200)).toBe(INSPECTOR_OPEN_SCENE_OFFSET_X_PX);
   });
 });
 

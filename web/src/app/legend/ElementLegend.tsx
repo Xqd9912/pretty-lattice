@@ -9,19 +9,21 @@ import { GLASS_SURFACE_CLASS } from "../surface";
 
 export function ElementLegend({
   entries,
+  offsetX = 0,
   safeArea,
 }: {
   entries: ElementLegendEntry[];
+  offsetX?: number;
   safeArea: PreviewSafeArea;
 }) {
   return (
     <nav
       aria-label="Element legend"
       className={cn(
-        "pointer-events-none absolute bottom-7 -translate-x-1/2 rounded-full border px-4 py-2 shadow-lg shadow-foreground/10",
+        "pointer-events-none absolute bottom-7 -translate-x-1/2 rounded-full border px-4 py-2 shadow-lg shadow-foreground/10 transition-[left,max-width] duration-[260ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
         GLASS_SURFACE_CLASS,
       )}
-      style={legendContainerStyle(safeArea)}
+      style={legendContainerStyle(safeArea, offsetX)}
     >
       <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
         {entries.map((entry) => (
@@ -42,9 +44,9 @@ export function ElementLegend({
   );
 }
 
-function legendContainerStyle(safeArea: PreviewSafeArea): CSSProperties {
+function legendContainerStyle(safeArea: PreviewSafeArea, offsetX: number): CSSProperties {
   return {
-    left: `calc(50% + ${(safeArea.left - safeArea.right) / 2}px)`,
+    left: `calc(50% + ${(safeArea.left - safeArea.right) / 2 + offsetX}px)`,
     maxWidth: `min(calc(100vw - ${safeArea.left + safeArea.right + 32}px), 760px)`,
   };
 }

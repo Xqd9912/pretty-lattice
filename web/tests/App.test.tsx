@@ -107,7 +107,7 @@ describe("App", () => {
 
     expect(screen.getByText("No structure loaded").isConnected).toBe(true);
     expect(screen.queryByTestId("lattice-canvas")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Open advanced settings" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sidebar" })).toBeNull();
 
     const structureCard = screen.getByRole("complementary", { name: "Current structure" });
     expect(within(structureCard).getByText("Pretty Lattice").isConnected).toBe(true);
@@ -191,7 +191,7 @@ describe("App", () => {
     expect(screen.queryByText("NaCl.cif")).toBeNull();
   });
 
-  test("lets display controls change image visibility and advanced settings change rotation mode", async () => {
+  test("lets display controls change image visibility and inspector settings change rotation mode", async () => {
     const user = userEvent.setup();
 
     await renderLoadedStructure(user);
@@ -215,16 +215,44 @@ describe("App", () => {
 
     expect(oneHopSwitch.getAttribute("aria-checked")).toBe("true");
 
-    await user.click(screen.getByRole("button", { name: "Open advanced settings" }));
+    const legend = screen.getByRole("navigation", { name: "Element legend" });
+    expect(legend.getAttribute("style")).toContain("calc(50% + 122px)");
+    const inspectorButton = screen.getByRole("button", { name: "Sidebar" });
+    expect(inspectorButton.getAttribute("aria-expanded")).toBe("false");
+    expect(inspectorButton.className).toContain("border-foreground/10");
+    expect(inspectorButton.className).not.toContain("tool-icon-button-active");
 
-    expect(screen.getByRole("radio", { name: "Trackball" }).getAttribute("aria-checked")).toBe(
-      "true",
+    await user.click(inspectorButton);
+
+    const inspector = screen.getByRole("complementary", { name: "Sidebar" });
+    expect(inspector.isConnected).toBe(true);
+    expect(within(inspector).queryByRole("heading", { name: "Inspector" })).toBeNull();
+    const advancedTab = within(inspector).getByRole("tab", { name: "Advanced" });
+    expect(advancedTab.isConnected).toBe(true);
+    expect(advancedTab.className).toContain("h-8");
+    expect(advancedTab.className).toContain("text-[0.875rem]");
+    expect(advancedTab.className).toContain("font-semibold");
+    expect(inspector.querySelector("[data-slot='separator']")).toBeNull();
+    expect(within(inspector).getByText("Interaction").className).toContain("text-xs");
+    expect(within(inspector).getByText("Bonds").className).toContain("text-xs");
+    expect(legend.getAttribute("style")).toContain("calc(50% + 10px)");
+    expect(inspectorButton.getAttribute("aria-expanded")).toBe("true");
+    expect(inspectorButton.className).toContain("tool-icon-button-active");
+
+    const interactionSelect = within(inspector).getByRole("combobox", { name: "Interaction" });
+    expect(interactionSelect.textContent).toContain("Trackball");
+
+    await user.click(interactionSelect);
+    await user.click(await screen.findByRole("option", { name: "Orbit" }));
+
+    expect(within(inspector).getByRole("combobox", { name: "Interaction" }).textContent).toContain(
+      "Orbit",
     );
 
-    await user.click(screen.getByRole("radio", { name: "Orbit" }));
+    await user.click(inspectorButton);
 
-    expect(screen.getByRole("radio", { name: "Orbit" }).getAttribute("aria-checked")).toBe(
-      "true",
+    expect(screen.getByRole("button", { name: "Sidebar" }).getAttribute("aria-expanded")).toBe(
+      "false",
     );
   });
 
@@ -330,7 +358,7 @@ describe("App", () => {
 
     await user.click(resetOpacityButton);
 
-    expect(resetOpacityButton.className).toContain("view-rail-button-reset-feedback");
+    expect(resetOpacityButton.className).toContain("tool-icon-button-reset-feedback");
     expect(polyhedraOpacityInput.value).toBe("25");
 
     const polyhedraCheckbox = within(commonControls).getByRole("checkbox", {
@@ -373,9 +401,9 @@ describe("App", () => {
     expect(unitCellOpacityInput.value).toBe("100");
     expect(bondsOpacityInput.value).toBe("100");
     expect(polyhedraOpacityInput.value).toBe("25");
-    expect(resetOpacityButton.className).toContain("view-rail-button-reset-feedback");
+    expect(resetOpacityButton.className).toContain("tool-icon-button-reset-feedback");
     await waitFor(() =>
-      expect(resetOpacityButton.className).not.toContain("view-rail-button-reset-feedback"),
+      expect(resetOpacityButton.className).not.toContain("tool-icon-button-reset-feedback"),
     );
     expect(resetOpacityButton.disabled).toBe(false);
   });
@@ -486,7 +514,7 @@ describe("App", () => {
     }) as HTMLButtonElement;
     await user.click(resetScaleButton);
 
-    expect(resetScaleButton.className).toContain("view-rail-button-reset-feedback");
+    expect(resetScaleButton.className).toContain("tool-icon-button-reset-feedback");
     expect(atomRadiusInput.value).toBe("100");
     expect(atomRadiusSlider.value).toBe("100");
     expect(bondThicknessInput.value).toBe("100");
@@ -611,7 +639,7 @@ describe("App", () => {
 
     expect(fetchCalls).toHaveLength(1);
 
-    await user.click(screen.getByRole("button", { name: "Open advanced settings" }));
+    await user.click(screen.getByRole("button", { name: "Sidebar" }));
     queueFetchResponse(jsonResponse(sceneWithPeriodicImages()));
 
     await user.click(screen.getByRole("combobox", { name: "Bond algorithm" }));
@@ -629,7 +657,7 @@ describe("App", () => {
     const user = userEvent.setup();
 
     await renderLoadedStructure(user);
-    await user.click(screen.getByRole("button", { name: "Open advanced settings" }));
+    await user.click(screen.getByRole("button", { name: "Sidebar" }));
     await user.click(screen.getByRole("combobox", { name: "Bond algorithm" }));
     await user.click(await screen.findByRole("option", { name: "Minimum distance" }));
 
@@ -699,7 +727,7 @@ describe("App", () => {
     expect(screen.queryByText("bad.cif")).toBeNull();
     expect(screen.getByText("No structure loaded").isConnected).toBe(true);
     expect(screen.queryByTestId("lattice-canvas")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Open advanced settings" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sidebar" })).toBeNull();
   });
 
   test("shows a backend unavailable alert when the Python server cannot be reached", async () => {

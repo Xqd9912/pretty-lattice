@@ -50,7 +50,12 @@ import {
   type ComponentVisibilityState,
   type StyleState,
 } from "../settings";
-import { GLASS_SURFACE_CLASS } from "../surface";
+import {
+  GLASS_SURFACE_CLASS,
+  TOOL_ICON_BUTTON_CLASS,
+  TOOL_ICON_BUTTON_RESET_FEEDBACK_A_CLASS,
+  TOOL_ICON_BUTTON_RESET_FEEDBACK_B_CLASS,
+} from "../surface";
 
 type CommonPanelTab = "camera" | "display" | "style" | "export";
 
@@ -431,9 +436,9 @@ function StyleTabContent({
                   size="icon"
                   aria-label="Reset scale"
                   className={cn(
-                    "view-rail-button size-7 rounded-[10px] border border-transparent bg-transparent text-muted-foreground shadow-none transition-[background-color,border-color,color,box-shadow] duration-150 [&_svg]:size-3.5",
-                    resetFeedbackPhase === "a" ? "view-rail-button-reset-feedback-a" : null,
-                    resetFeedbackPhase === "b" ? "view-rail-button-reset-feedback-b" : null,
+                    TOOL_ICON_BUTTON_CLASS,
+                    resetFeedbackPhase === "a" ? TOOL_ICON_BUTTON_RESET_FEEDBACK_A_CLASS : null,
+                    resetFeedbackPhase === "b" ? TOOL_ICON_BUTTON_RESET_FEEDBACK_B_CLASS : null,
                   )}
                   onClick={handleResetScaleClick}
                 >
@@ -729,9 +734,9 @@ function DisplayTabContent({
                   size="icon"
                   aria-label="Reset opacity"
                   className={cn(
-                    "view-rail-button size-7 rounded-[10px] border border-transparent bg-transparent text-muted-foreground shadow-none transition-[background-color,border-color,color,box-shadow] duration-150 [&_svg]:size-3.5",
-                    resetFeedbackPhase === "a" ? "view-rail-button-reset-feedback-a" : null,
-                    resetFeedbackPhase === "b" ? "view-rail-button-reset-feedback-b" : null,
+                    TOOL_ICON_BUTTON_CLASS,
+                    resetFeedbackPhase === "a" ? TOOL_ICON_BUTTON_RESET_FEEDBACK_A_CLASS : null,
+                    resetFeedbackPhase === "b" ? TOOL_ICON_BUTTON_RESET_FEEDBACK_B_CLASS : null,
                   )}
                   onClick={handleResetOpacityClick}
                 >

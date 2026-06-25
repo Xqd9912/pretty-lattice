@@ -44,15 +44,16 @@ import {
 import { StructureSummaryCard } from "./panels/StructureSummaryCard";
 import type { PreviewStatus } from "./previewState";
 import {
-  SettingsDrawer,
-  SettingsTrigger,
-} from "./settings/SettingsDrawer";
+  InspectorSidebar,
+  InspectorToggle,
+} from "./inspector/InspectorSidebar";
 import {
   createDefaultComponentOpacity,
   createDefaultComponentVisibility,
   createDefaultStyle,
   hasPolyhedra,
-  previewSafeAreaForSettings,
+  previewSafeAreaForInspector,
+  sceneOffsetXForInspector,
   visibleSceneForComponents,
 } from "./settings";
 import {
@@ -84,7 +85,7 @@ export function App() {
   );
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [bondAlgorithm, setBondAlgorithm] =
     useState<BondAlgorithm>(DEFAULT_BOND_ALGORITHM);
@@ -175,7 +176,7 @@ export function App() {
       setErrorMessage(STRUCTURE_FILE_TOO_LARGE_MESSAGE);
       setScene(null);
       setCurrentFile(null);
-      setIsSettingsOpen(false);
+      setIsInspectorOpen(false);
       setIsStructureSummaryCollapsed(true);
       return;
     }
@@ -185,7 +186,7 @@ export function App() {
     setErrorMessage(null);
     setScene(null);
     setCurrentFile(file);
-    setIsSettingsOpen(false);
+    setIsInspectorOpen(false);
     setBondAlgorithm(DEFAULT_BOND_ALGORITHM);
     setComponentVisibility(createDefaultComponentVisibility());
     setComponentOpacity(createDefaultComponentOpacity());
@@ -202,7 +203,7 @@ export function App() {
       setScene(null);
       setCurrentFile(null);
       setSelectedFileName(null);
-      setIsSettingsOpen(false);
+      setIsInspectorOpen(false);
       setPreviewStatus("error");
       setErrorMessage(
         isBackendUnavailablePreviewError(error)
@@ -241,7 +242,7 @@ export function App() {
         setScene(null);
         setCurrentFile(null);
         setSelectedFileName(null);
-        setIsSettingsOpen(false);
+        setIsInspectorOpen(false);
         setPreviewStatus("error");
         setErrorMessage(STRUCTURE_PARSE_ERROR_MESSAGE);
       }
@@ -262,7 +263,8 @@ export function App() {
     errorMessage === BACKEND_UNAVAILABLE_MESSAGE
       ? BACKEND_UNAVAILABLE_TITLE
       : "Unsupported file";
-  const previewSafeArea = previewSafeAreaForSettings();
+  const previewSafeArea = previewSafeAreaForInspector();
+  const sceneOffsetX = sceneOffsetXForInspector(isInspectorOpen, viewportSize.width);
   const effectivePreviewSafeArea = useMemo(
     () => previewSafeAreaForViewport(previewSafeArea, viewportSize.width),
     [previewSafeArea, viewportSize.width],
@@ -422,7 +424,8 @@ export function App() {
       />
 
       <section
-        className="scene-stage absolute inset-0"
+        className="scene-stage absolute inset-0 transition-transform duration-[260ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+        style={{ transform: `translateX(${sceneOffsetX}px)` }}
         aria-label="Crystal structure preview"
         onPointerCancelCapture={handleScenePointerEndCapture}
         onPointerDownCapture={handleScenePointerDownCapture}
@@ -468,6 +471,7 @@ export function App() {
       {legendEntries.length > 0 ? (
         <ElementLegend
           entries={legendEntries}
+          offsetX={sceneOffsetX}
           safeArea={previewSafeArea}
         />
       ) : null}
@@ -476,7 +480,7 @@ export function App() {
         ref={leftOverlayRef}
         className={cn(
           "absolute left-4 top-4 flex w-[296px] max-w-[calc(100vw-2rem)] flex-col gap-4",
-          isSettingsOpen ? "max-[760px]:hidden" : null,
+          isInspectorOpen ? "max-[760px]:hidden" : null,
         )}
       >
         <StructureSummaryCard
@@ -524,7 +528,7 @@ export function App() {
       {scene ? (
         <>
           <ViewControlRail
-            className={cn(isSettingsOpen ? "max-[760px]:hidden" : null)}
+            className={cn(isInspectorOpen ? "max-[760px]:hidden" : null)}
             interactionLocked={viewState.interactionLocked}
             lockedInteractionFeedbackCount={lockedInteractionFeedbackCount}
             onInteractionLockedChange={handleInteractionLockedChange}
@@ -533,21 +537,20 @@ export function App() {
             viewScale={viewState.viewScale}
           />
 
-          <SettingsTrigger
-            isOpen={isSettingsOpen}
-            onOpenChange={setIsSettingsOpen}
+          <InspectorToggle
+            isOpen={isInspectorOpen}
+            onOpenChange={setIsInspectorOpen}
           />
 
-          <SettingsDrawer
+          <InspectorSidebar
             bondAlgorithm={bondAlgorithm}
             interactionMode={viewState.interactionMode}
-            isOpen={isSettingsOpen}
+            isOpen={isInspectorOpen}
             isSceneLoading={previewStatus === "loading"}
             onBondAlgorithmChange={(nextBondAlgorithm) => {
               void handleBondAlgorithmChange(nextBondAlgorithm);
             }}
             onInteractionModeChange={handleInteractionModeChange}
-            onOpenChange={setIsSettingsOpen}
           />
         </>
       ) : null}
