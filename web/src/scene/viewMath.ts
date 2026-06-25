@@ -19,6 +19,12 @@ export interface OrthographicFrustum {
   top: number;
 }
 
+export interface CameraFitBounds {
+  projectedHeight: number;
+  projectedWidth: number;
+  span: number;
+}
+
 const DEFAULT_CELL_VECTORS: readonly [VectorTuple, VectorTuple, VectorTuple] = [
   [3.2, 0, 0],
   [0, 3.2, 0],
@@ -27,6 +33,9 @@ const DEFAULT_CELL_VECTORS: readonly [VectorTuple, VectorTuple, VectorTuple] = [
 
 const FALLBACK_OUTWARD = new Vector3(1, 1, 1).normalize();
 const FALLBACK_UP = new Vector3(-1, -1, 2).normalize();
+const SPAN_FIT_PADDING_RATIO = 1.7;
+const PROJECTED_FIT_PADDING_RATIO = 1.08;
+const MAX_PROJECTED_FIT_BOOST = 1.5;
 
 export function computeStandardCameraPose(
   vectors: VectorTuple[],
@@ -64,15 +73,27 @@ export function computeStandardCameraPose(
 }
 
 export function computeCameraFitZoom(
-  span: number,
+  bounds: CameraFitBounds,
   width: number,
   height: number,
   safeArea: PreviewSafeArea,
 ): number {
   const availableWidth = Math.max(1, width - safeArea.left - safeArea.right);
   const availableHeight = Math.max(1, height - safeArea.top - safeArea.bottom);
+  const availableSide = Math.min(availableWidth, availableHeight);
+  const spanZoom = Math.max(
+    0.01,
+    availableSide / (safeDimension(bounds.span) * SPAN_FIT_PADDING_RATIO),
+  );
+  const projectedZoom = Math.max(
+    0.01,
+    Math.min(
+      availableWidth / (safeDimension(bounds.projectedWidth) * PROJECTED_FIT_PADDING_RATIO),
+      availableHeight / (safeDimension(bounds.projectedHeight) * PROJECTED_FIT_PADDING_RATIO),
+    ),
+  );
 
-  return Math.max(0.01, Math.min(availableWidth, availableHeight) / (span * 1.7));
+  return Math.max(spanZoom, Math.min(projectedZoom, spanZoom * MAX_PROJECTED_FIT_BOOST));
 }
 
 export function computeOrthographicFrustum(
@@ -144,4 +165,8 @@ function stablePerpendicular(outward: Vector3): Vector3 {
 
 function vectorTuple(vector: Vector3): VectorTuple {
   return [vector.x, vector.y, vector.z];
+}
+
+function safeDimension(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value : 1;
 }

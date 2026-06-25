@@ -50,6 +50,7 @@ import {
 } from "./sceneGeometry";
 import {
   applyOrthographicFrustum,
+  type CameraFitBounds,
   computeCameraFitZoom,
   computeStandardCameraPose,
   type StandardCameraPose,
@@ -293,8 +294,8 @@ function PreviewSceneContent({
     [safeArea, size.width],
   );
   const fitZoom = useMemo(
-    () => computeCameraFitZoom(layout.span, size.width, size.height, effectiveSafeArea),
-    [effectiveSafeArea, layout.span, size.height, size.width],
+    () => computeCameraFitZoom(layout.cameraFitBounds, size.width, size.height, effectiveSafeArea),
+    [effectiveSafeArea, layout.cameraFitBounds, size.height, size.width],
   );
   const zoom = fitZoom * viewScale;
 
@@ -905,6 +906,7 @@ function CellFrame({ opacity, vectors }: { opacity: number; vectors: VectorTuple
 }
 
 export interface SceneLayout {
+  cameraFitBounds: CameraFitBounds;
   groupPosition: VectorTuple;
   span: number;
   standardPose: StandardCameraPose;
@@ -928,11 +930,67 @@ export function computeSceneLayout(
   const size = box.getSize(new Vector3());
   const span = Math.max(1, size.x, size.y, size.z);
   const standardPose = computeStandardCameraPose(scene.cell.vectors, span);
+  const groupPosition: VectorTuple = [-center.x, -center.y, -center.z];
+  const projectedFitSize = computeStandardProjectedFitSize(
+    scene,
+    atomRadiusModel,
+    groupPosition,
+    standardPose,
+  );
 
   return {
-    groupPosition: [-center.x, -center.y, -center.z],
+    cameraFitBounds: {
+      ...projectedFitSize,
+      span,
+    },
+    groupPosition,
     span,
     standardPose,
+  };
+}
+
+function computeStandardProjectedFitSize(
+  scene: SceneSpec,
+  atomRadiusModel: AtomRadiusModel,
+  groupPosition: VectorTuple,
+  standardPose: StandardCameraPose,
+): Pick<CameraFitBounds, "projectedHeight" | "projectedWidth"> {
+  const outward = new Vector3(...standardPose.outward).normalize();
+  const cameraUp = new Vector3(...standardPose.cameraUp).normalize();
+  const right = cameraUp.clone().cross(outward).normalize();
+  const screenUp = outward.clone().cross(right).normalize();
+  const offset = new Vector3(...groupPosition);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  function includePoint(point: Vector3 | VectorTuple, radius = 0) {
+    const localPoint = Array.isArray(point)
+      ? new Vector3(...point)
+      : point.clone();
+    localPoint.add(offset);
+    const safeRadius = Math.max(0, radius);
+    const x = localPoint.dot(right);
+    const y = localPoint.dot(screenUp);
+
+    minX = Math.min(minX, x - safeRadius);
+    maxX = Math.max(maxX, x + safeRadius);
+    minY = Math.min(minY, y - safeRadius);
+    maxY = Math.max(maxY, y + safeRadius);
+  }
+
+  for (const corner of cellCorners(scene.cell.vectors)) {
+    includePoint(corner);
+  }
+
+  for (const atom of scene.atoms) {
+    includePoint(atom.position, atomRadiusForModel(atom, atomRadiusModel));
+  }
+
+  return {
+    projectedHeight: Math.max(1, maxY - minY),
+    projectedWidth: Math.max(1, maxX - minX),
   };
 }
 

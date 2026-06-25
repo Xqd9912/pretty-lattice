@@ -66,14 +66,45 @@ describe("computeSceneLayout", () => {
   });
 
   test("fits the camera to stable preview safe areas", () => {
-    const zoom = computeCameraFitZoom(10, 1000, 800, {
+    const safeArea = {
       bottom: 132,
       left: 420,
       right: 176,
       top: 24,
-    });
+    };
+    const zoom = computeCameraFitZoom(
+      {
+        projectedHeight: 17,
+        projectedWidth: 17,
+        span: 10,
+      },
+      1000,
+      800,
+      safeArea,
+    );
 
     expect(zoom).toBeCloseTo(404 / 17);
+  });
+
+  test("gives slender standard projections a capped visual boost", () => {
+    const safeArea = {
+      bottom: 132,
+      left: 420,
+      right: 176,
+      top: 24,
+    };
+    const zoom = computeCameraFitZoom(
+      {
+        projectedHeight: 2,
+        projectedWidth: 4,
+        span: 10,
+      },
+      1000,
+      800,
+      safeArea,
+    );
+
+    expect(zoom).toBeCloseTo((404 / 17) * 1.5);
   });
 
   test("offsets the orthographic frustum toward the safe-area center", () => {
@@ -123,6 +154,13 @@ describe("computeSceneLayout", () => {
 
     expect(computeSceneLayout(scene).span).toBeCloseTo(6);
     expect(computeSceneLayout(scene, "vdw").span).toBeCloseTo(8);
+  });
+
+  test("tracks the Standard-view projected fit size for slender structures", () => {
+    const layout = computeSceneLayout(sceneWithLongCell());
+
+    expect(layout.cameraFitBounds.span).toBeCloseTo(layout.span);
+    expect(layout.cameraFitBounds.projectedWidth).toBeLessThan(layout.span);
   });
 
   test("uses fixed first-version bond styling", () => {
@@ -415,6 +453,27 @@ function sceneWithExportVisibilityAtoms(): SceneSpec {
         spaceGroup: null,
         spaceGroupNumber: null,
       },
+    },
+  };
+}
+
+function sceneWithLongCell(): SceneSpec {
+  return {
+    ...sceneWithOffCenterAtoms(),
+    atoms: [
+      atom("Si-0", [0, 0, 0]),
+      atom("Si-1", [10, 0, 0]),
+    ],
+    cell: {
+      vectors: [
+        [10, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+      ],
+    },
+    summary: {
+      ...sceneWithOffCenterAtoms().summary,
+      atomCount: 2,
     },
   };
 }

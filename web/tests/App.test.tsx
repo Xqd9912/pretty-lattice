@@ -485,7 +485,7 @@ describe("App", () => {
     expect(bondThicknessInput.value).toBe("100");
     expect(commonControls.querySelectorAll(".opacity-slider-snap-marker")).toHaveLength(2);
     expect(atomRadiusModelSelect.textContent).toContain("Uniform");
-    expect(bondStyleSelect.textContent).toContain("Bicolor");
+    expect(bondStyleSelect.textContent).toContain("By atom");
     expect(colorSchemeSelect.textContent).toContain("VESTA");
 
     await user.click(atomRadiusModelSelect);

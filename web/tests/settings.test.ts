@@ -26,7 +26,7 @@ import {
 } from "../src/app/settings";
 
 describe("settings", () => {
-  test("defaults style controls to global 100 percent and bicolor bonds", () => {
+  test("defaults style controls to global 100 percent and by-atom bonds", () => {
     expect(createDefaultStyle()).toEqual({
       atomRadius: 100,
       atomRadiusModel: "uniform",

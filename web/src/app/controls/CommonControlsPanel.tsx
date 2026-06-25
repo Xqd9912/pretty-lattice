@@ -100,7 +100,7 @@ const STYLE_SCALE_DEFAULT_VALUE = 100;
 const STYLE_SCALE_SLIDER_SNAP_DISTANCE = 4;
 const COMMON_SLIDER_BLUR_DELAY_MS = 500;
 const BOND_COLOR_OPTIONS: { label: string; value: BondColorMode }[] = [
-  { label: "Bicolor", value: "by-atom" },
+  { label: "By atom", value: "by-atom" },
   { label: "Uniform", value: "neutral" },
   { label: "Uniform (2D)", value: "unicolor-2d" },
 ];
@@ -128,7 +128,7 @@ const UNICOLOR_TOKEN_STYLE = {
   background:
     "linear-gradient(145deg, rgba(255, 255, 255, 0.72) 0 18%, rgba(255, 255, 255, 0.2) 19% 34%, rgba(255, 255, 255, 0) 35%), linear-gradient(180deg, #dbe0e8 0%, #aeb5c0 42%, #7d8795 100%)",
 } as const;
-const BICOLOR_TOKEN_STYLE = {
+const BY_ATOM_TOKEN_STYLE = {
   background:
     "linear-gradient(145deg, rgba(255, 255, 255, 0.74) 0 18%, rgba(255, 255, 255, 0.18) 19% 34%, rgba(255, 255, 255, 0) 35%), linear-gradient(90deg, #f58c9a 0 50%, #78a7ff 50% 100%)",
 } as const;
@@ -1001,7 +1001,7 @@ function bondStyleTokenStyle(value: BondColorMode): CSSProperties | undefined {
     return UNICOLOR_TOKEN_STYLE;
   }
   if (value === "by-atom") {
-    return BICOLOR_TOKEN_STYLE;
+    return BY_ATOM_TOKEN_STYLE;
   }
   if (value === "unicolor-2d") {
     return UNICOLOR_2D_TOKEN_STYLE;
