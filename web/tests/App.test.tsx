@@ -379,8 +379,8 @@ describe("App", () => {
     expect(atomsOpacityInput.value).toBe("100");
     expect(atomsOpacityInput.parentElement?.textContent).toContain("%");
     expect(bondsOpacityInput.value).toBe("100");
-    expect(polyhedraOpacityInput.value).toBe("25");
-    expect(polyhedraOpacitySlider.max).toBe("50");
+    expect(polyhedraOpacityInput.value).toBe("50");
+    expect(polyhedraOpacitySlider.max).toBe("100");
 
     await user.clear(atomsOpacityInput);
     await user.type(atomsOpacityInput, "98{Enter}");
@@ -396,7 +396,7 @@ describe("App", () => {
     await user.click(resetOpacityButton);
 
     expect(resetOpacityButton.className).toContain("tool-icon-button-reset-feedback");
-    expect(polyhedraOpacityInput.value).toBe("25");
+    expect(polyhedraOpacityInput.value).toBe("50");
 
     const polyhedraCheckbox = within(commonControls).getByRole("checkbox", {
       name: "Polyhedra",
@@ -407,14 +407,14 @@ describe("App", () => {
     await user.clear(polyhedraOpacityInput);
     await user.type(polyhedraOpacityInput, "80%{Enter}");
 
-    expect(polyhedraOpacityInput.value).toBe("50");
-    expect(polyhedraOpacitySlider.value).toBe("50");
+    expect(polyhedraOpacityInput.value).toBe("80");
+    expect(polyhedraOpacitySlider.value).toBe("80");
 
     await user.clear(polyhedraOpacityInput);
     await user.type(polyhedraOpacityInput, "80%{Enter}");
 
-    expect(polyhedraOpacityInput.value).toBe("50");
-    expect(polyhedraOpacitySlider.value).toBe("50");
+    expect(polyhedraOpacityInput.value).toBe("80");
+    expect(polyhedraOpacitySlider.value).toBe("80");
 
     await user.click(atomsCheckbox);
     expect(atomsCheckbox.getAttribute("aria-checked")).toBe("false");
@@ -437,7 +437,7 @@ describe("App", () => {
     expect(atomsCheckbox.getAttribute("aria-checked")).toBe("false");
     expect(unitCellOpacityInput.value).toBe("100");
     expect(bondsOpacityInput.value).toBe("100");
-    expect(polyhedraOpacityInput.value).toBe("25");
+    expect(polyhedraOpacityInput.value).toBe("50");
     expect(resetOpacityButton.className).toContain("tool-icon-button-reset-feedback");
     await waitFor(() =>
       expect(resetOpacityButton.className).not.toContain("tool-icon-button-reset-feedback"),

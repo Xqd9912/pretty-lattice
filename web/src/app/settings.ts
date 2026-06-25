@@ -47,14 +47,14 @@ export const DEFAULT_COMPONENT_OPACITY: ComponentOpacityState = {
   atoms: 100,
   unitCell: 100,
   bonds: 100,
-  polyhedra: 25,
+  polyhedra: 50,
 };
 
 export const COMPONENT_OPACITY_MAX: ComponentOpacityState = {
   atoms: 100,
   unitCell: 100,
   bonds: 100,
-  polyhedra: 50,
+  polyhedra: 100,
 };
 
 export type BondColorMode = "neutral" | "unicolor-2d" | "by-atom";
