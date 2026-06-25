@@ -302,7 +302,6 @@ export function App() {
     [scene, style.colorScheme],
   );
   const hasVisibleScene = visibleScene !== null;
-  const isOpenStructureDisabled = isStaticScenePreview || previewStatus === "loading";
   const errorTitle =
     errorMessage === BACKEND_UNAVAILABLE_MESSAGE
       ? BACKEND_UNAVAILABLE_TITLE
@@ -520,7 +519,6 @@ export function App() {
         type="file"
         className="hidden"
         tabIndex={-1}
-        disabled={isStaticScenePreview}
         onChange={(event) => void handleFileChange(event)}
       />
 
@@ -587,13 +585,9 @@ export function App() {
       >
         <StructureSummaryCard
           isCollapsed={isStructureSummaryCollapsed}
-          isOpenStructureDisabled={isOpenStructureDisabled}
           onCollapsedChange={setIsStructureSummaryCollapsed}
-          onOpenStructure={() => {
-            if (!isOpenStructureDisabled) {
-              fileInputRef.current?.click();
-            }
-          }}
+          onOpenStructure={() => fileInputRef.current?.click()}
+          previewStatus={previewStatus}
           scene={scene}
           selectedFileName={selectedFileName}
         />
