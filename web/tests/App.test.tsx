@@ -486,7 +486,7 @@ describe("App", () => {
     expect(commonControls.querySelectorAll(".opacity-slider-snap-marker")).toHaveLength(2);
     expect(atomRadiusModelSelect.textContent).toContain("Uniform");
     expect(bondStyleSelect.textContent).toContain("By atom");
-    expect(colorSchemeSelect.textContent).toContain("VESTA");
+    expect(colorSchemeSelect.textContent).toContain("VESTA Modern");
 
     await user.click(atomRadiusModelSelect);
     expect(await screen.findByText("Atom radius model")).toBeTruthy();

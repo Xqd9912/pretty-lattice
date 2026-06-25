@@ -26,6 +26,12 @@ describe("color schemes", () => {
     expect(elementColorForScheme("D", "jmol")).toBe("#ffffff");
     expect(elementColorForScheme("XX", "jmol")).toBe("#4c4c4c");
   });
+
+  test("defines softened VESTA Modern colors", () => {
+    expect(elementColorForScheme("O", "vesta-modern")).toBe("#d16759");
+    expect(elementColorForScheme("Cl", "vesta-modern")).toBe("#9fda96");
+    expect(elementColorForScheme("Si", "vesta-modern")).toBe("#4565ba");
+  });
 });
 
 function backendElementSymbols(): string[] {

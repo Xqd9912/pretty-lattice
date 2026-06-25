@@ -1,8 +1,9 @@
 import type { AtomSpec } from "../api/scene";
 import jmolColormap from "../data/colormaps/jmol.json";
+import vestaModernColormap from "../data/colormaps/vesta-modern.json";
 import vestaColormap from "../data/colormaps/vesta.json";
 
-export type ColorScheme = "vesta" | "jmol";
+export type ColorScheme = "vesta-modern" | "vesta" | "jmol";
 
 interface ColormapData {
   name: ColorScheme;
@@ -10,11 +11,13 @@ interface ColormapData {
 }
 
 const COLOR_SCHEMES: Record<ColorScheme, ColormapData> = {
+  "vesta-modern": vestaModernColormap as ColormapData,
   vesta: vestaColormap as ColormapData,
   jmol: jmolColormap as ColormapData,
 };
 
 export const COLOR_SCHEME_OPTIONS: { label: string; value: ColorScheme }[] = [
+  { label: "VESTA Modern", value: "vesta-modern" },
   { label: "VESTA", value: "vesta" },
   { label: "Jmol", value: "jmol" },
 ];

@@ -15,9 +15,9 @@ describe("deriveElementLegendEntries", () => {
         ]),
       ),
     ).toEqual([
-      { color: "#fadd3d", element: "Na" },
-      { color: "#32fc03", element: "Cl" },
-      { color: "#ff0300", element: "O" },
+      { color: "#e1d182", element: "Na" },
+      { color: "#9fda96", element: "Cl" },
+      { color: "#d16759", element: "O" },
     ]);
   });
 
@@ -44,6 +44,21 @@ describe("deriveElementLegendEntries", () => {
     ]);
   });
 
+  test("can derive legend colors from the original VESTA scheme", () => {
+    expect(
+      deriveElementLegendEntries(
+        sceneWithAtoms([
+          { element: "Na" },
+          { element: "O" },
+        ]),
+        "vesta",
+      ),
+    ).toEqual([
+      { color: "#fadd3d", element: "Na" },
+      { color: "#ff0300", element: "O" },
+    ]);
+  });
+
   test("derives entries from canonical atoms instead of periodic images", () => {
     expect(
       deriveElementLegendEntries(
@@ -55,8 +70,8 @@ describe("deriveElementLegendEntries", () => {
         ]),
       ),
     ).toEqual([
-      { color: "#fadd3d", element: "Na" },
-      { color: "#32fc03", element: "Cl" },
+      { color: "#e1d182", element: "Na" },
+      { color: "#9fda96", element: "Cl" },
     ]);
   });
 });

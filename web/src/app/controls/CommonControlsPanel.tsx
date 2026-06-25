@@ -143,6 +143,10 @@ const VESTA_TOKEN_STYLE = {
   background:
     "linear-gradient(90deg, #ffcccc 0 22%, #814929 22% 44%, #b0bae6 44% 66%, #ff0300 66% 100%)",
 } as const;
+const VESTA_MODERN_TOKEN_STYLE = {
+  background:
+    "linear-gradient(90deg, #f2c0c0 0 22%, #8d5434 22% 44%, #a9b3df 44% 66%, #d16759 66% 100%)",
+} as const;
 
 export function CommonControlsPanel({
   componentOpacity,
@@ -1021,11 +1025,21 @@ function ColorSchemeOptionLabel({
       <span
         aria-hidden="true"
         className="h-3 w-6 shrink-0 rounded-full border border-border"
-        style={value === "jmol" ? JMOL_TOKEN_STYLE : VESTA_TOKEN_STYLE}
+        style={colorSchemeTokenStyle(value)}
       />
       <span className="min-w-0 truncate">{label}</span>
     </span>
   );
+}
+
+function colorSchemeTokenStyle(value: ColorScheme): CSSProperties {
+  if (value === "jmol") {
+    return JMOL_TOKEN_STYLE;
+  }
+  if (value === "vesta-modern") {
+    return VESTA_MODERN_TOKEN_STYLE;
+  }
+  return VESTA_TOKEN_STYLE;
 }
 
 function ReservedTabContent() {
