@@ -945,16 +945,19 @@ describe("App", () => {
       .toBe("0");
     expect(within(commonControls).getByRole("slider", { name: "Roll" }).getAttribute("aria-valuemax"))
       .toBe("360");
-    expect(
-      within(commonControls).getByRole("textbox", { name: "Roll value" }),
-    ).toHaveProperty("value", "0");
+    const initialRollInput = within(commonControls).getByRole("textbox", {
+      name: "Roll value",
+    }) as HTMLInputElement;
+    expect(initialRollInput).toHaveProperty("value", "0");
+    expect(initialRollInput.style.width).toBe("1ch");
+    expect(initialRollInput.nextElementSibling?.textContent).toBe("°");
     const rollSlider = within(commonControls).getByRole("slider", { name: "Roll" });
     expect(rollSlider.className).not.toContain("focus-visible:ring-[3px]");
     expect(
       rollSlider.querySelector("[data-slot='angle-slider-thumb']")?.className,
     ).toContain("group-focus-visible:ring-[2px]");
 
-    expect(within(commonControls).getByText("Manual").isConnected).toBe(true);
+    expect(within(commonControls).getByText("Manual input").isConnected).toBe(true);
     expect(
       within(commonControls)
         .getAllByRole("textbox")
@@ -1002,18 +1005,30 @@ describe("App", () => {
     const rollInput = within(commonControls).getByRole("textbox", {
       name: "Roll value",
     }) as HTMLInputElement;
-    await user.clear(rollInput);
+    await user.click(rollInput);
+
+    expect(rollInput.value).toBe("");
+    expect(rollInput.style.width).toBe("1ch");
+
+    await user.tab();
+
+    expect(rollInput.value).toBe("0");
+
+    await user.click(rollInput);
     await user.type(rollInput, "-90{Enter}");
 
     expect(rollInput.value).toBe("270");
+    expect(rollInput.style.width).toBe("3ch");
+    expect(rollInput.nextElementSibling?.textContent).toBe("°");
     expect(
       within(commonControls).getByRole("slider", { name: "Roll" }).getAttribute("aria-valuenow"),
     ).toBe("270");
 
-    await user.clear(rollInput);
+    await user.click(rollInput);
     await user.type(rollInput, "-0.00001{Enter}");
 
     expect(rollInput.value).toBe("0");
+    expect(rollInput.style.width).toBe("1ch");
     expect(
       within(commonControls).getByRole("slider", { name: "Roll" }).getAttribute("aria-valuenow"),
     ).toBe("0");

@@ -407,7 +407,7 @@ export function CommonControlsPanel({
             className="overflow-hidden transition-[height] duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
             style={contentStyle}
           >
-            <TabsContent value="camera" className="pt-1.5">
+            <TabsContent value="camera">
               <CameraTabContent
                 cameraState={cameraState}
                 cellVectors={cellVectors}
@@ -1469,7 +1469,11 @@ function RollControl({
   const [draftValue, setDraftValue] = useState(committedValue);
   const displayedValue = isDragging ? draftValue : committedValue;
   const [valueText, setValueText] = useState(formatRollValue(committedValue));
+  const [isValueFocused, setIsValueFocused] = useState(false);
+  const [hasValueEdited, setHasValueEdited] = useState(false);
   const lastPreviewValueRef = useRef<number | null>(null);
+  const valueTextAtFocusRef = useRef(valueText);
+  const displayedValueText = isValueFocused && !hasValueEdited ? "" : valueText;
 
   useEffect(() => {
     if (isDragging) {
@@ -1480,8 +1484,8 @@ function RollControl({
     setValueText(formatRollValue(committedValue));
   }, [committedValue, isDragging]);
 
-  function commitValueText() {
-    const nextValue = parseRollInput(valueText);
+  function commitValueText(nextText = valueText) {
+    const nextValue = parseRollInput(nextText);
     if (nextValue === null) {
       setValueText(formatRollValue(displayedValue));
       return;
@@ -1491,6 +1495,34 @@ function RollControl({
     setDraftValue(normalizedValue);
     setValueText(formatRollValue(normalizedValue));
     onValueChange(normalizedValue);
+  }
+
+  function handleValueFocus() {
+    valueTextAtFocusRef.current = valueText;
+    setIsValueFocused(true);
+    setHasValueEdited(false);
+  }
+
+  function handleValueBlur(event: FocusEvent<HTMLInputElement>) {
+    const wasEdited = hasValueEdited;
+    setIsValueFocused(false);
+    setHasValueEdited(false);
+
+    if (!wasEdited) {
+      return;
+    }
+
+    if (event.currentTarget.value.trim() === "") {
+      setValueText(valueTextAtFocusRef.current);
+      return;
+    }
+
+    commitValueText(event.currentTarget.value);
+  }
+
+  function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
+    setHasValueEdited(true);
+    setValueText(event.target.value);
   }
 
   function handleSliderInteractionStart() {
@@ -1524,20 +1556,30 @@ function RollControl({
 
   function handleValueKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
+      event.preventDefault();
+      if (event.currentTarget.value.trim() === "") {
+        setValueText(valueTextAtFocusRef.current);
+      } else {
+        commitValueText(event.currentTarget.value);
+      }
       event.currentTarget.blur();
-      commitValueText();
       return;
     }
 
     if (event.key === "Escape") {
-      setValueText(formatRollValue(displayedValue));
+      setValueText(valueTextAtFocusRef.current);
       event.currentTarget.blur();
       return;
     }
 
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       event.preventDefault();
-      onValueChange(toPositiveRollDegrees(displayedValue + (event.key === "ArrowUp" ? 1 : -1)));
+      const normalizedValue = toPositiveRollDegrees(
+        displayedValue + (event.key === "ArrowUp" ? 1 : -1),
+      );
+      setHasValueEdited(true);
+      setValueText(formatRollValue(normalizedValue));
+      onValueChange(normalizedValue);
     }
   }
 
@@ -1560,18 +1602,27 @@ function RollControl({
         onValueChange={handleSliderPreviewChange}
         onValueCommit={handleSliderCommit}
       />
-      <label className="absolute left-1/2 top-1/2 z-10 grid h-6 w-[2.35rem] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[4px] border border-transparent bg-transparent transition-[background-color,border-color,box-shadow] duration-150 hover:border-foreground/8 hover:bg-background/55 focus-within:border-ring/15 focus-within:bg-background/70 focus-within:shadow-[0_0_0_0.5px_color-mix(in_srgb,var(--ring)_14%,transparent)]">
+      <label className="absolute left-1/2 top-1/2 z-10 inline-flex h-6 min-w-[1.65rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[4px] border border-transparent bg-transparent px-1.5 transition-[background-color,border-color,box-shadow] duration-150 hover:border-foreground/8 hover:bg-background/55 focus-within:border-ring/15 focus-within:bg-background/70 focus-within:shadow-[0_0_0_0.5px_color-mix(in_srgb,var(--ring)_14%,transparent)]">
         <span className="sr-only">Roll value</span>
         <input
           type="text"
           inputMode="decimal"
-          value={valueText}
+          value={displayedValueText}
           aria-label="Roll value"
-          className="h-full w-full border-0 bg-transparent px-1 text-center font-mono text-sm font-normal leading-none tabular-nums outline-none focus-visible:ring-0"
-          onBlur={commitValueText}
-          onChange={(event) => setValueText(event.target.value)}
+          className="h-full min-w-[1ch] border-0 bg-transparent px-0 text-right font-mono text-sm font-normal leading-none tabular-nums outline-none focus-visible:ring-0"
+          style={{ width: rollValueInputWidth(displayedValueText) }}
+          onBlur={handleValueBlur}
+          onChange={handleValueChange}
+          onFocus={handleValueFocus}
           onKeyDown={handleValueKeyDown}
         />
+        <span
+          aria-hidden="true"
+          data-slot="roll-degree-symbol"
+          className="pointer-events-none -ml-px select-none font-mono text-sm font-normal leading-none text-foreground"
+        >
+          °
+        </span>
       </label>
     </section>
   );
@@ -1732,7 +1783,7 @@ function VectorEditor({
           id="camera-manual-label"
           className="text-xs font-bold leading-tight text-muted-foreground"
         >
-          Manual
+          Manual input
         </h2>
         <div className="flex items-center justify-end gap-1">
           <Button
@@ -1910,6 +1961,10 @@ function formatVectorCoefficient(value: number): string {
 
 function formatRollValue(value: number): string {
   return String(displayRollDegrees(value));
+}
+
+function rollValueInputWidth(value: string): string {
+  return `${Math.min(8, Math.max(1, value.length))}ch`;
 }
 
 function toPositiveRollDegrees(value: number): number {
