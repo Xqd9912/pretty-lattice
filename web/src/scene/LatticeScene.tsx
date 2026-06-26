@@ -3,6 +3,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import {
   Box3,
   BufferGeometry,
+  Color,
   DoubleSide,
   Float32BufferAttribute,
   MOUSE,
@@ -670,8 +671,6 @@ function Bond({
     }
 
     const center = start.clone().add(end).multiplyScalar(0.5);
-    const startSegmentCenter = start.clone().add(direction.clone().multiplyScalar(0.25));
-    const endSegmentCenter = start.clone().add(direction.clone().multiplyScalar(0.75));
     const quaternion = new Quaternion().setFromUnitVectors(
       new Vector3(0, 1, 0),
       direction.clone().normalize(),
@@ -680,11 +679,9 @@ function Bond({
     return {
       center,
       endColor: atomColorForScheme(endAtom, colorScheme),
-      endSegmentCenter,
       length,
       quaternion,
       startColor: atomColorForScheme(startAtom, colorScheme),
-      startSegmentCenter,
     };
   }, [atomById, bond.endAtomId, bond.startAtomId, colorScheme]);
 
@@ -713,28 +710,17 @@ function Bond({
 
   if (colorMode === "by-atom") {
     return (
-      <>
-        <BondCylinder
-          color={geometry.startColor}
-          isTransparent={isTransparent}
-          length={geometry.length / 2}
-          opacity={opacity}
-          position={geometry.startSegmentCenter}
-          quaternion={geometry.quaternion}
-          radialSegments={meshDetail.bondRadialSegments}
-          radius={radius}
-        />
-        <BondCylinder
-          color={geometry.endColor}
-          isTransparent={isTransparent}
-          length={geometry.length / 2}
-          opacity={opacity}
-          position={geometry.endSegmentCenter}
-          quaternion={geometry.quaternion}
-          radialSegments={meshDetail.bondRadialSegments}
-          radius={radius}
-        />
-      </>
+      <TwoToneBondCylinder
+        endColor={geometry.endColor}
+        isTransparent={isTransparent}
+        length={geometry.length}
+        opacity={opacity}
+        position={geometry.center}
+        quaternion={geometry.quaternion}
+        radialSegments={meshDetail.bondRadialSegments}
+        radius={radius}
+        startColor={geometry.startColor}
+      />
     );
   }
 
@@ -749,6 +735,52 @@ function Bond({
       radialSegments={meshDetail.bondRadialSegments}
       radius={radius}
     />
+  );
+}
+
+function TwoToneBondCylinder({
+  endColor,
+  isTransparent,
+  length,
+  opacity,
+  position,
+  quaternion,
+  radialSegments,
+  radius,
+  startColor,
+}: {
+  endColor: string;
+  isTransparent: boolean;
+  length: number;
+  opacity: number;
+  position: Vector3;
+  quaternion: Quaternion;
+  radialSegments: number;
+  radius: number;
+  startColor: string;
+}) {
+  const geometry = useMemo(
+    () =>
+      twoToneBondCylinderGeometry({
+        endColor,
+        length,
+        radialSegments,
+        radius,
+        startColor,
+      }),
+    [endColor, length, radialSegments, radius, startColor],
+  );
+
+  return (
+    <mesh geometry={geometry} position={position} quaternion={quaternion}>
+      <meshLambertMaterial
+        key={isTransparent ? "two-tone-transparent" : "two-tone-opaque"}
+        depthWrite={!isTransparent}
+        opacity={opacity}
+        transparent={isTransparent}
+        vertexColors
+      />
+    </mesh>
   );
 }
 
@@ -803,6 +835,78 @@ function BondCylinder({
       )}
     </mesh>
   );
+}
+
+export function twoToneBondCylinderGeometry({
+  endColor,
+  length,
+  radialSegments,
+  radius,
+  startColor,
+}: {
+  endColor: string;
+  length: number;
+  radialSegments: number;
+  radius: number;
+  startColor: string;
+}): BufferGeometry {
+  const segments = Math.max(3, Math.floor(radialSegments));
+  const halfLength = length / 2;
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const colors: number[] = [];
+  const indices: number[] = [];
+  const start = new Color(startColor);
+  const end = new Color(endColor);
+  const rows = [
+    { color: start, y: -halfLength },
+    { color: start, y: 0 },
+    { color: end, y: 0 },
+    { color: end, y: halfLength },
+  ];
+
+  for (const row of rows) {
+    for (let index = 0; index <= segments; index += 1) {
+      const theta = (index / segments) * Math.PI * 2;
+      const sinTheta = Math.sin(theta);
+      const cosTheta = Math.cos(theta);
+
+      positions.push(radius * sinTheta, row.y, radius * cosTheta);
+      normals.push(sinTheta, 0, cosTheta);
+      colors.push(row.color.r, row.color.g, row.color.b);
+    }
+  }
+
+  const rowVertexCount = segments + 1;
+  addCylinderSideStrip(indices, 0, 1, rowVertexCount, segments);
+  addCylinderSideStrip(indices, 2, 3, rowVertexCount, segments);
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+  geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  return geometry;
+}
+
+function addCylinderSideStrip(
+  indices: number[],
+  startRow: number,
+  endRow: number,
+  rowVertexCount: number,
+  segments: number,
+) {
+  const startOffset = startRow * rowVertexCount;
+  const endOffset = endRow * rowVertexCount;
+
+  for (let index = 0; index < segments; index += 1) {
+    const a = startOffset + index;
+    const b = endOffset + index;
+    const c = endOffset + index + 1;
+    const d = startOffset + index + 1;
+
+    indices.push(a, d, b, b, d, c);
+  }
 }
 
 function Polyhedron({

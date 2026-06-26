@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { OrthographicCamera, Quaternion } from "three";
+import { OrthographicCamera, Quaternion, Vector3 } from "three";
 
 import type { AtomSpec, SceneSpec } from "../src/api/scene";
 import {
@@ -23,6 +23,7 @@ import {
   computeSceneLayout,
   polyhedronGeometryFromAtoms,
   previewSafeAreaForViewport,
+  twoToneBondCylinderGeometry,
 } from "../src/scene/LatticeScene";
 import {
   applyCameraPoseSnapshot,
@@ -194,6 +195,46 @@ describe("computeSceneLayout", () => {
     expect(EXPORT_SCENE_MESH_DETAIL_PRESETS.xhigh.bondRadialSegments).toBe(32);
   });
 
+  test("builds by-atom bonds as one open cylinder side with a hard color boundary", () => {
+    const geometry = twoToneBondCylinderGeometry({
+      endColor: "#0000ff",
+      length: 4,
+      radialSegments: 4,
+      radius: 0.5,
+      startColor: "#ff0000",
+    });
+    const position = geometry.getAttribute("position");
+    const color = geometry.getAttribute("color");
+    const rowVertexCount = 5;
+
+    expect(position.count).toBe(4 * rowVertexCount);
+    expect(geometry.index?.count).toBe(2 * 4 * 2 * 3);
+    expect(position.getY(0)).toBeCloseTo(-2);
+    expect(position.getY(rowVertexCount)).toBeCloseTo(0);
+    expect(position.getY(rowVertexCount * 2)).toBeCloseTo(0);
+    expect(position.getY(rowVertexCount * 3)).toBeCloseTo(2);
+    expect([color.getX(rowVertexCount), color.getY(rowVertexCount), color.getZ(rowVertexCount)])
+      .toEqual([1, 0, 0]);
+    expect([
+      color.getX(rowVertexCount * 2),
+      color.getY(rowVertexCount * 2),
+      color.getZ(rowVertexCount * 2),
+    ]).toEqual([0, 0, 1]);
+
+    for (let index = 0; index < position.count; index += 1) {
+      const isCenterCapVertex =
+        Math.abs(position.getY(index)) < 1e-12 &&
+        Math.abs(position.getX(index)) < 1e-12 &&
+        Math.abs(position.getZ(index)) < 1e-12;
+
+      expect(isCenterCapVertex).toBe(false);
+    }
+
+    expect(firstTriangleNormalDotVertexNormal(geometry)).toBeGreaterThan(0);
+
+    geometry.dispose();
+  });
+
   test("captures and applies a narrow orthographic camera pose snapshot", () => {
     const sourceOrientation = new Quaternion();
     const snapshot = createCameraPoseSnapshot(sourceOrientation, [1, 2, 3]);
@@ -360,6 +401,25 @@ function expectVectorClose(actual: [number, number, number], expected: [number, 
 
 function dot(left: [number, number, number], right: [number, number, number]) {
   return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
+}
+
+function firstTriangleNormalDotVertexNormal(geometry: ReturnType<typeof twoToneBondCylinderGeometry>) {
+  const position = geometry.getAttribute("position");
+  const normal = geometry.getAttribute("normal");
+  const index = geometry.index;
+
+  expect(index).not.toBeNull();
+
+  const a = index!.getX(0);
+  const b = index!.getX(1);
+  const c = index!.getX(2);
+  const pointA = new Vector3(position.getX(a), position.getY(a), position.getZ(a));
+  const pointB = new Vector3(position.getX(b), position.getY(b), position.getZ(b));
+  const pointC = new Vector3(position.getX(c), position.getY(c), position.getZ(c));
+  const faceNormal = pointB.sub(pointA).cross(pointC.sub(pointA)).normalize();
+  const vertexNormal = new Vector3(normal.getX(a), normal.getY(a), normal.getZ(a));
+
+  return faceNormal.dot(vertexNormal);
 }
 
 function sceneWithOffCenterAtoms(): SceneSpec {
