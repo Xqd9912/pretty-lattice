@@ -49,7 +49,7 @@ describe("computeSceneLayout", () => {
     expect(computeSceneLayout(scene).groupPosition).toEqual([-2.5, -1.5, -1]);
   });
 
-  test("uses the c-up three-quarter Standard camera pose", () => {
+  test("uses the VESTA-like c-outward b-star-up camera pose", () => {
     const pose = computeStandardCameraPose(
       [
         [1, 0, 0],
@@ -58,13 +58,11 @@ describe("computeSceneLayout", () => {
       ],
       3,
     );
-    const diagonal = 1 / Math.sqrt(3);
-    const cUp = 1 / Math.sqrt(6);
 
-    expectVectorClose(pose.outward, [diagonal, diagonal, diagonal]);
-    expectVectorClose(pose.cameraUp, [-cUp, -cUp, 2 * cUp]);
+    expectVectorClose(pose.outward, [0, 0, 1]);
+    expectVectorClose(pose.cameraUp, [0, 1, 0]);
     expect(dot(pose.outward, pose.cameraUp)).toBeCloseTo(0);
-    expect(dot([0, 0, 1], pose.cameraUp)).toBeGreaterThan(0);
+    expect(dot([0, 1, 0], pose.cameraUp)).toBeGreaterThan(0);
   });
 
   test("fits the camera to stable preview safe areas", () => {
@@ -186,11 +184,12 @@ describe("computeSceneLayout", () => {
     expect(computeSceneLayout(scene, "vdw").span).toBeCloseTo(9.2);
   });
 
-  test("tracks the Standard-view projected fit size for slender structures", () => {
+  test("tracks the VESTA-like projected fit size for slender structures", () => {
     const layout = computeSceneLayout(sceneWithLongCell());
 
     expect(layout.cameraFitBounds.span).toBeCloseTo(layout.span);
-    expect(layout.cameraFitBounds.projectedWidth).toBeLessThan(layout.span);
+    expect(layout.cameraFitBounds.projectedWidth).toBeCloseTo(layout.span);
+    expect(layout.cameraFitBounds.projectedHeight).toBeLessThan(layout.span);
   });
 
   test("uses fixed first-version bond styling", () => {

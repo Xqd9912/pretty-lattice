@@ -30,6 +30,16 @@ import {
   previewSafeAreaForViewport,
 } from "../scene/LatticeScene";
 import { createCameraPoseSnapshot } from "../scene/cameraPose";
+import {
+  applyCrystalCameraRoll,
+  stateFromViewVectors,
+  stateWithDirectAxis,
+  stateWithPrimaryDirection,
+  vectorsFromCameraQuaternion,
+  type CrystalAxisLabel,
+  type CrystalCameraPrimaryDirection,
+  type CrystalCameraState,
+} from "../scene/crystalCamera";
 import { computeStructureExportProjectedSize } from "../scene/exportFrame";
 import { OrientationGizmo } from "../scene/OrientationGizmo";
 import {
@@ -75,6 +85,8 @@ import {
 import {
   createPreviewViewState,
   resetPreviewViewState,
+  setPreviewCameraState,
+  setPreviewCameraVectorsExpanded,
   setPreviewInteractionLocked,
   setPreviewInteractionMode,
   setPreviewViewScale,
@@ -118,6 +130,7 @@ export function App() {
   const [exportSettings, setExportSettings] = useState(createDefaultExportSettings);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [cameraCommandVersion, setCameraCommandVersion] = useState(0);
   const [cameraOrientationVersion, setCameraOrientationVersion] = useState(0);
   const [viewState, setViewState] = useState(createPreviewViewState);
   const [lockedInteractionFeedbackCount, setLockedInteractionFeedbackCount] = useState(0);
@@ -129,6 +142,10 @@ export function App() {
   const cameraOrientationRef = useRef(new Quaternion());
   const lockedInteractionPointerRef = useRef<LockedInteractionPointer | null>(null);
   const lockedInteractionWheelIdleTimeoutRef = useRef<number | null>(null);
+  const visibleScene = useMemo(
+    () => visibleSceneForComponents(scene, componentVisibility),
+    [componentVisibility, scene],
+  );
 
   const handleViewScaleChange = useCallback((viewScale: number) => {
     setViewState((currentViewState) => setPreviewViewScale(currentViewState, viewScale));
@@ -159,11 +176,95 @@ export function App() {
 
   const handleResetView = useCallback(() => {
     setViewState(resetPreviewViewState);
+    setCameraCommandVersion((version) => version + 1);
   }, []);
 
   const handleCameraOrientationChange = useCallback(() => {
     setCameraOrientationVersion((version) => version + 1);
+    setViewState((currentViewState) => {
+      if (!visibleScene) {
+        return currentViewState;
+      }
+
+      const poseVectors = vectorsFromCameraQuaternion(cameraOrientationRef.current);
+      return setPreviewCameraState(
+        currentViewState,
+        stateFromViewVectors(
+          visibleScene.cell.vectors,
+          currentViewState.camera.primary,
+          poseVectors.up,
+          poseVectors.outward,
+          currentViewState.camera.vectorsExpanded,
+        ),
+      );
+    });
+  }, [visibleScene]);
+
+  const handleCameraStateChange = useCallback((cameraState: CrystalCameraState) => {
+    setViewState((currentViewState) => setPreviewCameraState(currentViewState, cameraState));
+    setCameraCommandVersion((version) => version + 1);
   }, []);
+
+  const handleCameraPrimaryChange = useCallback(
+    (primary: CrystalCameraPrimaryDirection) => {
+      if (!visibleScene) {
+        return;
+      }
+
+      setViewState((currentViewState) =>
+        setPreviewCameraState(
+          currentViewState,
+          stateWithPrimaryDirection(
+            visibleScene.cell.vectors,
+            cameraOrientationRef.current,
+            primary,
+            currentViewState.camera.vectorsExpanded,
+          ),
+        ),
+      );
+    },
+    [visibleScene],
+  );
+
+  const handleCameraRollChange = useCallback(
+    (rollDegrees: number) => {
+      if (!visibleScene) {
+        return;
+      }
+
+      setViewState((currentViewState) =>
+        setPreviewCameraState(
+          currentViewState,
+          applyCrystalCameraRoll(visibleScene.cell.vectors, currentViewState.camera, rollDegrees),
+        ),
+      );
+      setCameraCommandVersion((version) => version + 1);
+    },
+    [visibleScene],
+  );
+
+  const handleCameraVectorsExpandedChange = useCallback((vectorsExpanded: boolean) => {
+    setViewState((currentViewState) =>
+      setPreviewCameraVectorsExpanded(currentViewState, vectorsExpanded),
+    );
+  }, []);
+
+  const handleGizmoAxisClick = useCallback(
+    (axis: CrystalAxisLabel) => {
+      if (!visibleScene) {
+        return;
+      }
+
+      setViewState((currentViewState) =>
+        setPreviewCameraState(
+          currentViewState,
+          stateWithDirectAxis(visibleScene.cell.vectors, currentViewState.camera, axis),
+        ),
+      );
+      setCameraCommandVersion((version) => version + 1);
+    },
+    [visibleScene],
+  );
 
   useEffect(() => {
     if (!isStaticScenePreview) {
@@ -268,6 +369,7 @@ export function App() {
     setExportSettings(createDefaultExportSettings());
     setExportError(null);
     cameraOrientationRef.current.identity();
+    setCameraCommandVersion((version) => version + 1);
     setCameraOrientationVersion((version) => version + 1);
     setViewState(createPreviewViewState());
     setIsStructureSummaryCollapsed(true);
@@ -328,10 +430,6 @@ export function App() {
     [currentFile, scene],
   );
 
-  const visibleScene = useMemo(
-    () => visibleSceneForComponents(scene, componentVisibility),
-    [componentVisibility, scene],
-  );
   const exportProjectedSize = useMemo(() => {
     if (!visibleScene) {
       return null;
@@ -591,6 +689,8 @@ export function App() {
       >
         {visibleScene ? (
           <LatticeScene
+            cameraCommandVersion={cameraCommandVersion}
+            cameraState={viewState.camera}
             cameraOrientationRef={cameraOrientationRef}
             onCameraOrientationChange={handleCameraOrientationChange}
             interactionLocked={viewState.interactionLocked}
@@ -632,7 +732,8 @@ export function App() {
         <OrientationGizmo
           cameraOrientationRef={cameraOrientationRef}
           cellVectors={visibleScene.cell.vectors}
-          className="pointer-events-none absolute"
+          className="absolute"
+          onAxisClick={handleGizmoAxisClick}
           style={orientationGizmoContainerStyle(effectivePreviewSafeArea, orientationGizmoSize)}
         />
       ) : null}
@@ -664,6 +765,8 @@ export function App() {
         {scene ? (
           <div ref={commonControlsPanelRef}>
             <CommonControlsPanel
+              cameraState={viewState.camera}
+              cellVectors={scene.cell.vectors}
               componentOpacity={componentOpacity}
               style={style}
               exportProjectedSize={exportProjectedSize ?? undefined}
@@ -675,6 +778,10 @@ export function App() {
               onAtomRadiusModelChange={(atomRadiusModel) => {
                 setStyle((currentStyle) => ({ ...currentStyle, atomRadiusModel }));
               }}
+              onCameraPrimaryChange={handleCameraPrimaryChange}
+              onCameraRollChange={handleCameraRollChange}
+              onCameraStateChange={handleCameraStateChange}
+              onCameraVectorsExpandedChange={handleCameraVectorsExpandedChange}
               onComponentOpacityChange={setComponentOpacity}
               onExport={handleExportFigure}
               onExportSettingsChange={handleExportSettingsChange}

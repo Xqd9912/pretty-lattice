@@ -1,6 +1,15 @@
+import {
+  applyCrystalCameraRoll,
+  createDefaultCrystalCameraState,
+  type CrystalCameraPrimaryDirection,
+  type CrystalCameraState,
+} from "../scene/crystalCamera";
+import type { VectorTuple } from "../scene/viewMath";
+
 export type InteractionMode = "trackball" | "orbit";
 
 export interface PreviewViewState {
+  camera: CrystalCameraState;
   interactionLocked: boolean;
   interactionMode: InteractionMode;
   resetCounter: number;
@@ -23,6 +32,7 @@ export const INTERACTION_MODE_OPTIONS: readonly {
 
 export function createPreviewViewState(): PreviewViewState {
   return {
+    camera: createDefaultCrystalCameraState(),
     interactionLocked: false,
     interactionMode: "trackball",
     resetCounter: 0,
@@ -33,8 +43,56 @@ export function createPreviewViewState(): PreviewViewState {
 export function resetPreviewViewState(state: PreviewViewState): PreviewViewState {
   return {
     ...state,
+    camera: createDefaultCrystalCameraState(),
     resetCounter: state.resetCounter + 1,
     viewScale: DEFAULT_VIEW_SCALE,
+  };
+}
+
+export function setPreviewCameraState(
+  state: PreviewViewState,
+  camera: CrystalCameraState,
+): PreviewViewState {
+  return {
+    ...state,
+    camera,
+  };
+}
+
+export function setPreviewCameraPrimaryDirection(
+  state: PreviewViewState,
+  primary: CrystalCameraPrimaryDirection,
+): PreviewViewState {
+  return {
+    ...state,
+    camera: {
+      ...state.camera,
+      primary,
+    },
+  };
+}
+
+export function setPreviewCameraRoll(
+  state: PreviewViewState,
+  cellVectors: VectorTuple[],
+  rollDegrees: number,
+): PreviewViewState {
+  return {
+    ...state,
+    camera: applyCrystalCameraRoll(cellVectors, state.camera, rollDegrees),
+  };
+}
+
+export function setPreviewCameraVectorsExpanded(
+  state: PreviewViewState,
+  vectorsExpanded: boolean,
+): PreviewViewState {
+  return {
+    ...state,
+    camera: {
+      ...state.camera,
+      vectorsExpanded,
+    },
   };
 }
 

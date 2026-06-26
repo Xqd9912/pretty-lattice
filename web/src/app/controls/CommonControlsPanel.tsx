@@ -1,5 +1,7 @@
 import {
   AlertTriangleIcon,
+  Check,
+  ChevronDown,
   ImageDown,
   Link,
   Palette,
@@ -16,6 +18,7 @@ import {
   type ReactNode,
   type SetStateAction,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -39,6 +42,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 
 import type { AtomRadiusModel } from "../../api/scene";
+import {
+  computeCrystalCameraVectors,
+  normalizeRollDegrees,
+  parseVectorCoefficients,
+  stateFromViewVectors,
+  type CrystalCameraPrimaryDirection,
+  type CrystalCameraState,
+} from "../../scene/crystalCamera";
+import type { VectorTuple } from "../../scene/viewMath";
 import {
   COLOR_SCHEME_OPTIONS,
   type ColorScheme,
@@ -154,6 +166,8 @@ const VESTA_SOFT_TOKEN_STYLE = {
 } as const;
 
 export function CommonControlsPanel({
+  cameraState,
+  cellVectors,
   componentOpacity,
   componentVisibility,
   exportError,
@@ -164,11 +178,17 @@ export function CommonControlsPanel({
   onComponentOpacityChange,
   onComponentVisibilityChange,
   onAtomRadiusModelChange,
+  onCameraPrimaryChange,
+  onCameraRollChange,
+  onCameraStateChange,
+  onCameraVectorsExpandedChange,
   onExport,
   onExportSettingsChange,
   onStyleChange,
   style,
 }: {
+  cameraState: CrystalCameraState;
+  cellVectors: VectorTuple[];
   componentOpacity: ComponentOpacityState;
   componentVisibility: ComponentVisibilityState;
   exportError: string | null;
@@ -177,6 +197,10 @@ export function CommonControlsPanel({
   hasPolyhedra: boolean;
   isExporting: boolean;
   onAtomRadiusModelChange: (atomRadiusModel: AtomRadiusModel) => void;
+  onCameraPrimaryChange: (primary: CrystalCameraPrimaryDirection) => void;
+  onCameraRollChange: (rollDegrees: number) => void;
+  onCameraStateChange: (cameraState: CrystalCameraState) => void;
+  onCameraVectorsExpandedChange: (vectorsExpanded: boolean) => void;
   onComponentOpacityChange: Dispatch<SetStateAction<ComponentOpacityState>>;
   onComponentVisibilityChange: Dispatch<SetStateAction<ComponentVisibilityState>>;
   onExport: () => void;
@@ -373,7 +397,14 @@ export function CommonControlsPanel({
             style={contentStyle}
           >
             <TabsContent value="camera" className="pt-1.5">
-              <ReservedTabContent />
+              <CameraTabContent
+                cameraState={cameraState}
+                cellVectors={cellVectors}
+                onCameraPrimaryChange={onCameraPrimaryChange}
+                onCameraRollChange={onCameraRollChange}
+                onCameraStateChange={onCameraStateChange}
+                onCameraVectorsExpandedChange={onCameraVectorsExpandedChange}
+              />
             </TabsContent>
             <TabsContent value="display">
               <DisplayTabContent
@@ -1120,6 +1151,396 @@ function colorSchemeTokenStyle(value: ColorScheme): CSSProperties {
     return VESTA_SOFT_TOKEN_STYLE;
   }
   return VESTA_TOKEN_STYLE;
+}
+
+function CameraTabContent({
+  cameraState,
+  cellVectors,
+  onCameraPrimaryChange,
+  onCameraRollChange,
+  onCameraStateChange,
+  onCameraVectorsExpandedChange,
+}: {
+  cameraState: CrystalCameraState;
+  cellVectors: VectorTuple[];
+  onCameraPrimaryChange: (primary: CrystalCameraPrimaryDirection) => void;
+  onCameraRollChange: (rollDegrees: number) => void;
+  onCameraStateChange: (cameraState: CrystalCameraState) => void;
+  onCameraVectorsExpandedChange: (vectorsExpanded: boolean) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <section aria-labelledby="camera-primary-label" className="grid gap-1.5 px-1.5">
+        <h2
+          id="camera-primary-label"
+          className="text-xs font-bold leading-tight text-muted-foreground"
+        >
+          Primary direction
+        </h2>
+        <Tabs
+          value={cameraState.primary}
+          className="w-full gap-0"
+          onValueChange={(value) =>
+            onCameraPrimaryChange(value as CrystalCameraPrimaryDirection)
+          }
+        >
+          <TabsList
+            aria-label="Primary direction"
+            className="!h-7 w-full rounded-md p-0.5"
+          >
+            <TabsTrigger
+              value="outward"
+              className="!h-6 rounded-[4px] px-2 py-0 text-xs font-medium"
+            >
+              Outward
+            </TabsTrigger>
+            <TabsTrigger
+              value="upward"
+              className="!h-6 rounded-[4px] px-2 py-0 text-xs font-medium"
+            >
+              Upward
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </section>
+
+      <RollControl
+        value={cameraState.rollDegrees}
+        onValueChange={onCameraRollChange}
+      />
+
+      <Separator className="my-0.5" />
+
+      <VectorEditor
+        cameraState={cameraState}
+        cellVectors={cellVectors}
+        onCameraStateChange={onCameraStateChange}
+        onExpandedChange={onCameraVectorsExpandedChange}
+      />
+    </div>
+  );
+}
+
+function RollControl({
+  onValueChange,
+  value,
+}: {
+  onValueChange: (value: number) => void;
+  value: number;
+}) {
+  const [valueText, setValueText] = useState(formatRollValue(value));
+  const sliderBlur = useAutoBlurSlider();
+  const sliderPosition = (normalizeRollDegrees(value) + 180) / 360;
+  const sliderStyle = {
+    "--opacity-slider-position": `${Math.min(100, Math.max(0, sliderPosition * 100))}%`,
+  } as CSSProperties;
+
+  useEffect(() => {
+    setValueText(formatRollValue(value));
+  }, [value]);
+
+  function commitValueText() {
+    const nextValue = parseRollInput(valueText);
+    if (nextValue === null) {
+      setValueText(formatRollValue(value));
+      return;
+    }
+
+    const normalizedValue = normalizeRollDegrees(nextValue);
+    setValueText(formatRollValue(normalizedValue));
+    onValueChange(normalizedValue);
+  }
+
+  function handleValueKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.currentTarget.blur();
+      commitValueText();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      setValueText(formatRollValue(value));
+      event.currentTarget.blur();
+      return;
+    }
+
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      onValueChange(normalizeRollDegrees(value + (event.key === "ArrowUp" ? 1 : -1)));
+    }
+  }
+
+  return (
+    <section
+      aria-labelledby="camera-roll-label"
+      className="grid h-7 min-w-0 grid-cols-[minmax(5.5rem,1fr)_6.25rem_2.8rem] items-center gap-2 rounded-md px-1.5 text-sm"
+    >
+      <h2 id="camera-roll-label" className="min-w-0 truncate leading-tight">
+        Roll
+      </h2>
+      <div
+        className="opacity-slider-shell relative mr-3 h-5"
+        data-disabled="false"
+        style={sliderStyle}
+      >
+        <input
+          type="range"
+          min={-180}
+          max={180}
+          step={1}
+          value={Math.round(normalizeRollDegrees(value))}
+          aria-label="Roll"
+          aria-valuetext={`${formatRollValue(value)}°`}
+          className="opacity-slider absolute inset-0 z-10 h-full w-full"
+          ref={sliderBlur.ref}
+          onChange={(event) => onValueChange(normalizeRollDegrees(Number(event.target.value)))}
+          onMouseDown={sliderBlur.handlePointerDown}
+          onMouseUp={sliderBlur.handlePointerEnd}
+          onPointerCancel={sliderBlur.handlePointerEnd}
+          onPointerDown={sliderBlur.handlePointerDown}
+          onPointerUp={sliderBlur.handlePointerEnd}
+        />
+        <span aria-hidden="true" className="opacity-slider-track pointer-events-none" />
+        <span aria-hidden="true" className="opacity-slider-fill pointer-events-none" />
+        <span aria-hidden="true" className="opacity-slider-thumb pointer-events-none" />
+      </div>
+      <label className="opacity-value-control group flex h-[22px] items-baseline justify-center gap-0 rounded-md border px-0.5 transition-[background-color,border-color,box-shadow] duration-150">
+        <span className="sr-only">Roll value</span>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={valueText}
+          aria-label="Roll value"
+          className="opacity-value-input h-full w-[2rem] border-0 bg-transparent px-0 text-center font-mono text-[0.68rem] leading-none tabular-nums outline-none"
+          onBlur={commitValueText}
+          onChange={(event) => setValueText(event.target.value)}
+          onKeyDown={handleValueKeyDown}
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none font-mono text-[0.68rem] font-normal leading-none text-muted-foreground"
+        >
+          °
+        </span>
+      </label>
+    </section>
+  );
+}
+
+function VectorEditor({
+  cameraState,
+  cellVectors,
+  onCameraStateChange,
+  onExpandedChange,
+}: {
+  cameraState: CrystalCameraState;
+  cellVectors: VectorTuple[];
+  onCameraStateChange: (cameraState: CrystalCameraState) => void;
+  onExpandedChange: (expanded: boolean) => void;
+}) {
+  const currentDraft = useMemo(() => draftFromCameraState(cameraState), [cameraState]);
+  const [draft, setDraft] = useState(currentDraft);
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    if (!isDirty) {
+      setDraft(currentDraft);
+    }
+  }, [currentDraft, isDirty]);
+
+  function updateDraft(row: "direct" | "reciprocal", index: number, value: string) {
+    setIsDirty(true);
+    setDraft((currentDraftState) => ({
+      ...currentDraftState,
+      [row]: currentDraftState[row].map((entry, entryIndex) =>
+        entryIndex === index ? value : entry,
+      ) as [string, string, string],
+    }));
+  }
+
+  function resetDraft() {
+    setDraft(currentDraft);
+    setIsDirty(false);
+  }
+
+  function applyDraft() {
+    const direct = parseVectorCoefficients(draft.direct);
+    const reciprocal = parseVectorCoefficients(draft.reciprocal);
+    if (!direct || !reciprocal) {
+      resetDraft();
+      return;
+    }
+
+    const cameraVectors = computeCrystalCameraVectors(cellVectors, {
+      ...cameraState,
+      direct,
+      reciprocal,
+    });
+    const nextState = stateFromViewVectors(
+      cellVectors,
+      cameraState.primary,
+      cameraVectors.up,
+      cameraVectors.outward,
+      cameraState.vectorsExpanded,
+    );
+
+    setIsDirty(false);
+    onCameraStateChange(nextState);
+  }
+
+  function handleFieldKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.currentTarget.blur();
+      applyDraft();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      resetDraft();
+      event.currentTarget.blur();
+    }
+  }
+
+  const upwardRow = {
+    basisLabels: cameraState.primary === "upward"
+      ? ["a", "b", "c"]
+      : ["a*", "b*", "c*"],
+    draft: cameraState.primary === "upward" ? draft.direct : draft.reciprocal,
+    label: "Upward",
+    row: cameraState.primary === "upward" ? "direct" : "reciprocal",
+  } as const;
+  const outwardRow = {
+    basisLabels: cameraState.primary === "outward"
+      ? ["a", "b", "c"]
+      : ["a*", "b*", "c*"],
+    draft: cameraState.primary === "outward" ? draft.direct : draft.reciprocal,
+    label: "Outward",
+    row: cameraState.primary === "outward" ? "direct" : "reciprocal",
+  } as const;
+  const vectorRows = cameraState.primary === "outward"
+    ? [outwardRow, upwardRow]
+    : [upwardRow, outwardRow];
+
+  return (
+    <section aria-labelledby="camera-vectors-label" className="grid gap-2 px-1.5">
+      <button
+        type="button"
+        aria-expanded={cameraState.vectorsExpanded}
+        aria-controls="camera-vectors-editor"
+        className="flex h-7 items-center justify-between rounded-md text-left text-xs font-bold leading-tight text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+        onClick={() => onExpandedChange(!cameraState.vectorsExpanded)}
+      >
+        <span id="camera-vectors-label" className="px-1">
+          Vectors
+        </span>
+        <ChevronDown
+          aria-hidden="true"
+          className={cn(
+            "mr-1 size-3.5 transition-transform duration-150",
+            cameraState.vectorsExpanded ? "rotate-180" : null,
+          )}
+        />
+      </button>
+
+      {cameraState.vectorsExpanded ? (
+        <div id="camera-vectors-editor" className="grid gap-2">
+          {vectorRows.map((row) => (
+            <VectorEditorRow
+              basisLabels={row.basisLabels}
+              key={row.label}
+              label={row.label}
+              values={row.draft}
+              onValueChange={(index, value) => updateDraft(row.row, index, value)}
+              onKeyDown={handleFieldKeyDown}
+            />
+          ))}
+          <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Reset vectors draft"
+              className={TOOL_ICON_BUTTON_CLASS}
+              onClick={resetDraft}
+            >
+              <RotateCcw aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Apply vectors"
+              className={TOOL_ICON_BUTTON_CLASS}
+              onClick={applyDraft}
+            >
+              <Check aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function VectorEditorRow({
+  basisLabels,
+  label,
+  onKeyDown,
+  onValueChange,
+  values,
+}: {
+  basisLabels: string[];
+  label: string;
+  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onValueChange: (index: number, value: string) => void;
+  values: readonly string[];
+}) {
+  return (
+    <div className="grid gap-1">
+      <span className="px-0.5 text-[0.68rem] font-semibold leading-none text-muted-foreground">
+        {label}
+      </span>
+      <div className="grid grid-cols-3 gap-1">
+        {basisLabels.map((basisLabel, index) => (
+          <label key={basisLabel} className="grid min-w-0 gap-1">
+            <span className="px-0.5 text-[0.68rem] font-semibold leading-none text-muted-foreground">
+              {basisLabel}
+            </span>
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={values[index] ?? "0"}
+              aria-label={`${label} ${basisLabel}`}
+              className="h-6 min-w-0 px-1.5 text-left font-mono text-[0.68rem] tabular-nums focus-visible:border-ring/20 focus-visible:bg-background/80 focus-visible:ring-[1px] focus-visible:ring-ring/20 md:text-[0.68rem]"
+              onChange={(event) => onValueChange(index, event.target.value)}
+              onKeyDown={onKeyDown}
+            />
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function draftFromCameraState(cameraState: CrystalCameraState): {
+  direct: [string, string, string];
+  reciprocal: [string, string, string];
+} {
+  return {
+    direct: cameraState.direct.map(formatVectorCoefficient) as [string, string, string],
+    reciprocal: cameraState.reciprocal.map(formatVectorCoefficient) as [string, string, string],
+  };
+}
+
+function formatVectorCoefficient(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)));
+}
+
+function formatRollValue(value: number): string {
+  return String(Math.round(normalizeRollDegrees(value)));
+}
+
+function parseRollInput(value: string): number | null {
+  const nextValue = Number(value.trim().replace(/°$/, ""));
+  return Number.isFinite(nextValue) ? nextValue : null;
 }
 
 function ReservedTabContent() {

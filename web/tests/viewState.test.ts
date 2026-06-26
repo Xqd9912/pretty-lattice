@@ -13,10 +13,12 @@ import {
   snapZoomSliderPosition,
   viewScaleToSliderPosition,
 } from "../src/app/viewState";
+import { createDefaultCrystalCameraState } from "../src/scene/crystalCamera";
 
 describe("preview view state", () => {
   test("defaults to Trackball at fitted zoom with unlocked interaction", () => {
     expect(createPreviewViewState()).toEqual({
+      camera: createDefaultCrystalCameraState(),
       interactionLocked: false,
       interactionMode: "trackball",
       resetCounter: 0,
@@ -31,6 +33,7 @@ describe("preview view state", () => {
     );
 
     expect(resetPreviewViewState(state)).toEqual({
+      camera: createDefaultCrystalCameraState(),
       interactionLocked: true,
       interactionMode: "orbit",
       resetCounter: 1,

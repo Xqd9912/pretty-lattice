@@ -95,7 +95,16 @@ mock.module("three/examples/jsm/controls/TrackballControls.js", () => ({
 }));
 
 mock.module("../src/scene/OrientationGizmo", () => ({
-  OrientationGizmo: () => <div data-testid="mock-orientation-gizmo" />,
+  OrientationGizmo: ({ onAxisClick }: { onAxisClick?: (axis: "a" | "b" | "c") => void }) => (
+    <div data-testid="mock-orientation-gizmo">
+      <button type="button" onClick={() => onAxisClick?.("a")}>
+        gizmo a
+      </button>
+      <button type="button" onClick={() => onAxisClick?.("c")}>
+        gizmo c
+      </button>
+    </div>
+  ),
 }));
 
 let exportRequests: CreateFigureExportOptions[] = [];
@@ -855,6 +864,143 @@ describe("App", () => {
     await user.click(within(commonControls).getByRole("tab", { name: "Display" }));
 
     expect(content?.className).not.toContain("h-[");
+  });
+
+  test("shows crystal camera controls with collapsed vector editing", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    await user.click(within(commonControls).getByRole("tab", { name: "Camera" }));
+
+    expect(within(commonControls).queryByText("No controls")).toBeNull();
+    expect(within(commonControls).getByText("Primary direction").isConnected).toBe(true);
+    expect(
+      within(commonControls).getByRole("tab", { name: "Outward" }).getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(within(commonControls).getByRole("slider", { name: "Roll" })).toHaveProperty(
+      "value",
+      "0",
+    );
+    expect(
+      within(commonControls).getByRole("textbox", { name: "Roll value" }),
+    ).toHaveProperty("value", "0");
+
+    const vectorsButton = within(commonControls).getByRole("button", { name: "Vectors" });
+    expect(vectorsButton.getAttribute("aria-expanded")).toBe("false");
+    expect(within(commonControls).queryByRole("textbox", { name: "Upward c" })).toBeNull();
+
+    await user.click(vectorsButton);
+
+    expect(vectorsButton.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      within(commonControls)
+        .getAllByRole("textbox")
+        .map((textbox) => textbox.getAttribute("aria-label")),
+    ).toEqual([
+      "Roll value",
+      "Outward a",
+      "Outward b",
+      "Outward c",
+      "Upward a*",
+      "Upward b*",
+      "Upward c*",
+    ]);
+    expect(
+      within(commonControls).getByRole("textbox", { name: "Outward a" }),
+    ).toHaveProperty("value", "0");
+    expect(
+      within(commonControls).getByRole("textbox", { name: "Outward c" }),
+    ).toHaveProperty("value", "1");
+    expect(
+      within(commonControls).getByRole("textbox", { name: "Upward b*" }),
+    ).toHaveProperty("value", "1");
+  });
+
+  test("batch-applies camera vector drafts and resets the draft from current state", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    await user.click(within(commonControls).getByRole("tab", { name: "Camera" }));
+    await user.click(within(commonControls).getByRole("button", { name: "Vectors" }));
+
+    const outwardA = within(commonControls).getByRole("textbox", {
+      name: "Outward a",
+    }) as HTMLInputElement;
+    const outwardC = within(commonControls).getByRole("textbox", {
+      name: "Outward c",
+    }) as HTMLInputElement;
+    await user.clear(outwardA);
+    await user.type(outwardA, "1");
+
+    expect(outwardA.value).toBe("1");
+    expect(outwardC.value).toBe("1");
+
+    await user.click(within(commonControls).getByRole("button", { name: "Reset vectors draft" }));
+
+    expect(outwardA.value).toBe("0");
+    expect(outwardC.value).toBe("1");
+
+    await user.clear(outwardA);
+    await user.type(outwardA, "1");
+    await user.click(within(commonControls).getByRole("button", { name: "Apply vectors" }));
+
+    expect(outwardA.value).toBe("1");
+    expect(outwardC.value).toBe("1");
+
+    await user.clear(outwardA);
+    await user.type(outwardA, "not-a-number");
+    await user.click(within(commonControls).getByRole("button", { name: "Apply vectors" }));
+
+    expect(outwardA.value).toBe("1");
+  });
+
+  test("swaps camera vector bases when primary direction changes", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    await user.click(within(commonControls).getByRole("tab", { name: "Camera" }));
+    await user.click(within(commonControls).getByRole("tab", { name: "Upward" }));
+    await user.click(within(commonControls).getByRole("button", { name: "Vectors" }));
+
+    expect(
+      within(commonControls).getByRole("tab", { name: "Upward" }).getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(within(commonControls).getByRole("textbox", { name: "Upward c" }).isConnected)
+      .toBe(true);
+    expect(within(commonControls).getByRole("textbox", { name: "Outward b*" }).isConnected)
+      .toBe(true);
+    expect(within(commonControls).queryByRole("textbox", { name: "Outward c" })).toBeNull();
+  });
+
+  test("routes gizmo clicks through the selected camera primary direction", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    await user.click(screen.getByRole("button", { name: "gizmo a" }));
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    await user.click(within(commonControls).getByRole("tab", { name: "Camera" }));
+    await user.click(within(commonControls).getByRole("button", { name: "Vectors" }));
+
+    expect(
+      within(commonControls).getByRole("textbox", { name: "Outward a" }),
+    ).toHaveProperty("value", "1");
+    expect(
+      within(commonControls).getByRole("textbox", { name: "Outward c" }),
+    ).toHaveProperty("value", "0");
+
+    await user.click(within(commonControls).getByRole("tab", { name: "Upward" }));
+    await user.click(screen.getByRole("button", { name: "gizmo c" }));
+
+    expect(
+      within(commonControls).getByRole("textbox", { name: "Upward c" }),
+    ).toHaveProperty("value", "1");
   });
 
   test("starts with collapsed extended structure details and toggles them from the card", async () => {

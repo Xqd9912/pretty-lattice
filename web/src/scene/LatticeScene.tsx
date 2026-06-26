@@ -39,6 +39,11 @@ import {
 import { CameraHeadlight } from "./CameraHeadlight";
 import { applyCameraPoseSnapshot, type CameraPoseSnapshot } from "./cameraPose";
 import {
+  computeCrystalCameraPose,
+  type CrystalCameraState,
+  type CrystalCameraPose,
+} from "./crystalCamera";
+import {
   applyOrthographicExportFrame,
   type StructureExportFramePlan,
 } from "./exportFrame";
@@ -150,6 +155,8 @@ export const EXPORT_SCENE_MESH_DETAIL_PRESETS: Record<ExportMeshQuality, SceneMe
 
 export function LatticeScene({
   cameraOrientationRef,
+  cameraState,
+  cameraCommandVersion,
   componentOpacity,
   interactionLocked,
   interactionMode,
@@ -166,6 +173,8 @@ export function LatticeScene({
   viewScale,
 }: {
   cameraOrientationRef?: CameraOrientationRef;
+  cameraCommandVersion: number;
+  cameraState: CrystalCameraState;
   componentOpacity: ComponentOpacityState;
   interactionLocked: boolean;
   interactionMode: InteractionMode;
@@ -183,8 +192,8 @@ export function LatticeScene({
 }) {
   const layoutSourceScene = layoutScene ?? scene;
   const layout = useMemo(
-    () => computeSceneLayout(layoutSourceScene, style.atomRadiusModel),
-    [layoutSourceScene, style.atomRadiusModel],
+    () => computeSceneLayout(layoutSourceScene, style.atomRadiusModel, cameraState),
+    [cameraState, layoutSourceScene, style.atomRadiusModel],
   );
   const cameraProps = useMemo<OrthographicCanvasCameraProps>(
     () => ({
@@ -211,6 +220,8 @@ export function LatticeScene({
       <ambientLight intensity={PREVIEW_AMBIENT_LIGHT_INTENSITY} />
       <CameraHeadlight />
       <PreviewCameraController
+        cameraCommandVersion={cameraCommandVersion}
+        cameraPose={layout.cameraPose}
         interactionLocked={interactionLocked}
         interactionMode={interactionMode}
         layout={layout}
@@ -427,6 +438,8 @@ const MemoizedStructureSceneObjects = memo(StructureSceneObjects);
 type CameraControls = OrbitControls | TrackballControls;
 
 function PreviewCameraController({
+  cameraCommandVersion,
+  cameraPose,
   interactionLocked,
   interactionMode,
   layout,
@@ -435,6 +448,8 @@ function PreviewCameraController({
   safeArea,
   viewScale,
 }: {
+  cameraCommandVersion: number;
+  cameraPose: CrystalCameraPose;
   interactionLocked: boolean;
   interactionMode: InteractionMode;
   layout: SceneLayout;
@@ -445,7 +460,9 @@ function PreviewCameraController({
 }) {
   const { camera, gl, size } = useThree();
   const controlsRef = useRef<CameraControls | null>(null);
+  const cameraPoseRef = useRef(cameraPose);
   const syncedViewScaleRef = useRef(viewScale);
+  cameraPoseRef.current = cameraPose;
   const effectiveSafeArea = useMemo(
     () => previewSafeAreaForViewport(safeArea, size.width),
     [safeArea, size.width],
@@ -460,8 +477,10 @@ function PreviewCameraController({
   }, [viewScale]);
 
   useLayoutEffect(() => {
-    applyStandardCameraPose(camera, layout.standardPose, layout.span);
-  }, [camera, layout.span, layout.standardPose, resetCounter]);
+    applyStandardCameraPose(camera, cameraPoseRef.current, layout.span);
+    controlsRef.current?.target.copy(CAMERA_TARGET);
+    controlsRef.current?.update();
+  }, [camera, cameraCommandVersion, layout.span, resetCounter]);
 
   useLayoutEffect(() => {
     if (!(camera instanceof OrthographicCamera)) {
@@ -1071,6 +1090,7 @@ function CellFrame({ opacity, vectors }: { opacity: number; vectors: VectorTuple
 
 export interface SceneLayout {
   cameraFitBounds: CameraFitBounds;
+  cameraPose: CrystalCameraPose;
   groupPosition: VectorTuple;
   span: number;
   standardPose: StandardCameraPose;
@@ -1079,6 +1099,7 @@ export interface SceneLayout {
 export function computeSceneLayout(
   scene: SceneSpec,
   atomRadiusModel: AtomRadiusModel = "uniform",
+  cameraState?: CrystalCameraState,
 ): SceneLayout {
   const points = [
     ...cellCorners(scene.cell.vectors),
@@ -1094,6 +1115,17 @@ export function computeSceneLayout(
   const size = box.getSize(new Vector3());
   const span = Math.max(1, size.x, size.y, size.z);
   const standardPose = computeStandardCameraPose(scene.cell.vectors, span);
+  const cameraPose = computeCrystalCameraPose(
+    scene.cell.vectors,
+    cameraState ?? {
+      direct: [0, 0, 1],
+      primary: "outward",
+      reciprocal: [0, 1, 0],
+      rollDegrees: 0,
+      vectorsExpanded: false,
+    },
+    span,
+  );
   const groupPosition: VectorTuple = [-center.x, -center.y, -center.z];
   const projectedFitSize = computeStandardProjectedFitSize(
     scene,
@@ -1107,6 +1139,7 @@ export function computeSceneLayout(
       ...projectedFitSize,
       span,
     },
+    cameraPose,
     groupPosition,
     span,
     standardPose,

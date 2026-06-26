@@ -31,8 +31,8 @@ const DEFAULT_CELL_VECTORS: readonly [VectorTuple, VectorTuple, VectorTuple] = [
   [0, 0, 3.2],
 ];
 
-const FALLBACK_OUTWARD = new Vector3(1, 1, 1).normalize();
-const FALLBACK_UP = new Vector3(-1, -1, 2).normalize();
+const FALLBACK_OUTWARD = new Vector3(0, 0, 1).normalize();
+const FALLBACK_UP = new Vector3(0, 1, 0).normalize();
 const SPAN_FIT_PADDING_RATIO = 1.7;
 const PROJECTED_FIT_PADDING_RATIO = 1.08;
 const MAX_PROJECTED_FIT_BOOST = 1.5;
@@ -42,18 +42,13 @@ export function computeStandardCameraPose(
   span: number,
 ): StandardCameraPose {
   const [vectorA, vectorB, vectorC] = withDefaultCellVectors(vectors);
-  const a = normalizedVector(vectorA, new Vector3(1, 0, 0));
-  const b = normalizedVector(vectorB, new Vector3(0, 1, 0));
-  const c = normalizedVector(vectorC, new Vector3(0, 0, 1));
-  const outward = a.clone().add(b).add(c);
+  const a = vectorFromTuple(vectorA, new Vector3(1, 0, 0));
+  const b = vectorFromTuple(vectorB, new Vector3(0, 1, 0));
+  const c = vectorFromTuple(vectorC, new Vector3(0, 0, 1));
+  const outward = normalizedVector(vectorC, FALLBACK_OUTWARD);
+  const reciprocalB = computeReciprocalVectorB(a, b, c);
+  const up = reciprocalB.sub(outward.clone().multiplyScalar(reciprocalB.dot(outward)));
 
-  if (outward.lengthSq() < 1e-12) {
-    outward.copy(FALLBACK_OUTWARD);
-  } else {
-    outward.normalize();
-  }
-
-  const up = c.clone().sub(outward.clone().multiplyScalar(c.dot(outward)));
   if (up.lengthSq() < 1e-12) {
     up.copy(stablePerpendicular(outward));
   } else {
@@ -152,14 +147,32 @@ function normalizedVector(vector: VectorTuple, fallback: Vector3): Vector3 {
   return nextVector.normalize();
 }
 
+function vectorFromTuple(vector: VectorTuple, fallback: Vector3): Vector3 {
+  const nextVector = new Vector3(...vector);
+  if (nextVector.lengthSq() < 1e-12) {
+    return fallback.clone();
+  }
+
+  return nextVector;
+}
+
+function computeReciprocalVectorB(a: Vector3, b: Vector3, c: Vector3): Vector3 {
+  const volume = a.dot(b.clone().cross(c));
+  if (Math.abs(volume) < 1e-12) {
+    return FALLBACK_OUTWARD.clone();
+  }
+
+  return c.clone().cross(a).divideScalar(volume);
+}
+
 function stablePerpendicular(outward: Vector3): Vector3 {
-  const projected = FALLBACK_UP.clone().sub(outward.clone().multiplyScalar(FALLBACK_UP.dot(outward)));
+  const projected = FALLBACK_OUTWARD.clone().sub(outward.clone().multiplyScalar(FALLBACK_OUTWARD.dot(outward)));
   if (projected.lengthSq() >= 1e-12) {
     return projected.normalize();
   }
 
-  return new Vector3(0, 1, 0)
-    .sub(outward.clone().multiplyScalar(outward.y))
+  return new Vector3(1, 0, 0)
+    .sub(outward.clone().multiplyScalar(outward.x))
     .normalize();
 }
 
