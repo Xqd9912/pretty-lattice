@@ -140,7 +140,8 @@ const FOG_START_OFFSET_LATE = 0.35;
 const FOG_FALLOFF_SPAN_STRONG = 0.35;
 const FOG_FALLOFF_SPAN_SOFT = 1.15;
 const ATOM_HALO_COLOR = "#5f6670";
-const ATOM_HALO_PULSE_MS = 200;
+const ATOM_HALO_PULSE_MS = 240;
+const ATOM_HALO_SELECT_MS = 150;
 const ATOM_HALO_SELECTED_SCALE = 1.16;
 const ATOM_HALO_PULSE_SCALE = ATOM_HALO_SELECTED_SCALE;
 const ATOM_HALO_PULSE_MIN_SCALE = 1.03;
@@ -1055,6 +1056,12 @@ interface CameraPoseAnimation {
   targetSpan: number;
 }
 
+interface HaloSelectionTransition {
+  startOpacity: number;
+  startScale: number;
+  startTimeMs: number;
+}
+
 function createCameraPoseAnimation(
   camera: { position: Vector3; quaternion: Quaternion },
   targetPose: CrystalCameraPose,
@@ -1254,14 +1261,13 @@ function Atom({
   const haloMaterialRef = useRef<MeshBasicMaterial | null>(null);
   const haloMeshRef = useRef<Mesh | null>(null);
   const pulseStartTimeRef = useRef<number | null>(null);
+  const selectionTransitionRef = useRef<HaloSelectionTransition | null>(null);
   const [isPulsing, setIsPulsing] = useState(false);
   const isTransparent = opacity < 1;
   const radius = atomRadiusForModel(atom, radiusModel);
   const scaledRadius = radius * radiusScale;
   const color = atomColorForScheme(atom, colorScheme);
   const showHalo = inspected || isPulsing;
-  const haloScale = inspected ? ATOM_HALO_SELECTED_SCALE : ATOM_HALO_PULSE_MIN_SCALE;
-  const haloOpacity = inspected ? ATOM_HALO_SELECTED_OPACITY : 0;
 
   useEffect(() => {
     if (pulseToken === 0) {
@@ -1274,6 +1280,23 @@ function Atom({
     setIsPulsing(true);
   }, [pulseToken]);
 
+  useEffect(() => {
+    if (!inspected) {
+      selectionTransitionRef.current = null;
+      return;
+    }
+
+    const haloMesh = haloMeshRef.current;
+    const haloMaterial = haloMaterialRef.current;
+    selectionTransitionRef.current = {
+      startOpacity: haloMaterial?.opacity ?? 0,
+      startScale: haloMesh?.scale.x ?? ATOM_HALO_PULSE_MIN_SCALE,
+      startTimeMs: performance.now(),
+    };
+    pulseStartTimeRef.current = null;
+    setIsPulsing(false);
+  }, [inspected]);
+
   useFrame(() => {
     const haloMesh = haloMeshRef.current;
     const haloMaterial = haloMaterialRef.current;
@@ -1282,8 +1305,30 @@ function Atom({
     }
 
     if (inspected) {
-      haloMesh.scale.setScalar(ATOM_HALO_SELECTED_SCALE);
-      haloMaterial.opacity = ATOM_HALO_SELECTED_OPACITY;
+      const selectionTransition = selectionTransitionRef.current;
+      if (!selectionTransition) {
+        haloMesh.scale.setScalar(ATOM_HALO_SELECTED_SCALE);
+        haloMaterial.opacity = ATOM_HALO_SELECTED_OPACITY;
+        return;
+      }
+
+      const progress = Math.min(
+        1,
+        (performance.now() - selectionTransition.startTimeMs) / ATOM_HALO_SELECT_MS,
+      );
+      const easedProgress = easeOutCubic(progress);
+      const scale =
+        selectionTransition.startScale +
+        (ATOM_HALO_SELECTED_SCALE - selectionTransition.startScale) * easedProgress;
+      const nextOpacity =
+        selectionTransition.startOpacity +
+        (ATOM_HALO_SELECTED_OPACITY - selectionTransition.startOpacity) * easedProgress;
+      haloMesh.scale.setScalar(scale);
+      haloMaterial.opacity = nextOpacity;
+
+      if (progress >= 1) {
+        selectionTransitionRef.current = null;
+      }
       return;
     }
 
@@ -1341,7 +1386,7 @@ function Atom({
             ref={haloMaterialRef}
             color={ATOM_HALO_COLOR}
             depthWrite={false}
-            opacity={haloOpacity}
+            opacity={0}
             transparent
           />
         </mesh>

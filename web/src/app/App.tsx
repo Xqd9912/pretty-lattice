@@ -273,12 +273,16 @@ export function App() {
   }, [startAnimatedCameraCommand]);
 
   const handleAtomPulse = useCallback((atomId: string) => {
+    if (atomId === inspectedAtomId) {
+      return;
+    }
+
     setInspectedAtomId(null);
     setPulseAtom((currentPulseAtom) => ({
       atomId,
       token: (currentPulseAtom?.token ?? 0) + 1,
     }));
-  }, []);
+  }, [inspectedAtomId]);
 
   const handleAtomInspect = useCallback((atomId: string | null) => {
     setInspectedAtomId(atomId);
