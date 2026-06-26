@@ -17,6 +17,7 @@ import {
 import { CameraHeadlight } from "./CameraHeadlight";
 import { computeStructureExportFramePlan } from "./exportFrame";
 import { PREVIEW_AMBIENT_LIGHT_INTENSITY } from "./renderAppearance";
+import { DEFAULT_RENDERER_PARAMETERS } from "./renderBackend";
 
 export interface RasterExportImage {
   blob: Blob;
@@ -95,11 +96,7 @@ export async function renderStructureRasterPng({
       },
       dpr: 1,
       frameloop: "never",
-      gl: {
-        alpha: true,
-        antialias: true,
-        preserveDrawingBuffer: true,
-      },
+      gl: DEFAULT_RENDERER_PARAMETERS,
       onCreated: (state) => {
         rootState = state;
       },

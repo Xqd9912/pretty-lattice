@@ -66,7 +66,12 @@ mock.module("@react-three/fiber", () => {
       children: ReactNode;
       gl?: unknown;
       orthographic?: boolean;
-    }) => <div {...props} />,
+    }) => (
+      <div
+        data-render-backend={typeof _gl === "function" ? "webgpu" : "webgl"}
+        {...props}
+      />
+    ),
     useFrame: () => {},
     useThree: () => ({
       camera: new MockCamera(),
@@ -128,6 +133,10 @@ let fetchCalls: FetchCall[] = [];
 let fetchResponses: Response[] = [];
 
 beforeEach(() => {
+  Object.defineProperty(navigator, "gpu", {
+    configurable: true,
+    value: undefined,
+  });
   fetchCalls = [];
   fetchResponses = [];
   exportDownloads = [];
@@ -276,11 +285,22 @@ describe("App", () => {
     expect(advancedTab.className).toContain("text-[0.875rem]");
     expect(advancedTab.className).toContain("font-semibold");
     expect(inspector.querySelector("[data-slot='separator']")).toBeNull();
+    expect(within(inspector).getByText("Renderer").className).toContain("text-xs");
     expect(within(inspector).getByText("Interaction").className).toContain("text-xs");
     expect(within(inspector).getByText("Bonds").className).toContain("text-xs");
     expect(legend.getAttribute("style")).toContain("calc(50% + 10px)");
     expect(inspectorButton.getAttribute("aria-expanded")).toBe("true");
     expect(inspectorButton.className).toContain("tool-icon-button-active");
+
+    const rendererSelect = within(inspector).getByRole("combobox", { name: "Renderer" });
+    expect(rendererSelect.textContent).toContain("WebGL");
+    expect(screen.getByTestId("lattice-canvas").getAttribute("data-render-backend")).toBe(
+      "webgl",
+    );
+    await user.click(rendererSelect);
+    expect((await screen.findByRole("option", { name: "WebGPU" })).getAttribute("aria-disabled"))
+      .toBe("true");
+    await user.keyboard("{Escape}");
 
     const interactionSelect = within(inspector).getByRole("combobox", { name: "Interaction" });
     expect(interactionSelect.textContent).toContain("Trackball");
@@ -297,6 +317,47 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Sidebar" }).getAttribute("aria-expanded")).toBe(
       "false",
     );
+  });
+
+  test("switches to WebGPU for preview without reuploading while export stays renderer-agnostic", async () => {
+    const user = userEvent.setup();
+    const requestAdapter = mock(async () => ({}));
+    Object.defineProperty(navigator, "gpu", {
+      configurable: true,
+      value: { requestAdapter },
+    });
+
+    await renderLoadedStructure(user);
+    expect(fetchCalls).toHaveLength(1);
+    expect(screen.getByTestId("lattice-canvas").getAttribute("data-render-backend")).toBe(
+      "webgl",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Sidebar" }));
+    const inspector = screen.getByRole("complementary", { name: "Sidebar" });
+    await waitFor(() => expect(requestAdapter).toHaveBeenCalled());
+
+    const rendererSelect = within(inspector).getByRole("combobox", { name: "Renderer" });
+    await user.click(rendererSelect);
+    const webGpuOption = await screen.findByRole("option", { name: "WebGPU" });
+    expect(webGpuOption.getAttribute("aria-disabled")).not.toBe("true");
+    await user.click(webGpuOption);
+
+    expect(fetchCalls).toHaveLength(1);
+    expect(within(inspector).getByRole("combobox", { name: "Renderer" }).textContent).toContain(
+      "WebGPU",
+    );
+    expect(screen.getByTestId("lattice-canvas").getAttribute("data-render-backend")).toBe(
+      "webgpu",
+    );
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    await user.click(within(commonControls).getByRole("tab", { name: "Export" }));
+    await user.click(within(commonControls).getByRole("button", { name: "Export PNG" }));
+    await waitFor(() => expect(exportRequests).toHaveLength(1));
+
+    expect("renderBackend" in exportRequests[0]!).toBe(false);
+    expect(exportDownloads[0]?.fileName).toBe("NaCl.png");
   });
 
   test("toggles polyhedra independently from atoms, bonds, and unit cell", async () => {
@@ -614,6 +675,7 @@ describe("App", () => {
     await user.click(exportPngButton);
     await waitFor(() => expect(exportRequests).toHaveLength(1));
 
+    expect("renderBackend" in exportRequests[0]!).toBe(false);
     expect(exportRequests[0]?.settings.format).toBe("png");
     expect(exportRequests[0]?.settings.supersampling).toBe(2);
     expect(exportDownloads[0]?.fileName).toBe("NaCl.png");

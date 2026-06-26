@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import type { AtomSpec, SceneSpec } from "../src/api/scene";
 import {
+  DEFAULT_RENDER_BACKEND,
+  RENDER_BACKEND_OPTIONS,
   STYLE_SCALE_MAX,
   STYLE_SCALE_MIN,
   createDefaultExportSettings,
@@ -48,6 +50,20 @@ describe("settings", () => {
       supersampling: 2,
       width: 2000,
     });
+  });
+
+  test("defaults the render backend to WebGL with WebGPU as an option", () => {
+    expect(DEFAULT_RENDER_BACKEND).toBe("webgl");
+    expect(RENDER_BACKEND_OPTIONS).toEqual([
+      {
+        label: "WebGL",
+        value: "webgl",
+      },
+      {
+        label: "WebGPU",
+        value: "webgpu",
+      },
+    ]);
   });
 
   test("edits export dimensions with locked and unlocked projected scale", () => {

@@ -87,6 +87,12 @@ export const STYLE_SCALE_MAX: Pick<StyleState, "atomRadius" | "bondThickness"> =
 export type ExportFormat = "png" | "pdf";
 export type ExportMeshQuality = "low" | "medium" | "high" | "xhigh";
 export type ExportSupersampling = 1 | 2 | 4;
+export type RenderBackend = "webgl" | "webgpu";
+
+export interface RenderBackendOption {
+  label: string;
+  value: RenderBackend;
+}
 
 export interface ExportProjectedSize {
   height: number;
@@ -121,6 +127,17 @@ export const EXPORT_MESH_QUALITY_OPTIONS: readonly ExportMeshQuality[] = [
   "medium",
   "high",
   "xhigh",
+];
+export const DEFAULT_RENDER_BACKEND: RenderBackend = "webgl";
+export const RENDER_BACKEND_OPTIONS: readonly RenderBackendOption[] = [
+  {
+    label: "WebGL",
+    value: "webgl",
+  },
+  {
+    label: "WebGPU",
+    value: "webgpu",
+  },
 ];
 
 export const DEFAULT_EXPORT_SETTINGS: ExportSettingsState = {

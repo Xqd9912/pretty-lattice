@@ -33,6 +33,11 @@ import { createCameraPoseSnapshot } from "../scene/cameraPose";
 import { computeStructureExportProjectedSize } from "../scene/exportFrame";
 import { OrientationGizmo } from "../scene/OrientationGizmo";
 import {
+  detectWebGpuAvailable,
+  initialWebGpuAvailability,
+  type WebGpuAvailability,
+} from "../scene/renderBackend";
+import {
   CommonControlsPanel,
 } from "./controls/CommonControlsPanel";
 import { ViewControlRail } from "./controls/ViewControlRail";
@@ -58,9 +63,11 @@ import {
   createDefaultComponentVisibility,
   createDefaultExportSettings,
   createDefaultStyle,
+  DEFAULT_RENDER_BACKEND,
   type ExportSettingsState,
   hasPolyhedra,
   previewSafeAreaForInspector,
+  type RenderBackend,
   sceneOffsetXForInspector,
   syncExportSettingsProjectedSize,
   visibleSceneForComponents,
@@ -99,6 +106,10 @@ export function App() {
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [bondAlgorithm, setBondAlgorithm] =
     useState<BondAlgorithm>(DEFAULT_BOND_ALGORITHM);
+  const [renderBackend, setRenderBackend] =
+    useState<RenderBackend>(DEFAULT_RENDER_BACKEND);
+  const [webGpuAvailability, setWebGpuAvailability] =
+    useState<WebGpuAvailability>(initialWebGpuAvailability);
   const [componentVisibility, setComponentVisibility] = useState(
     createDefaultComponentVisibility,
   );
@@ -134,6 +145,17 @@ export function App() {
       setPreviewInteractionLocked(currentViewState, interactionLocked),
     );
   }, []);
+
+  const handleRenderBackendChange = useCallback(
+    (nextRenderBackend: RenderBackend) => {
+      if (nextRenderBackend === "webgpu" && webGpuAvailability !== "available") {
+        return;
+      }
+
+      setRenderBackend(nextRenderBackend);
+    },
+    [webGpuAvailability],
+  );
 
   const handleResetView = useCallback(() => {
     setViewState(resetPreviewViewState);
@@ -180,6 +202,35 @@ export function App() {
       isCurrent = false;
     };
   }, [isStaticScenePreview]);
+
+  useEffect(() => {
+    if (webGpuAvailability !== "checking") {
+      return;
+    }
+
+    let isCurrent = true;
+
+    async function checkWebGpu() {
+      const isAvailable = await detectWebGpuAvailable();
+      if (!isCurrent) {
+        return;
+      }
+
+      setWebGpuAvailability(isAvailable ? "available" : "unavailable");
+    }
+
+    void checkWebGpu();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [webGpuAvailability]);
+
+  useEffect(() => {
+    if (renderBackend === "webgpu" && webGpuAvailability === "unavailable") {
+      setRenderBackend(DEFAULT_RENDER_BACKEND);
+    }
+  }, [renderBackend, webGpuAvailability]);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -307,6 +358,7 @@ export function App() {
     [scene, style.colorScheme],
   );
   const hasVisibleScene = visibleScene !== null;
+  const webGpuAvailable = webGpuAvailability === "available";
   const errorTitle =
     errorMessage === BACKEND_UNAVAILABLE_MESSAGE
       ? BACKEND_UNAVAILABLE_TITLE
@@ -546,6 +598,7 @@ export function App() {
             layoutScene={scene ?? visibleScene}
             onViewScaleChange={handleViewScaleChange}
             resetCounter={viewState.resetCounter}
+            renderBackend={renderBackend}
             safeArea={previewSafeArea}
             scene={visibleScene}
             componentOpacity={componentOpacity}
@@ -662,6 +715,9 @@ export function App() {
               void handleBondAlgorithmChange(nextBondAlgorithm);
             }}
             onInteractionModeChange={handleInteractionModeChange}
+            onRenderBackendChange={handleRenderBackendChange}
+            renderBackend={renderBackend}
+            webGpuAvailable={webGpuAvailable}
           />
         </>
       ) : null}

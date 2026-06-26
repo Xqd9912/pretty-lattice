@@ -14,9 +14,6 @@ import {
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TrackballControls } from "three/examples/jsm/controls/TrackballControls.js";
-import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
-import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
-import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 
 import type {
   AtomRadiusModel,
@@ -30,6 +27,7 @@ import type {
   BondColorMode,
   ComponentOpacityState,
   ExportMeshQuality,
+  RenderBackend,
   StyleState,
 } from "../app/settings";
 import {
@@ -63,6 +61,7 @@ import {
   type StandardCameraPose,
   type VectorTuple,
 } from "./viewMath";
+import { createPreviewRendererFactory } from "./renderBackend";
 
 export interface PreviewSafeArea {
   bottom: number;
@@ -158,6 +157,7 @@ export function LatticeScene({
   onViewScaleChange,
   onCameraOrientationChange,
   resetCounter,
+  renderBackend,
   safeArea = EMPTY_SAFE_AREA,
   scene,
   showAtoms = true,
@@ -173,6 +173,7 @@ export function LatticeScene({
   onCameraOrientationChange?: () => void;
   onViewScaleChange: (viewScale: number) => void;
   resetCounter: number;
+  renderBackend: RenderBackend;
   safeArea?: PreviewSafeArea;
   scene: SceneSpec;
   showAtoms?: boolean;
@@ -194,16 +195,17 @@ export function LatticeScene({
     }),
     [layout.span, layout.standardPose.cameraPosition, layout.standardPose.distance],
   );
-  const glProps = useMemo(
-    () => ({ antialias: true, alpha: true, preserveDrawingBuffer: true }),
-    [],
+  const rendererFactory = useMemo(
+    () => createPreviewRendererFactory(renderBackend),
+    [renderBackend],
   );
 
   return (
     <Canvas
+      key={renderBackend}
       orthographic
       camera={cameraProps}
-      gl={glProps}
+      gl={rendererFactory}
       data-testid="lattice-canvas"
     >
       <ambientLight intensity={PREVIEW_AMBIENT_LIGHT_INTENSITY} />
@@ -1039,30 +1041,32 @@ export function polyhedronGeometryFromAtoms(
 }
 
 function CellFrame({ opacity, vectors }: { opacity: number; vectors: VectorTuple[] }) {
-  const cellFrame = useMemo(() => {
-    const geometry = new LineSegmentsGeometry();
-    geometry.setPositions(cellFrameLinePositions(vectors));
-
-    const material = new LineMaterial({
-      color: CELL_FRAME_COLOR,
-      depthWrite: opacity >= 1,
-      linewidth: CELL_FRAME_LINE_WIDTH_PIXELS,
-      opacity,
-      transparent: opacity < 1,
-      worldUnits: false,
-    });
-
-    return new LineSegments2(geometry, material);
-  }, [opacity, vectors]);
+  const geometry = useMemo(() => {
+    const nextGeometry = new BufferGeometry();
+    nextGeometry.setAttribute(
+      "position",
+      new Float32BufferAttribute(cellFrameLinePositions(vectors), 3),
+    );
+    return nextGeometry;
+  }, [vectors]);
 
   useEffect(() => {
     return () => {
-      cellFrame.geometry.dispose();
-      cellFrame.material.dispose();
+      geometry.dispose();
     };
-  }, [cellFrame]);
+  }, [geometry]);
 
-  return <primitive object={cellFrame} />;
+  return (
+    <lineSegments geometry={geometry}>
+      <lineBasicMaterial
+        color={CELL_FRAME_COLOR}
+        depthWrite={opacity >= 1}
+        linewidth={CELL_FRAME_LINE_WIDTH_PIXELS}
+        opacity={opacity}
+        transparent={opacity < 1}
+      />
+    </lineSegments>
+  );
 }
 
 export interface SceneLayout {
