@@ -38,14 +38,14 @@ describe("color schemes", () => {
 
   test("defines softened Jmol Soft colors", () => {
     expect(elementColorForScheme("H", "jmol-soft")).toBe("#dedede");
-    expect(elementColorForScheme("N", "jmol-soft")).toBe("#506dc2");
-    expect(elementColorForScheme("O", "jmol-soft")).toBe("#d2685a");
+    expect(elementColorForScheme("N", "jmol-soft")).toBe("#4c6cca");
+    expect(elementColorForScheme("O", "jmol-soft")).toBe("#d86254");
   });
 
   test("defines softened VESTA Soft colors", () => {
-    expect(elementColorForScheme("O", "vesta-soft")).toBe("#d16759");
-    expect(elementColorForScheme("Cl", "vesta-soft")).toBe("#9fda96");
-    expect(elementColorForScheme("Si", "vesta-soft")).toBe("#4565ba");
+    expect(elementColorForScheme("O", "vesta-soft")).toBe("#d86253");
+    expect(elementColorForScheme("Cl", "vesta-soft")).toBe("#96dc8d");
+    expect(elementColorForScheme("Si", "vesta-soft")).toBe("#4064c2");
   });
 });
 

@@ -142,7 +142,7 @@ const JMOL_TOKEN_STYLE = {
 } as const;
 const JMOL_SOFT_TOKEN_STYLE = {
   background:
-    "linear-gradient(90deg, #dedede 0 25%, #919191 25% 50%, #506dc2 50% 75%, #d2685a 75% 100%)",
+    "linear-gradient(90deg, #dedede 0 25%, #919191 25% 50%, #4c6cca 50% 75%, #d86254 75% 100%)",
 } as const;
 const VESTA_TOKEN_STYLE = {
   background:
@@ -150,7 +150,7 @@ const VESTA_TOKEN_STYLE = {
 } as const;
 const VESTA_SOFT_TOKEN_STYLE = {
   background:
-    "linear-gradient(90deg, #f2c0c0 0 25%, #8d5434 25% 50%, #a9b3df 50% 75%, #d16759 75% 100%)",
+    "linear-gradient(90deg, #f2c0c0 0 25%, #8d5434 25% 50%, #a9b3df 50% 75%, #d86253 75% 100%)",
 } as const;
 
 export function CommonControlsPanel({

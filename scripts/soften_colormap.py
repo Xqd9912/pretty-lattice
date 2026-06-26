@@ -15,12 +15,12 @@ class SofteningProfile:
     min_lightness: float = 0.46
     max_lightness: float = 0.90
     chroma_knee: float = 0.08
-    chroma_cap: float = 0.14
-    yellow_green_chroma_cap: float = 0.11
+    chroma_cap: float = 0.16
+    yellow_green_chroma_cap: float = 0.13
     yellow_green_start: float = 80.0
     yellow_green_end: float = 160.0
     bright_lightness: float = 0.84
-    bright_chroma_scale: float = 0.92
+    bright_chroma_scale: float = 0.96
 
 
 @dataclass(frozen=True)
@@ -94,12 +94,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-lightness", type=float, default=0.46)
     parser.add_argument("--max-lightness", type=float, default=0.90)
     parser.add_argument("--chroma-knee", type=float, default=0.08)
-    parser.add_argument("--chroma-cap", type=float, default=0.14)
-    parser.add_argument("--yellow-green-chroma-cap", type=float, default=0.11)
+    parser.add_argument("--chroma-cap", type=float, default=0.16)
+    parser.add_argument("--yellow-green-chroma-cap", type=float, default=0.13)
     parser.add_argument("--yellow-green-start", type=float, default=80.0)
     parser.add_argument("--yellow-green-end", type=float, default=160.0)
     parser.add_argument("--bright-lightness", type=float, default=0.84)
-    parser.add_argument("--bright-chroma-scale", type=float, default=0.92)
+    parser.add_argument("--bright-chroma-scale", type=float, default=0.96)
     return parser.parse_args()
 
 
