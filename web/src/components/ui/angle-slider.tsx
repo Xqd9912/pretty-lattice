@@ -130,8 +130,7 @@ function AngleSlider({
       aria-valuenow={displayValue}
       aria-valuetext={`${displayValue}°`}
       className={cn(
-        "relative size-20 shrink-0 touch-none rounded-full outline-none",
-        "focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        "group relative size-20 shrink-0 touch-none rounded-full outline-none",
         disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
         className,
       )}
@@ -162,7 +161,7 @@ function AngleSlider({
         style={{ transform: "rotate(var(--angle-slider-angle))" }}
       >
         <div
-          className="absolute left-1/2 top-[6px] size-3.5 -translate-x-1/2 rounded-full border-[1.5px] border-foreground/85 bg-background shadow-[0_1px_3px_rgb(0_0_0/0.2)] transition-shadow"
+          className="absolute left-1/2 top-[6px] size-3.5 -translate-x-1/2 rounded-full border-[1.5px] border-foreground/85 bg-background shadow-[0_1px_3px_rgb(0_0_0/0.2)] transition-shadow group-focus-visible:ring-[2px] group-focus-visible:ring-ring/35 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background"
           data-slot="angle-slider-thumb"
         />
       </div>

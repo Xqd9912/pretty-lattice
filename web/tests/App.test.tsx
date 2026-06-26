@@ -894,6 +894,11 @@ describe("App", () => {
     expect(
       within(commonControls).getByRole("textbox", { name: "Roll value" }),
     ).toHaveProperty("value", "0");
+    const rollSlider = within(commonControls).getByRole("slider", { name: "Roll" });
+    expect(rollSlider.className).not.toContain("focus-visible:ring-[3px]");
+    expect(
+      rollSlider.querySelector("[data-slot='angle-slider-thumb']")?.className,
+    ).toContain("group-focus-visible:ring-[2px]");
 
     expect(within(commonControls).getByText("Manual").isConnected).toBe(true);
     expect(
