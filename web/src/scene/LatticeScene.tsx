@@ -58,6 +58,7 @@ import {
   applyOrthographicFrustum,
   type CameraFitBounds,
   computeCameraFitZoom,
+  computeOrthographicFrustum,
   computeStandardCameraPose,
   type StandardCameraPose,
   type VectorTuple,
@@ -96,6 +97,7 @@ const NARROW_VIEWPORT_SAFE_AREA: PreviewSafeArea = {
 };
 const CAMERA_TARGET = new Vector3(0, 0, 0);
 const VIEW_SCALE_SYNC_EPSILON = 0.0005;
+const FRUSTUM_SYNC_EPSILON = 0.000001;
 export const BOND_COLOR = "#c7cbd1";
 export const BOND_2D_RADIAL_SEGMENTS = 12;
 export const BOND_TUBE_RADIAL_SEGMENTS = 24;
@@ -512,20 +514,17 @@ function PreviewCameraController({
     const orthographicCamera = camera;
 
     function handleControlsChange() {
-      const nextViewScale = clampViewScale(orthographicCamera.zoom / fitZoom);
+      const nextViewScale = syncOrthographicFrustumToCameraZoom(
+        orthographicCamera,
+        fitZoom,
+        size.width,
+        size.height,
+        effectiveSafeArea,
+      );
 
       if (Math.abs(nextViewScale - syncedViewScaleRef.current) < VIEW_SCALE_SYNC_EPSILON) {
         return;
       }
-
-      const nextZoom = fitZoom * nextViewScale;
-      applyOrthographicFrustum(
-        orthographicCamera,
-        size.width,
-        size.height,
-        nextZoom,
-        effectiveSafeArea,
-      );
 
       syncedViewScaleRef.current = nextViewScale;
       onViewScaleChange(nextViewScale);
@@ -537,9 +536,43 @@ function PreviewCameraController({
 
   useFrame(() => {
     controlsRef.current?.update();
+
+    if (camera instanceof OrthographicCamera) {
+      syncOrthographicFrustumToCameraZoom(
+        camera,
+        fitZoom,
+        size.width,
+        size.height,
+        effectiveSafeArea,
+      );
+    }
   });
 
   return null;
+}
+
+function syncOrthographicFrustumToCameraZoom(
+  camera: OrthographicCamera,
+  fitZoom: number,
+  width: number,
+  height: number,
+  safeArea: PreviewSafeArea,
+): number {
+  const nextViewScale = clampViewScale(camera.zoom / fitZoom);
+  const nextZoom = fitZoom * nextViewScale;
+  const frustum = computeOrthographicFrustum(width, height, nextZoom, safeArea);
+
+  if (
+    Math.abs(camera.zoom - nextZoom) > FRUSTUM_SYNC_EPSILON ||
+    Math.abs(camera.left - frustum.left) > FRUSTUM_SYNC_EPSILON ||
+    Math.abs(camera.right - frustum.right) > FRUSTUM_SYNC_EPSILON ||
+    Math.abs(camera.top - frustum.top) > FRUSTUM_SYNC_EPSILON ||
+    Math.abs(camera.bottom - frustum.bottom) > FRUSTUM_SYNC_EPSILON
+  ) {
+    applyOrthographicFrustum(camera, width, height, nextZoom, safeArea);
+  }
+
+  return nextViewScale;
 }
 
 function configureCameraControls(

@@ -35,6 +35,7 @@ import {
   projectCellFrameLinesToExportFrame,
 } from "../src/scene/exportFrame";
 import {
+  applyOrthographicFrustum,
   computeCameraFitZoom,
   computeOrthographicFrustum,
   computeStandardCameraPose,
@@ -118,6 +119,34 @@ describe("computeSceneLayout", () => {
 
     expect((frustum.left + frustum.right) / 2).toBeCloseTo(-1.22);
     expect((frustum.bottom + frustum.top) / 2).toBeCloseTo(-0.54);
+  });
+
+  test("keeps the unit-cell center visually anchored while orthographic zoom changes", () => {
+    const width = 1000;
+    const height = 800;
+    const safeArea = {
+      bottom: 132,
+      left: 420,
+      right: 176,
+      top: 24,
+    };
+    const expectedScreenX = safeArea.left + (width - safeArea.left - safeArea.right) / 2;
+    const expectedScreenY = safeArea.top + (height - safeArea.top - safeArea.bottom) / 2;
+
+    for (const zoom of [10, 25, 50, 100, 200]) {
+      const camera = new OrthographicCamera();
+      camera.position.set(10, 10, 10);
+      camera.lookAt(0, 0, 0);
+      applyOrthographicFrustum(camera, width, height, zoom, safeArea);
+      camera.updateMatrixWorld(true);
+
+      const projectedCenter = new Vector3(0, 0, 0).project(camera);
+      const screenX = ((projectedCenter.x + 1) / 2) * width;
+      const screenY = ((-projectedCenter.y + 1) / 2) * height;
+
+      expect(screenX).toBeCloseTo(expectedScreenX);
+      expect(screenY).toBeCloseTo(expectedScreenY);
+    }
   });
 
   test("folds the preview safe area for narrow viewports", () => {
