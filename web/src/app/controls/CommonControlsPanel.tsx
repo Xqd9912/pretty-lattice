@@ -180,6 +180,8 @@ export function CommonControlsPanel({
   onComponentVisibilityChange,
   onAtomRadiusModelChange,
   onCameraPrimaryChange,
+  onCameraRollPreviewChange,
+  onCameraRollPreviewStart,
   onCameraRollChange,
   onCameraStateChange,
   onCameraVectorsExpandedChange,
@@ -199,6 +201,8 @@ export function CommonControlsPanel({
   isExporting: boolean;
   onAtomRadiusModelChange: (atomRadiusModel: AtomRadiusModel) => void;
   onCameraPrimaryChange: (primary: CrystalCameraPrimaryDirection) => void;
+  onCameraRollPreviewChange: (rollDegrees: number) => void;
+  onCameraRollPreviewStart: () => void;
   onCameraRollChange: (rollDegrees: number) => void;
   onCameraStateChange: (cameraState: CrystalCameraState) => void;
   onCameraVectorsExpandedChange: (vectorsExpanded: boolean) => void;
@@ -402,6 +406,8 @@ export function CommonControlsPanel({
                 cameraState={cameraState}
                 cellVectors={cellVectors}
                 onCameraPrimaryChange={onCameraPrimaryChange}
+                onCameraRollPreviewChange={onCameraRollPreviewChange}
+                onCameraRollPreviewStart={onCameraRollPreviewStart}
                 onCameraRollChange={onCameraRollChange}
                 onCameraStateChange={onCameraStateChange}
                 onCameraVectorsExpandedChange={onCameraVectorsExpandedChange}
@@ -1158,6 +1164,8 @@ function CameraTabContent({
   cameraState,
   cellVectors,
   onCameraPrimaryChange,
+  onCameraRollPreviewChange,
+  onCameraRollPreviewStart,
   onCameraRollChange,
   onCameraStateChange,
   onCameraVectorsExpandedChange,
@@ -1165,6 +1173,8 @@ function CameraTabContent({
   cameraState: CrystalCameraState;
   cellVectors: VectorTuple[];
   onCameraPrimaryChange: (primary: CrystalCameraPrimaryDirection) => void;
+  onCameraRollPreviewChange: (rollDegrees: number) => void;
+  onCameraRollPreviewStart: () => void;
   onCameraRollChange: (rollDegrees: number) => void;
   onCameraStateChange: (cameraState: CrystalCameraState) => void;
   onCameraVectorsExpandedChange: (vectorsExpanded: boolean) => void;
@@ -1212,6 +1222,8 @@ function CameraTabContent({
 
         <RollControl
           value={cameraState.rollDegrees}
+          onPreviewValueChange={onCameraRollPreviewChange}
+          onPreviewStart={onCameraRollPreviewStart}
           onValueChange={onCameraRollChange}
         />
       </div>
@@ -1229,27 +1241,71 @@ function CameraTabContent({
 }
 
 function RollControl({
+  onPreviewStart,
+  onPreviewValueChange,
   onValueChange,
   value,
 }: {
+  onPreviewStart: () => void;
+  onPreviewValueChange: (value: number) => void;
   onValueChange: (value: number) => void;
   value: number;
 }) {
-  const [valueText, setValueText] = useState(formatRollValue(value));
+  const committedValue = normalizeRollDegrees(value);
+  const [isDragging, setIsDragging] = useState(false);
+  const [draftValue, setDraftValue] = useState(committedValue);
+  const displayedValue = isDragging ? draftValue : committedValue;
+  const [valueText, setValueText] = useState(formatRollValue(committedValue));
+  const lastPreviewValueRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setValueText(formatRollValue(value));
-  }, [value]);
+    if (isDragging) {
+      return;
+    }
+
+    setDraftValue(committedValue);
+    setValueText(formatRollValue(committedValue));
+  }, [committedValue, isDragging]);
 
   function commitValueText() {
     const nextValue = parseRollInput(valueText);
     if (nextValue === null) {
-      setValueText(formatRollValue(value));
+      setValueText(formatRollValue(displayedValue));
       return;
     }
 
     const normalizedValue = normalizeRollDegrees(nextValue);
+    setDraftValue(normalizedValue);
     setValueText(formatRollValue(normalizedValue));
+    onValueChange(normalizedValue);
+  }
+
+  function handleSliderInteractionStart() {
+    setIsDragging(true);
+    setDraftValue(committedValue);
+    setValueText(formatRollValue(committedValue));
+    lastPreviewValueRef.current = null;
+    onPreviewStart();
+  }
+
+  function handleSliderPreviewChange(nextValue: number) {
+    const normalizedValue = normalizeRollDegrees(nextValue);
+    if (Object.is(normalizedValue, lastPreviewValueRef.current)) {
+      return;
+    }
+
+    lastPreviewValueRef.current = normalizedValue;
+    setDraftValue(normalizedValue);
+    setValueText(formatRollValue(normalizedValue));
+    onPreviewValueChange(normalizedValue);
+  }
+
+  function handleSliderCommit(nextValue: number) {
+    const normalizedValue = normalizeRollDegrees(nextValue);
+    setDraftValue(normalizedValue);
+    setValueText(formatRollValue(normalizedValue));
+    setIsDragging(false);
+    lastPreviewValueRef.current = null;
     onValueChange(normalizedValue);
   }
 
@@ -1261,14 +1317,14 @@ function RollControl({
     }
 
     if (event.key === "Escape") {
-      setValueText(formatRollValue(value));
+      setValueText(formatRollValue(displayedValue));
       event.currentTarget.blur();
       return;
     }
 
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       event.preventDefault();
-      onValueChange(normalizeRollDegrees(value + (event.key === "ArrowUp" ? 1 : -1)));
+      onValueChange(normalizeRollDegrees(displayedValue + (event.key === "ArrowUp" ? 1 : -1)));
     }
   }
 
@@ -1283,8 +1339,10 @@ function RollControl({
       <AngleSlider
         aria-label="Roll"
         className="size-24"
-        value={normalizeRollDegrees(value)}
-        onValueChange={(nextValue) => onValueChange(normalizeRollDegrees(nextValue))}
+        value={displayedValue}
+        onInteractionStart={handleSliderInteractionStart}
+        onValueChange={handleSliderPreviewChange}
+        onValueCommit={handleSliderCommit}
       />
       <label className="opacity-value-control group absolute bottom-2 right-0 flex h-[22px] items-baseline justify-center gap-0 rounded-md border px-0.5 transition-[background-color,border-color,box-shadow] duration-150">
         <span className="sr-only">Roll value</span>

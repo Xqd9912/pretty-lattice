@@ -137,6 +137,7 @@ export function App() {
   const [isCameraCommandAnimationActive, setIsCameraCommandAnimationActive] = useState(false);
   const [isCameraControlsInteractionActive, setIsCameraControlsInteractionActive] =
     useState(false);
+  const [isCameraRollInteractionActive, setIsCameraRollInteractionActive] = useState(false);
   const [cameraControlsFrozenState, setCameraControlsFrozenState] =
     useState<CrystalCameraState | null>(null);
   const [viewState, setViewState] = useState(createPreviewViewState);
@@ -150,8 +151,10 @@ export function App() {
   const cameraOrientationRef = useRef(new Quaternion());
   const cameraControlFreezeCandidateRef = useRef<CrystalCameraState | null>(null);
   const cameraControlFreezeRequestRef = useRef(0);
+  const cameraRollInteractionBaseStateRef = useRef<CrystalCameraState | null>(null);
   const isCameraCommandAnimationActiveRef = useRef(false);
   const isCameraControlsInteractionActiveRef = useRef(false);
+  const isCameraRollInteractionActiveRef = useRef(false);
   const lockedInteractionPointerRef = useRef<LockedInteractionPointer | null>(null);
   const lockedInteractionWheelIdleTimeoutRef = useRef<number | null>(null);
   const visibleScene = useMemo(
@@ -193,10 +196,13 @@ export function App() {
   const clearCameraDerivedUiFreezeState = useCallback(() => {
     cameraControlFreezeRequestRef.current += 1;
     cameraControlFreezeCandidateRef.current = null;
+    cameraRollInteractionBaseStateRef.current = null;
     isCameraCommandAnimationActiveRef.current = false;
     isCameraControlsInteractionActiveRef.current = false;
+    isCameraRollInteractionActiveRef.current = false;
     setIsCameraCommandAnimationActive(false);
     setIsCameraControlsInteractionActive(false);
+    setIsCameraRollInteractionActive(false);
     setCameraControlsFrozenState(null);
   }, []);
 
@@ -256,7 +262,8 @@ export function App() {
   const handleCameraOrientationChange = useCallback(() => {
     if (
       isCameraCommandAnimationActiveRef.current ||
-      isCameraControlsInteractionActiveRef.current
+      isCameraControlsInteractionActiveRef.current ||
+      isCameraRollInteractionActiveRef.current
     ) {
       return;
     }
@@ -290,22 +297,58 @@ export function App() {
     [clearCameraDerivedUiFreezeState, visibleScene],
   );
 
+  const handleCameraRollPreviewStart = useCallback(() => {
+    if (!visibleScene) {
+      return;
+    }
+
+    cameraRollInteractionBaseStateRef.current = cameraControlsPanelState;
+    isCameraRollInteractionActiveRef.current = true;
+    setIsCameraRollInteractionActive(true);
+  }, [cameraControlsPanelState, visibleScene]);
+
+  const handleCameraRollPreviewChange = useCallback(
+    (rollDegrees: number) => {
+      if (!visibleScene) {
+        return;
+      }
+
+      const baseCameraState =
+        cameraRollInteractionBaseStateRef.current ?? cameraControlsPanelState;
+      cameraInteractionStore.requestCameraState(
+        applyCrystalCameraRoll(visibleScene.cell.vectors, baseCameraState, rollDegrees),
+      );
+    },
+    [cameraControlsPanelState, cameraInteractionStore, visibleScene],
+  );
+
   const handleCameraRollChange = useCallback(
     (rollDegrees: number) => {
       if (!visibleScene) {
         return;
       }
 
-      clearCameraDerivedUiFreezeState();
+      const baseCameraState = cameraRollInteractionBaseStateRef.current ?? viewState.camera;
+      const nextCameraState = applyCrystalCameraRoll(
+        visibleScene.cell.vectors,
+        baseCameraState,
+        rollDegrees,
+      );
+      cameraRollInteractionBaseStateRef.current = null;
+      isCameraRollInteractionActiveRef.current = false;
+      setIsCameraRollInteractionActive(false);
       setViewState((currentViewState) =>
         setPreviewCameraState(
           currentViewState,
-          applyCrystalCameraRoll(visibleScene.cell.vectors, currentViewState.camera, rollDegrees),
+          {
+            ...nextCameraState,
+            vectorsExpanded: currentViewState.camera.vectorsExpanded,
+          },
         ),
       );
       setCameraCommandVersion((version) => version + 1);
     },
-    [clearCameraDerivedUiFreezeState, visibleScene],
+    [viewState.camera, visibleScene],
   );
 
   const handleCameraVectorsExpandedChange = useCallback((vectorsExpanded: boolean) => {
@@ -338,7 +381,10 @@ export function App() {
 
     cameraControlFreezeRequestRef.current += 1;
     cameraControlFreezeCandidateRef.current = null;
-    if (!isCameraControlsInteractionActiveRef.current) {
+    if (
+      !isCameraControlsInteractionActiveRef.current &&
+      !isCameraRollInteractionActiveRef.current
+    ) {
       setCameraControlsFrozenState(null);
       setCameraOrientationVersion((version) => version + 1);
     }
@@ -474,10 +520,13 @@ export function App() {
     cameraOrientationRef.current.identity();
     cameraControlFreezeRequestRef.current += 1;
     cameraControlFreezeCandidateRef.current = null;
+    cameraRollInteractionBaseStateRef.current = null;
     isCameraCommandAnimationActiveRef.current = false;
     isCameraControlsInteractionActiveRef.current = false;
+    isCameraRollInteractionActiveRef.current = false;
     setIsCameraCommandAnimationActive(false);
     setIsCameraControlsInteractionActive(false);
+    setIsCameraRollInteractionActive(false);
     setCameraControlsFrozenState(null);
     setCameraCommandVersion((version) => version + 1);
     setCameraOrientationVersion((version) => version + 1);
@@ -810,7 +859,9 @@ export function App() {
             }
             cameraInteractionStore={cameraInteractionStore}
             suspendCameraOrientationUpdates={
-              isCameraCommandAnimationActive || isCameraControlsInteractionActive
+              isCameraCommandAnimationActive ||
+              isCameraControlsInteractionActive ||
+              isCameraRollInteractionActive
             }
             interactionLocked={viewState.interactionLocked}
             interactionMode={viewState.interactionMode}
@@ -896,6 +947,8 @@ export function App() {
                 setStyle((currentStyle) => ({ ...currentStyle, atomRadiusModel }));
               }}
               onCameraPrimaryChange={handleCameraPrimaryChange}
+              onCameraRollPreviewChange={handleCameraRollPreviewChange}
+              onCameraRollPreviewStart={handleCameraRollPreviewStart}
               onCameraRollChange={handleCameraRollChange}
               onCameraStateChange={handleCameraStateChange}
               onCameraVectorsExpandedChange={handleCameraVectorsExpandedChange}

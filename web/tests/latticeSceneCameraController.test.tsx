@@ -108,9 +108,11 @@ mock.module("three/examples/jsm/controls/TrackballControls.js", () => ({
 const { createDefaultComponentOpacity, createDefaultStyle } = await import("../src/app/settings");
 const { createCameraInteractionStore } = await import("../src/app/cameraInteractionStore");
 const { LatticeScene } = await import("../src/scene/LatticeScene");
-const { createDefaultCrystalCameraState, stateWithDirectAxis } = await import(
-  "../src/scene/crystalCamera"
-);
+const {
+  applyCrystalCameraRoll,
+  createDefaultCrystalCameraState,
+  stateWithDirectAxis,
+} = await import("../src/scene/crystalCamera");
 
 afterEach(() => {
   resetMockCamera();
@@ -283,6 +285,36 @@ describe("LatticeScene camera commands", () => {
     expect(cameraInteractionStore.getViewScaleCommandSnapshot().version).toBe(
       initialCommandVersion,
     );
+  });
+
+  test("applies camera state commands from the interaction store without rerendering", () => {
+    const scene = orthogonalScene();
+    const defaultCamera = createDefaultCrystalCameraState();
+    const cameraInteractionStore = createCameraInteractionStore();
+    const rolledCamera = applyCrystalCameraRoll(scene.cell.vectors, defaultCamera, 90);
+
+    render(
+      <LatticeScene
+        cameraCommandVersion={0}
+        cameraInteractionStore={cameraInteractionStore}
+        cameraState={defaultCamera}
+        componentOpacity={createDefaultComponentOpacity()}
+        interactionLocked={false}
+        interactionMode="trackball"
+        renderBackend="webgl"
+        resetCounter={0}
+        scene={scene}
+        style={createDefaultStyle()}
+      />,
+    );
+
+    expect(Math.abs(mockCamera.up.x)).toBeLessThan(1e-8);
+    expect(mockCamera.up.y).toBeGreaterThan(0);
+
+    act(() => cameraInteractionStore.requestCameraState(rolledCamera));
+
+    expect(mockCamera.up.x).toBeLessThan(0);
+    expect(Math.abs(mockCamera.up.y)).toBeLessThan(1e-8);
   });
 
   test("keeps user camera interaction active until inertia settles", () => {

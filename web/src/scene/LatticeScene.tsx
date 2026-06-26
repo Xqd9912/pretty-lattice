@@ -212,9 +212,25 @@ export function LatticeScene({
   suspendCameraOrientationUpdates?: boolean;
 }) {
   const layoutSourceScene = layoutScene ?? scene;
-  const layout = useMemo(
-    () => computeSceneLayout(layoutSourceScene, style.atomRadiusModel, cameraState),
-    [cameraState, layoutSourceScene, style.atomRadiusModel],
+  const structureLayout = useMemo(
+    () => computeSceneStructureLayout(layoutSourceScene, style.atomRadiusModel),
+    [layoutSourceScene, style.atomRadiusModel],
+  );
+  const cameraPose = useMemo(
+    () =>
+      computeCrystalCameraPose(
+        layoutSourceScene.cell.vectors,
+        cameraState,
+        structureLayout.span,
+      ),
+    [cameraState, layoutSourceScene.cell.vectors, structureLayout.span],
+  );
+  const layout = useMemo<SceneLayout>(
+    () => ({
+      ...structureLayout,
+      cameraPose,
+    }),
+    [cameraPose, structureLayout],
   );
   const cameraProps = useMemo<OrthographicCanvasCameraProps>(
     () => ({
@@ -245,6 +261,7 @@ export function LatticeScene({
         cameraCommandVersion={cameraCommandVersion}
         cameraInteractionStore={cameraInteractionStore}
         cameraPose={layout.cameraPose}
+        cellVectors={layoutSourceScene.cell.vectors}
         interactionLocked={interactionLocked}
         interactionMode={interactionMode}
         layout={layout}
@@ -483,6 +500,7 @@ function PreviewCameraController({
   cameraCommandVersion,
   cameraInteractionStore,
   cameraPose,
+  cellVectors,
   interactionLocked,
   interactionMode,
   layout,
@@ -495,6 +513,7 @@ function PreviewCameraController({
   cameraCommandVersion: number;
   cameraInteractionStore: CameraInteractionStore;
   cameraPose: CrystalCameraPose;
+  cellVectors: VectorTuple[];
   interactionLocked: boolean;
   interactionMode: InteractionMode;
   layout: SceneLayout;
@@ -717,6 +736,31 @@ function PreviewCameraController({
     fitZoom,
     size.height,
     size.width,
+  ]);
+
+  useEffect(() => {
+    return cameraInteractionStore.subscribeCameraStateCommand(() => {
+      const { cameraState } = cameraInteractionStore.getCameraStateCommandSnapshot();
+      if (!cameraState) {
+        return;
+      }
+
+      cameraAnimationRef.current = null;
+      setCameraAnimationActive(false);
+      applyStandardCameraPose(
+        camera,
+        computeCrystalCameraPose(cellVectors, cameraState, layout.span),
+        layout.span,
+      );
+      controlsRef.current?.target.copy(CAMERA_TARGET);
+      controlsRef.current?.update();
+    });
+  }, [
+    camera,
+    cameraInteractionStore,
+    cellVectors,
+    layout.span,
+    setCameraAnimationActive,
   ]);
 
   useEffect(() => {
@@ -1466,12 +1510,15 @@ function CellFrame({ opacity, vectors }: { opacity: number; vectors: VectorTuple
   );
 }
 
-export interface SceneLayout {
+export interface SceneStructureLayout {
   cameraFitBounds: CameraFitBounds;
-  cameraPose: CrystalCameraPose;
   groupPosition: VectorTuple;
   span: number;
   standardPose: StandardCameraPose;
+}
+
+export interface SceneLayout extends SceneStructureLayout {
+  cameraPose: CrystalCameraPose;
 }
 
 export function computeSceneLayout(
@@ -1479,6 +1526,22 @@ export function computeSceneLayout(
   atomRadiusModel: AtomRadiusModel = "uniform",
   cameraState?: CrystalCameraState,
 ): SceneLayout {
+  const structureLayout = computeSceneStructureLayout(scene, atomRadiusModel);
+
+  return {
+    ...structureLayout,
+    cameraPose: computeCrystalCameraPose(
+      scene.cell.vectors,
+      cameraState ?? createFallbackCrystalCameraState(),
+      structureLayout.span,
+    ),
+  };
+}
+
+export function computeSceneStructureLayout(
+  scene: SceneSpec,
+  atomRadiusModel: AtomRadiusModel = "uniform",
+): SceneStructureLayout {
   const points = [
     ...cellCorners(scene.cell.vectors),
     ...scene.atoms.map((atom) => new Vector3(...atom.position)),
@@ -1493,17 +1556,6 @@ export function computeSceneLayout(
   const size = box.getSize(new Vector3());
   const span = Math.max(1, size.x, size.y, size.z);
   const standardPose = computeStandardCameraPose(scene.cell.vectors, span);
-  const cameraPose = computeCrystalCameraPose(
-    scene.cell.vectors,
-    cameraState ?? {
-      direct: [0, 0, 1],
-      primary: "outward",
-      reciprocal: [0, 1, 0],
-      rollDegrees: 0,
-      vectorsExpanded: false,
-    },
-    span,
-  );
   const groupPosition: VectorTuple = [-center.x, -center.y, -center.z];
   const projectedFitSize = computeStandardProjectedFitSize(
     scene,
@@ -1517,10 +1569,19 @@ export function computeSceneLayout(
       ...projectedFitSize,
       span,
     },
-    cameraPose,
     groupPosition,
     span,
     standardPose,
+  };
+}
+
+function createFallbackCrystalCameraState(): CrystalCameraState {
+  return {
+    direct: [0, 0, 1],
+    primary: "outward",
+    reciprocal: [0, 1, 0],
+    rollDegrees: 0,
+    vectorsExpanded: false,
   };
 }
 

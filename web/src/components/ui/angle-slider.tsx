@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 
 interface AngleSliderProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "onChange"> {
   disabled?: boolean;
+  onInteractionStart?: () => void;
+  onValueCommit?: (value: number) => void;
   onValueChange?: (value: number) => void;
   step?: number;
   value: number;
@@ -15,6 +17,8 @@ const ANGLE_SLIDER_MAX = 180;
 function AngleSlider({
   className,
   disabled = false,
+  onInteractionStart,
+  onValueCommit,
   onValueChange,
   step = 1,
   style,
@@ -23,13 +27,20 @@ function AngleSlider({
 }: AngleSliderProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const isPointerActiveRef = React.useRef(false);
+  const latestValueRef = React.useRef(normalizeAngleValue(value));
   const angle = valueToAngle(value);
   const displayValue = Math.round(normalizeAngleValue(value));
+
+  React.useEffect(() => {
+    if (!isPointerActiveRef.current) {
+      latestValueRef.current = normalizeAngleValue(value);
+    }
+  }, [value]);
 
   function updateValueFromPointer(event: React.PointerEvent<HTMLDivElement>) {
     const rect = rootRef.current?.getBoundingClientRect();
     if (!rect) {
-      return;
+      return latestValueRef.current;
     }
 
     const centerX = rect.left + rect.width / 2;
@@ -37,7 +48,10 @@ function AngleSlider({
     const pointerAngle =
       Math.atan2(event.clientX - centerX, centerY - event.clientY) * 180 / Math.PI;
     const normalizedAngle = ((pointerAngle % 360) + 360) % 360;
-    onValueChange?.(snapValue(angleToValue(normalizedAngle), step));
+    const nextValue = snapValue(angleToValue(normalizedAngle), step);
+    latestValueRef.current = nextValue;
+    onValueChange?.(nextValue);
+    return nextValue;
   }
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -47,6 +61,8 @@ function AngleSlider({
 
     event.preventDefault();
     isPointerActiveRef.current = true;
+    latestValueRef.current = normalizeAngleValue(value);
+    onInteractionStart?.();
     event.currentTarget.focus();
     event.currentTarget.setPointerCapture(event.pointerId);
     updateValueFromPointer(event);
@@ -62,9 +78,13 @@ function AngleSlider({
   }
 
   function handlePointerEnd(event: React.PointerEvent<HTMLDivElement>) {
+    const wasPointerActive = isPointerActiveRef.current;
     isPointerActiveRef.current = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (wasPointerActive) {
+      onValueCommit?.(latestValueRef.current);
     }
   }
 
@@ -84,7 +104,9 @@ function AngleSlider({
 
     if (event.key === "Home") {
       event.preventDefault();
+      latestValueRef.current = 0;
       onValueChange?.(0);
+      onValueCommit?.(0);
       return;
     }
 
@@ -93,7 +115,10 @@ function AngleSlider({
     }
 
     event.preventDefault();
-    onValueChange?.(snapValue(value + keyDeltas[event.key]!, step));
+    const nextValue = snapValue(value + keyDeltas[event.key]!, step);
+    latestValueRef.current = nextValue;
+    onValueChange?.(nextValue);
+    onValueCommit?.(nextValue);
   }
 
   return (
