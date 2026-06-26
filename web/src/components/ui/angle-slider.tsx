@@ -27,6 +27,7 @@ function AngleSlider({
 }: AngleSliderProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const isPointerActiveRef = React.useRef(false);
+  const activePointerIdRef = React.useRef<number | null>(null);
   const latestValueRef = React.useRef(normalizeAngleValue(value));
   const angle = valueToAngle(value);
   const displayValue = displayAngleValue(value);
@@ -54,13 +55,37 @@ function AngleSlider({
     return nextValue;
   }
 
+  function finishPointerInteraction(
+    target: HTMLDivElement,
+    pointerId: number,
+    { commit }: { commit: boolean },
+  ) {
+    if (!isPointerActiveRef.current || activePointerIdRef.current !== pointerId) {
+      return;
+    }
+
+    isPointerActiveRef.current = false;
+    activePointerIdRef.current = null;
+    if (target.hasPointerCapture(pointerId)) {
+      target.releasePointerCapture(pointerId);
+    }
+    if (commit) {
+      onValueCommit?.(latestValueRef.current);
+    }
+  }
+
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (disabled) {
       return;
     }
 
     event.preventDefault();
+    if (isPointerActiveRef.current && activePointerIdRef.current !== null) {
+      finishPointerInteraction(event.currentTarget, activePointerIdRef.current, { commit: true });
+    }
+
     isPointerActiveRef.current = true;
+    activePointerIdRef.current = event.pointerId;
     latestValueRef.current = normalizeAngleValue(value);
     onInteractionStart?.();
     event.currentTarget.focus();
@@ -69,7 +94,16 @@ function AngleSlider({
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (!isPointerActiveRef.current || disabled) {
+    if (
+      !isPointerActiveRef.current ||
+      activePointerIdRef.current !== event.pointerId ||
+      disabled
+    ) {
+      return;
+    }
+
+    if (event.buttons === 0) {
+      finishPointerInteraction(event.currentTarget, event.pointerId, { commit: true });
       return;
     }
 
@@ -78,14 +112,11 @@ function AngleSlider({
   }
 
   function handlePointerEnd(event: React.PointerEvent<HTMLDivElement>) {
-    const wasPointerActive = isPointerActiveRef.current;
-    isPointerActiveRef.current = false;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    if (wasPointerActive) {
-      onValueCommit?.(latestValueRef.current);
-    }
+    finishPointerInteraction(event.currentTarget, event.pointerId, { commit: true });
+  }
+
+  function handleLostPointerCapture(event: React.PointerEvent<HTMLDivElement>) {
+    finishPointerInteraction(event.currentTarget, event.pointerId, { commit: true });
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -144,6 +175,7 @@ function AngleSlider({
       } as React.CSSProperties}
       tabIndex={disabled ? -1 : 0}
       onKeyDown={handleKeyDown}
+      onLostPointerCapture={handleLostPointerCapture}
       onPointerCancel={handlePointerEnd}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -151,7 +183,7 @@ function AngleSlider({
     >
       <div
         aria-hidden="true"
-        className="absolute inset-[8px] rounded-full border-[8px] border-muted-foreground/16 bg-transparent"
+        className="absolute inset-[8px] rounded-full border-[8px] border-muted-foreground/16 bg-transparent shadow-[inset_0_1px_1px_rgb(255_255_255/0.78),inset_0_-1px_3px_rgb(0_0_0/0.13),0_1px_3px_rgb(0_0_0/0.06)]"
         data-slot="angle-slider-track"
       />
       <div
