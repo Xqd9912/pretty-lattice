@@ -108,7 +108,7 @@ interface PolyhedronSpec {
 
 ### 不用造的轮子
 
-- 不用造 neighbor / bonding algorithm：继续用 pymatgen `CrystalNN` / `MinimumDistanceNN` / `VoronoiNN` allowlist。
+- 不用造 neighbor / bonding algorithm：继续用 pymatgen `CrystalNN` / `MinimumDistanceNN` / `CutOffDictNN.from_preset("vesta_2019")` allowlist。
 - 不用造 convex hull：后端用 SciPy `ConvexHull`，或前端用 Three.js convex geometry；第一版我更建议后端 faces。
 - 不用造周期邻居补全：沿用当前 atom_records、image offset、one-hop bonded image 机制。
 - 不用造 VESTA color/radius 数据：已有 `elements.toml` 和 `colormaps/vesta.toml`。

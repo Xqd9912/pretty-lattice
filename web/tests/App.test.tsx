@@ -226,6 +226,48 @@ describe("App", () => {
     ).toEqual(["Atoms", "Bonds", "Unit cell", "Polyhedra"]);
   });
 
+  test("shows VESTA as the automatic default for large structures", async () => {
+    const user = userEvent.setup();
+    queueFetchResponse(jsonResponse(sceneWithPeriodicImages({ atomCount: 200 })));
+
+    render(<App />);
+
+    await user.upload(getFileInput(), structureFile("large.cif"));
+
+    await waitFor(() => expect(fetchCalls).toHaveLength(1));
+    expect(fetchCalls[0]?.input).toBe("/api/structure-preview");
+
+    await user.click(screen.getByRole("button", { name: "Sidebar" }));
+    expect(screen.getByRole("combobox", { name: "Bond algorithm" }).textContent).toContain(
+      "VESTA",
+    );
+  });
+
+  test("shows a compact spinner while a structure is loading", async () => {
+    const user = userEvent.setup();
+    let resolveScene: (scene: SceneSpec) => void = () => {};
+    const scenePromise = new Promise<SceneSpec>((resolve) => {
+      resolveScene = resolve;
+    });
+    queueFetchResponse({
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => scenePromise,
+      ok: true,
+    } as Response);
+
+    render(<App />);
+    await user.upload(getFileInput(), structureFile());
+
+    expect(screen.getByText("Loading structure").isConnected).toBe(true);
+    const spinner = screen.getByTestId("loading-structure-spinner");
+    expect(spinner.className).toContain("size-3");
+    expect(spinner.className).toContain("motion-safe:animate-spin");
+
+    resolveScene(sceneWithPeriodicImages());
+
+    await screen.findByTestId("lattice-canvas");
+  });
+
   test("does not restore a previously uploaded scene after the app remounts", async () => {
     const user = userEvent.setup();
     queueFetchResponse(jsonResponse(sceneWithPeriodicImages()));
@@ -880,6 +922,14 @@ describe("App", () => {
     );
     expect(fetchCalls[1]?.init?.body).toBeInstanceOf(File);
     expect(polyhedraCheckbox.getAttribute("aria-checked")).toBe("true");
+
+    queueFetchResponse(jsonResponse(sceneWithPeriodicImages()));
+    await user.click(screen.getByRole("combobox", { name: "Bond algorithm" }));
+    await user.click(await screen.findByRole("option", { name: "VESTA" }));
+
+    await waitFor(() => expect(fetchCalls).toHaveLength(3));
+    expect(fetchCalls[2]?.input).toBe("/api/structure-preview?bondAlgorithm=vesta");
+    expect(fetchCalls[2]?.init?.body).toBeInstanceOf(File);
   });
 
   test("keeps the loaded scene and places backend alerts beside the view rail", async () => {
@@ -1122,8 +1172,10 @@ function structureFile(name = "NaCl.cif"): File {
 }
 
 function sceneWithPeriodicImages({
+  atomCount = 2,
   polyhedra = true,
 }: {
+  atomCount?: number;
   polyhedra?: boolean;
 } = {}): SceneSpec {
   return {
@@ -1169,7 +1221,7 @@ function sceneWithPeriodicImages({
       ],
     },
     summary: {
-      atomCount: 2,
+      atomCount,
       cell: {
         a: "1.00",
         alpha: "90.00",

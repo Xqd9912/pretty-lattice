@@ -18,6 +18,7 @@ import {
   BACKEND_UNAVAILABLE_TITLE,
   BACKEND_UNAVAILABLE_MESSAGE,
   STATIC_SCENE_PREVIEW_NAME,
+  defaultBondAlgorithmForAtomCount,
   hasStaticScenePreview,
   isBackendUnavailablePreviewError,
   loadStaticScenePreview,
@@ -274,6 +275,7 @@ export function App() {
 
     try {
       const nextScene = await uploadStructurePreview(file);
+      setBondAlgorithm(defaultBondAlgorithmForAtomCount(nextScene.summary.atomCount));
       setScene(nextScene);
       setComponentVisibility(createDefaultComponentVisibility(nextScene));
       setPreviewStatus("ready");
@@ -612,7 +614,18 @@ export function App() {
             className="grid h-full w-full place-items-center bg-background text-sm text-muted-foreground"
             data-state={previewStatus}
           >
-            {previewStatus === "loading" ? "Loading structure" : "No structure loaded"}
+            {previewStatus === "loading" ? (
+              <span className="inline-flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  data-testid="loading-structure-spinner"
+                  className="inline-flex size-3 shrink-0 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground motion-safe:animate-spin motion-safe:[animation-duration:450ms]"
+                />
+                Loading structure
+              </span>
+            ) : (
+              "No structure loaded"
+            )}
           </div>
         )}
       </section>

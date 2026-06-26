@@ -1,19 +1,6 @@
 # Development Setup
 
-## Requirements
-
-- Python 3.12
-- `uv`
-- Bun
-- a modern browser with WebGL
-
 ## Python
-
-Install dependencies:
-
-```bash
-uv sync
-```
 
 Run the local GUI server:
 
@@ -51,18 +38,6 @@ Run the Vite development server:
 bun run dev
 ```
 
-By default, Vite proxies `/api` to:
-
-```text
-http://127.0.0.1:8765
-```
-
-If the Python server is running elsewhere:
-
-```bash
-PRETTY_LATTICE_API_URL=http://127.0.0.1:9000 bun run dev
-```
-
 Run frontend checks:
 
 ```bash
@@ -70,15 +45,6 @@ bun run test
 bun run typecheck
 bun run build
 ```
-
-Add shadcn/ui components as needed:
-
-```bash
-bunx shadcn@latest add button
-```
-
-Keep shadcn/ui focused on application controls. Figure rendering style, materials, and camera
-behavior should stay in the Three.js scene layer.
 
 ## Current Development Flow
 

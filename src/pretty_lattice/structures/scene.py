@@ -7,7 +7,7 @@ from itertools import product
 from typing import Literal, NotRequired, TypedDict
 
 from pymatgen.core import Structure
-from pymatgen.core.local_env import CrystalNN, MinimumDistanceNN, VoronoiNN
+from pymatgen.core.local_env import CrystalNN, CutOffDictNN, MinimumDistanceNN
 from pymatgen.core.sites import PeriodicSite
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from scipy.spatial import Delaunay, QhullError
@@ -22,9 +22,10 @@ from pretty_lattice.structures.symmetry import point_group_schoenflies_symbol
 _BOUNDARY_TOLERANCE = 1e-6
 _CANONICAL_IMAGE_OFFSET = (0, 0, 0)
 _FLOAT_ZERO_TOLERANCE = 1e-12
+AUTO_BOND_ALGORITHM_ATOM_COUNT_THRESHOLD = 200
 DEFAULT_BOND_ALGORITHM = "crystal-nn"
 
-BondAlgorithm = Literal["crystal-nn", "minimum-distance", "voronoi-nn"]
+BondAlgorithm = Literal["crystal-nn", "minimum-distance", "vesta"]
 AtomRadiusModel = Literal["uniform", "atomic", "vdw", "ionic"]
 ImageReason = Literal["boundary", "bonded"]
 VisibilityDependency = Literal["boundaryAtoms", "oneHopBondedAtoms"]
@@ -33,7 +34,7 @@ type _AtomKey = tuple[int, tuple[int, int, int]]
 _BOND_ALGORITHM_LABELS: dict[BondAlgorithm, str] = {
     "crystal-nn": "CrystalNN",
     "minimum-distance": "MinimumDistanceNN",
-    "voronoi-nn": "VoronoiNN",
+    "vesta": "VESTA",
 }
 _IMAGE_REASON_ORDER: tuple[ImageReason, ...] = ("boundary", "bonded")
 _VISIBILITY_DEPENDENCY_ORDER: tuple[VisibilityDependency, ...] = (
@@ -181,6 +182,9 @@ def build_scene_response(
     element_registry: ElementRegistry | None = None,
 ) -> SceneSpec:
     normalized_bond_algorithm = normalize_bond_algorithm(bond_algorithm)
+    selected_bond_algorithm = normalized_bond_algorithm or _default_bond_algorithm_for_structure(
+        structure
+    )
     elements = element_registry or load_element_registry()
     cell_vectors = [_vector3(vector) for vector in structure.lattice.matrix]
     can_generate_periodic_images = _has_valid_3d_periodic_cell(structure)
@@ -249,7 +253,7 @@ def build_scene_response(
         try:
             connectivity = _build_connectivity(
                 atom_records=atom_records,
-                bond_algorithm=normalized_bond_algorithm,
+                bond_algorithm=selected_bond_algorithm,
                 canonical_source_keys=canonical_source_keys,
                 boundary_source_keys=boundary_source_keys,
                 site_render_data=site_render_data,
@@ -261,7 +265,7 @@ def build_scene_response(
                     "code": "bond-analysis-failed",
                     "message": (
                         "Bond analysis with "
-                        f"{_BOND_ALGORITHM_LABELS[normalized_bond_algorithm]} failed: {exc}"
+                        f"{_BOND_ALGORITHM_LABELS[selected_bond_algorithm]} failed: {exc}"
                     ),
                 }
             )
@@ -274,7 +278,7 @@ def build_scene_response(
                         "code": "bond-analysis-failed",
                         "message": (
                             "Bond analysis with "
-                            f"{_BOND_ALGORITHM_LABELS[normalized_bond_algorithm]} failed: {exc}"
+                            f"{_BOND_ALGORITHM_LABELS[selected_bond_algorithm]} failed: {exc}"
                         ),
                     }
                 )
@@ -292,7 +296,7 @@ def build_scene_response(
                         "code": "polyhedra-analysis-failed",
                         "message": (
                             "Polyhedra analysis with "
-                            f"{_BOND_ALGORITHM_LABELS[normalized_bond_algorithm]} failed: {exc}"
+                            f"{_BOND_ALGORITHM_LABELS[selected_bond_algorithm]} failed: {exc}"
                         ),
                     }
                 )
@@ -310,9 +314,9 @@ def build_scene_response(
     return scene
 
 
-def normalize_bond_algorithm(value: str | None) -> BondAlgorithm:
+def normalize_bond_algorithm(value: str | None) -> BondAlgorithm | None:
     if value is None or value == "":
-        return DEFAULT_BOND_ALGORITHM
+        return None
 
     normalized = value.strip()
     if normalized in _BOND_ALGORITHM_LABELS:
@@ -322,6 +326,12 @@ def normalize_bond_algorithm(value: str | None) -> BondAlgorithm:
     raise UnsupportedBondAlgorithmError(
         f"Unsupported bond algorithm '{value}'. Supported algorithms: {supported}."
     )
+
+
+def _default_bond_algorithm_for_structure(structure: Structure) -> BondAlgorithm:
+    if len(structure) >= AUTO_BOND_ALGORITHM_ATOM_COUNT_THRESHOLD:
+        return "vesta"
+    return DEFAULT_BOND_ALGORITHM
 
 
 def _element_radii(element: ElementRecord) -> AtomRadiiSpec:
@@ -653,10 +663,33 @@ def _neighbor_analyzer_for_bond_algorithm(bond_algorithm: BondAlgorithm):
         return CrystalNN()
     if bond_algorithm == "minimum-distance":
         return MinimumDistanceNN()
-    if bond_algorithm == "voronoi-nn":
-        return VoronoiNN()
+    if bond_algorithm == "vesta":
+        return _VestaCutOffDictNN.from_preset("vesta_2019")
 
     raise UnsupportedBondAlgorithmError(f"Unsupported bond algorithm '{bond_algorithm}'.")
+
+
+class _VestaCutOffDictNN(CutOffDictNN):
+    def get_nn_info(self, structure: Structure, n: int) -> list[dict]:
+        site = structure[n]
+        site_key = _site_element_symbol(site)
+        neighbor_info: list[dict] = []
+
+        for neighbor in structure.get_neighbors(site, self._max_dist):
+            distance = neighbor.nn_distance
+            neighbor_key = _site_element_symbol(neighbor)
+            cutoff = self._lookup_dict.get(site_key, {}).get(neighbor_key, 0.0)
+            if distance < cutoff:
+                neighbor_info.append(
+                    {
+                        "site": neighbor,
+                        "image": self._get_image(structure, neighbor),
+                        "weight": distance,
+                        "site_index": self._get_original_site(structure, neighbor),
+                    }
+                )
+
+        return neighbor_info
 
 
 def _combined_visibility_dependency_groups(

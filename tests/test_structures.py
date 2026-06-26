@@ -326,11 +326,40 @@ def test_scene_response_supports_selected_bond_algorithms() -> None:
 
     crystal_scene = build_scene_response(structure)
     minimum_distance_scene = build_scene_response(structure, bond_algorithm="minimum-distance")
+    vesta_scene = build_scene_response(structure, bond_algorithm="vesta")
 
     assert crystal_scene["bonds"]
     assert minimum_distance_scene["bonds"]
+    assert vesta_scene["bonds"]
     assert "warnings" not in crystal_scene
     assert "warnings" not in minimum_distance_scene
+    assert "warnings" not in vesta_scene
+
+
+@pytest.mark.parametrize(
+    ("atom_count", "expected_algorithm"),
+    [(199, "crystal-nn"), (200, "vesta")],
+)
+def test_scene_response_auto_selects_default_bond_algorithm_by_atom_count(
+    monkeypatch: pytest.MonkeyPatch,
+    atom_count: int,
+    expected_algorithm: str,
+) -> None:
+    captured_algorithms: list[str] = []
+
+    def capture_connectivity(**kwargs: object) -> scene_module._ConnectivityResult:
+        captured_algorithms.append(str(kwargs["bond_algorithm"]))
+        return scene_module._ConnectivityResult(bonds=[], connections_by_source={})
+
+    monkeypatch.setattr(scene_module, "_build_connectivity", capture_connectivity)
+    structure = _structure_from_fractional_positions(
+        ["C"] * atom_count,
+        [[index / atom_count, 0.25, 0.25] for index in range(atom_count)],
+    )
+
+    build_scene_response(structure)
+
+    assert captured_algorithms == [expected_algorithm]
 
 
 def test_scene_response_generates_polyhedra_for_complete_coordination_environment() -> None:
@@ -373,13 +402,17 @@ def test_scene_response_polyhedra_follow_selected_bond_algorithm() -> None:
     structure = read_structure(FIXTURE_DIR / "Al2O3.cif")
 
     crystal_scene = build_scene_response(structure, bond_algorithm="crystal-nn")
-    voronoi_scene = build_scene_response(structure, bond_algorithm="voronoi-nn")
+    minimum_distance_scene = build_scene_response(structure, bond_algorithm="minimum-distance")
+    vesta_scene = build_scene_response(structure, bond_algorithm="vesta")
 
     assert len(crystal_scene["polyhedra"]) == 24
-    assert len(voronoi_scene["bonds"]) != len(crystal_scene["bonds"])
-    assert voronoi_scene["polyhedra"] == []
+    assert minimum_distance_scene["bonds"]
+    assert minimum_distance_scene["polyhedra"]
+    assert vesta_scene["bonds"]
+    assert vesta_scene["polyhedra"]
     assert "warnings" not in crystal_scene
-    assert "warnings" not in voronoi_scene
+    assert "warnings" not in minimum_distance_scene
+    assert "warnings" not in vesta_scene
 
 
 def test_scene_response_rejects_unsupported_bond_algorithm() -> None:
@@ -387,6 +420,9 @@ def test_scene_response_rejects_unsupported_bond_algorithm() -> None:
 
     with pytest.raises(UnsupportedBondAlgorithmError, match="Unsupported bond algorithm"):
         build_scene_response(structure, bond_algorithm="custom-cutoff")
+
+    with pytest.raises(UnsupportedBondAlgorithmError, match="Unsupported bond algorithm"):
+        build_scene_response(structure, bond_algorithm="voronoi-nn")
 
 
 def test_scene_response_marks_one_hop_bonded_images_without_recursive_expansion() -> None:

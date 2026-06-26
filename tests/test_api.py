@@ -98,6 +98,24 @@ async def test_structure_preview_upload_endpoint_accepts_supported_bond_algorith
 
 
 @pytest.mark.anyio
+async def test_structure_preview_upload_endpoint_accepts_vesta_bond_algorithm() -> None:
+    payload = (FIXTURE_DIR / "SrTiO3.cif").read_bytes()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app()), base_url="http://testserver"
+    ) as client:
+        response = await client.post(
+            "/api/structure-preview?bondAlgorithm=vesta",
+            content=payload,
+            headers={"x-pretty-lattice-filename": "SrTiO3.cif"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["bonds"]
+    assert "polyhedra" in response.json()
+
+
+@pytest.mark.anyio
 async def test_structure_preview_upload_endpoint_rejects_unsupported_bond_algorithm() -> None:
     payload = (FIXTURE_DIR / "SrTiO3.cif").read_bytes()
 
