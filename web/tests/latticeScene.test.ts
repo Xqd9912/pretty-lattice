@@ -589,6 +589,7 @@ function sceneWithLongCell(): SceneSpec {
 }
 
 function atom(id: string, position: [number, number, number]): AtomSpec {
+  const siteIndex = Number(id.match(/-(\d+)/)?.[1] ?? 0);
   return {
     element: "Si",
     fractionalPosition: [0, 0, 0],
@@ -600,5 +601,6 @@ function atom(id: string, position: [number, number, number]): AtomSpec {
     visibilityDependencyGroups: [],
     position,
     siteId: id,
+    siteIndex,
   };
 }

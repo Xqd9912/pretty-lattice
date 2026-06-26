@@ -162,6 +162,7 @@ def test_scene_response_shape_excludes_renderer_visual_data() -> None:
     assert canonical_atoms[0] == {
         "id": "Sr-0",
         "siteId": "Sr-0",
+        "siteIndex": 0,
         "element": "Sr",
         "position": [0.0, 0.0, 0.0],
         "fractionalPosition": [0.0, 0.0, 0.0],

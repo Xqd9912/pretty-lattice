@@ -49,6 +49,7 @@ export interface SymmetrySummary {
 export interface AtomSpec {
   id: string;
   siteId: string;
+  siteIndex: number;
   element: string;
   position: [number, number, number];
   fractionalPosition: [number, number, number];

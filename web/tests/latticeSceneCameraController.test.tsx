@@ -416,6 +416,7 @@ function orthogonalScene(): SceneSpec {
         isPeriodicImage: false,
         position: [0, 0, 0],
         siteId: "Si-0",
+        siteIndex: 0,
         visibilityDependencies: [],
         visibilityDependencyGroups: [],
       },

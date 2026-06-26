@@ -44,6 +44,7 @@ async def test_structure_preview_upload_endpoint_returns_scene() -> None:
         periodic_image_atoms = [atom for atom in payload["atoms"] if atom["isPeriodicImage"]]
         assert [atom["element"] for atom in canonical_atoms] == ["Sr", "Ti", "O", "O", "O"]
         assert canonical_atoms[0]["siteId"] == "Sr-0"
+        assert canonical_atoms[0]["siteIndex"] == 0
         assert canonical_atoms[0]["fractionalPosition"] == [0.0, 0.0, 0.0]
         assert canonical_atoms[0]["imageOffset"] == [0, 0, 0]
         assert canonical_atoms[0]["imageReasons"] == []

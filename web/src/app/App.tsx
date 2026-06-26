@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AtomInspectorCard } from "./AtomInspectorCard";
 import {
   DEFAULT_BOND_ALGORITHM,
   BACKEND_UNAVAILABLE_TITLE,
@@ -25,6 +26,7 @@ import {
   type BondAlgorithm,
   type SceneSpec,
 } from "../api/scene";
+import { inspectedAtomInfoForId } from "./atomInspector";
 import {
   LatticeScene,
   previewSafeAreaForViewport,
@@ -137,6 +139,8 @@ export function App() {
   const [isCameraControlsInteractionActive, setIsCameraControlsInteractionActive] =
     useState(false);
   const [isCameraRollInteractionActive, setIsCameraRollInteractionActive] = useState(false);
+  const [inspectedAtomId, setInspectedAtomId] = useState<string | null>(null);
+  const [pulseAtom, setPulseAtom] = useState<{ atomId: string; token: number } | null>(null);
   const [cameraControlsFrozenState, setCameraControlsFrozenState] =
     useState<CrystalCameraState | null>(null);
   const [viewState, setViewState] = useState(createPreviewViewState);
@@ -157,6 +161,10 @@ export function App() {
   const visibleScene = useMemo(
     () => visibleSceneForComponents(scene, componentVisibility),
     [componentVisibility, scene],
+  );
+  const inspectedAtomInfo = useMemo(
+    () => inspectedAtomInfoForId(visibleScene, inspectedAtomId),
+    [inspectedAtomId, visibleScene],
   );
   const cameraControlsPanelState = useMemo<CrystalCameraState>(() => {
     return cameraControlsFrozenState ?? viewState.camera;
@@ -263,6 +271,18 @@ export function App() {
   const handleCameraStateChange = useCallback((cameraState: CrystalCameraState) => {
     startAnimatedCameraCommand(cameraState);
   }, [startAnimatedCameraCommand]);
+
+  const handleAtomPulse = useCallback((atomId: string) => {
+    setInspectedAtomId(null);
+    setPulseAtom((currentPulseAtom) => ({
+      atomId,
+      token: (currentPulseAtom?.token ?? 0) + 1,
+    }));
+  }, []);
+
+  const handleAtomInspect = useCallback((atomId: string | null) => {
+    setInspectedAtomId(atomId);
+  }, []);
 
   const handleCameraPrimaryChange = useCallback(
     (primary: CrystalCameraPrimaryDirection) => {
@@ -419,6 +439,8 @@ export function App() {
         }
 
         setScene(null);
+        setInspectedAtomId(null);
+        setPulseAtom(null);
         setSelectedFileName(null);
         setPreviewStatus("error");
         setErrorMessage("Static example could not be loaded.");
@@ -478,6 +500,8 @@ export function App() {
       setPreviewStatus("error");
       setErrorMessage(STRUCTURE_FILE_TOO_LARGE_MESSAGE);
       setScene(null);
+      setInspectedAtomId(null);
+      setPulseAtom(null);
       setCurrentFile(null);
       setIsInspectorOpen(false);
       setIsStructureSummaryCollapsed(true);
@@ -488,6 +512,8 @@ export function App() {
     setPreviewStatus("loading");
     setErrorMessage(null);
     setScene(null);
+    setInspectedAtomId(null);
+    setPulseAtom(null);
     setCurrentFile(file);
     setIsInspectorOpen(false);
     setBondAlgorithm(DEFAULT_BOND_ALGORITHM);
@@ -519,6 +545,8 @@ export function App() {
       setPreviewStatus("ready");
     } catch (error) {
       setScene(null);
+      setInspectedAtomId(null);
+      setPulseAtom(null);
       setCurrentFile(null);
       setSelectedFileName(null);
       setIsInspectorOpen(false);
@@ -549,6 +577,8 @@ export function App() {
         });
         setBondAlgorithm(nextBondAlgorithm);
         setScene(nextScene);
+        setInspectedAtomId(null);
+        setPulseAtom(null);
         setPreviewStatus("ready");
       } catch (error) {
         if (isBackendUnavailablePreviewError(error)) {
@@ -558,6 +588,8 @@ export function App() {
         }
 
         setScene(null);
+        setInspectedAtomId(null);
+        setPulseAtom(null);
         setCurrentFile(null);
         setSelectedFileName(null);
         setIsInspectorOpen(false);
@@ -612,6 +644,16 @@ export function App() {
   const triggerLockedInteractionFeedback = useCallback(() => {
     setLockedInteractionFeedbackCount((count) => count + 1);
   }, []);
+
+  useEffect(() => {
+    if (!inspectedAtomId) {
+      return;
+    }
+
+    if (!visibleScene || !componentVisibility.atoms || !inspectedAtomInfo) {
+      setInspectedAtomId(null);
+    }
+  }, [componentVisibility.atoms, inspectedAtomId, inspectedAtomInfo, visibleScene]);
 
   useEffect(() => {
     if (exportProjectedSize === null) {
@@ -789,6 +831,8 @@ export function App() {
             onCameraControlsInteractionActiveChange={
               handleCameraControlsInteractionActiveChange
             }
+            onAtomInspect={handleAtomInspect}
+            onAtomPulse={handleAtomPulse}
             cameraInteractionStore={cameraInteractionStore}
             suspendCameraOrientationUpdates={
               isCameraCommandAnimationActive ||
@@ -802,6 +846,9 @@ export function App() {
             renderBackend={renderBackend}
             safeArea={previewSafeArea}
             scene={visibleScene}
+            inspectedAtomId={inspectedAtomId}
+            pulseAtomId={pulseAtom?.atomId ?? null}
+            pulseToken={pulseAtom?.token ?? 0}
             componentOpacity={componentOpacity}
             style={style}
             showAtoms={componentVisibility.atoms}
@@ -843,6 +890,15 @@ export function App() {
           entries={legendEntries}
           offsetX={sceneOffsetX}
           safeArea={previewSafeArea}
+        />
+      ) : null}
+
+      {inspectedAtomInfo ? (
+        <AtomInspectorCard
+          colorScheme={style.colorScheme}
+          info={inspectedAtomInfo}
+          isInspectorOpen={isInspectorOpen}
+          onClose={() => setInspectedAtomId(null)}
         />
       ) : null}
 

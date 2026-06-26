@@ -87,6 +87,7 @@ function sceneWithAtoms(atoms: TestAtom[]): SceneSpec {
       element,
       id: `${element}-${index}`,
       siteId: `${element}-${index}`,
+      siteIndex: index,
       position: [index, 0, 0],
       fractionalPosition: [index, 0, 0],
       imageOffset: isPeriodicImage ? [1, 0, 0] : [0, 0, 0],

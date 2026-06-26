@@ -460,6 +460,8 @@ function atom(
 ): AtomSpec {
   const isPeriodicImage = imageOffset.some((value) => value !== 0);
   const visibilityDependencies = Array.from(new Set(visibilityDependencyGroups.flat()));
+  const siteId = id.split("-image-", 1)[0]!;
+  const siteIndex = Number(siteId.match(/-(\d+)/)?.[1] ?? 0);
   return {
     element,
     fractionalPosition: imageOffset,
@@ -470,6 +472,7 @@ function atom(
     visibilityDependencies,
     visibilityDependencyGroups,
     position: imageOffset,
-    siteId: id.split("-image-", 1)[0]!,
+    siteId,
+    siteIndex,
   };
 }

@@ -1,5 +1,13 @@
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { Canvas, type ThreeEvent, useFrame, useThree } from "@react-three/fiber";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Box3,
   BufferGeometry,
@@ -7,6 +15,8 @@ import {
   DoubleSide,
   Float32BufferAttribute,
   Fog,
+  Mesh,
+  MeshBasicMaterial,
   MOUSE,
   OrthographicCamera,
   Quaternion,
@@ -128,6 +138,13 @@ const FOG_START_OFFSET_EARLY = -0.7;
 const FOG_START_OFFSET_LATE = 0.35;
 const FOG_FALLOFF_SPAN_STRONG = 0.35;
 const FOG_FALLOFF_SPAN_SOFT = 1.15;
+const ATOM_HALO_COLOR = "#5f6670";
+const ATOM_HALO_PULSE_MS = 200;
+const ATOM_HALO_SELECTED_SCALE = 1.16;
+const ATOM_HALO_PULSE_SCALE = ATOM_HALO_SELECTED_SCALE;
+const ATOM_HALO_PULSE_MIN_SCALE = 1.03;
+const ATOM_HALO_SELECTED_OPACITY = 0.48;
+const ATOM_HALO_PULSE_OPACITY = 0.62;
 
 export {
   BOND_RADIUS,
@@ -184,10 +201,15 @@ export function LatticeScene({
   onCameraCommandAnimationActiveChange,
   onCameraControlsInteractionActiveChange,
   onCameraOrientationChange,
+  onAtomInspect,
+  onAtomPulse,
   resetCounter,
   renderBackend,
   safeArea = EMPTY_SAFE_AREA,
   scene,
+  inspectedAtomId = null,
+  pulseAtomId = null,
+  pulseToken = 0,
   showAtoms = true,
   showUnitCell = true,
   style,
@@ -208,10 +230,15 @@ export function LatticeScene({
     quaternionSnapshot?: Quaternion,
   ) => void;
   onCameraOrientationChange?: () => void;
+  onAtomInspect?: (atomId: string | null) => void;
+  onAtomPulse?: (atomId: string) => void;
   resetCounter: number;
   renderBackend: RenderBackend;
   safeArea?: PreviewSafeArea;
   scene: SceneSpec;
+  inspectedAtomId?: string | null;
+  pulseAtomId?: string | null;
+  pulseToken?: number;
   showAtoms?: boolean;
   showUnitCell?: boolean;
   style: StyleState;
@@ -281,6 +308,11 @@ export function LatticeScene({
         layout={layout}
         meshDetail={PREVIEW_SCENE_MESH_DETAIL}
         scene={scene}
+        inspectedAtomId={inspectedAtomId}
+        onAtomInspect={onAtomInspect}
+        onAtomPulse={onAtomPulse}
+        pulseAtomId={pulseAtomId}
+        pulseToken={pulseToken}
         showAtoms={showAtoms}
         showUnitCell={showUnitCell}
         style={style}
@@ -341,6 +373,11 @@ function PreviewSceneContent({
   layout,
   meshDetail,
   scene,
+  inspectedAtomId,
+  onAtomInspect,
+  onAtomPulse,
+  pulseAtomId,
+  pulseToken,
   showAtoms,
   showUnitCell,
   style,
@@ -349,6 +386,11 @@ function PreviewSceneContent({
   layout: SceneLayout;
   meshDetail: SceneMeshDetail;
   scene: SceneSpec;
+  inspectedAtomId: string | null;
+  onAtomInspect?: (atomId: string | null) => void;
+  onAtomPulse?: (atomId: string) => void;
+  pulseAtomId: string | null;
+  pulseToken: number;
   showAtoms: boolean;
   showUnitCell: boolean;
   style: StyleState;
@@ -364,6 +406,11 @@ function PreviewSceneContent({
         groupPosition={layout.groupPosition}
         meshDetail={meshDetail}
         scene={scene}
+        inspectedAtomId={inspectedAtomId}
+        onAtomInspect={onAtomInspect}
+        onAtomPulse={onAtomPulse}
+        pulseAtomId={pulseAtomId}
+        pulseToken={pulseToken}
         showAtoms={showAtoms}
         showUnitCell={showUnitCell}
         style={style}
@@ -508,6 +555,11 @@ function StructureSceneObjects({
   groupPosition,
   meshDetail,
   scene,
+  inspectedAtomId = null,
+  onAtomInspect,
+  onAtomPulse,
+  pulseAtomId = null,
+  pulseToken = 0,
   showAtoms,
   showUnitCell,
   style,
@@ -517,12 +569,17 @@ function StructureSceneObjects({
   groupPosition: VectorTuple;
   meshDetail: SceneMeshDetail;
   scene: SceneSpec;
+  inspectedAtomId?: string | null;
+  onAtomInspect?: (atomId: string | null) => void;
+  onAtomPulse?: (atomId: string) => void;
+  pulseAtomId?: string | null;
+  pulseToken?: number;
   showAtoms: boolean;
   showUnitCell: boolean;
   style: StyleState;
 }) {
   return (
-    <group>
+    <group onPointerMissed={() => onAtomInspect?.(null)}>
       <group position={groupPosition}>
         {showUnitCell ? (
           <CellFrame
@@ -557,7 +614,11 @@ function StructureSceneObjects({
                 key={atom.id}
                 atom={atom}
                 colorScheme={style.colorScheme}
+                inspected={inspectedAtomId === atom.id}
                 meshDetail={meshDetail}
+                onInspect={onAtomInspect}
+                onPulse={onAtomPulse}
+                pulseToken={pulseAtomId === atom.id ? pulseToken : 0}
                 radiusModel={style.atomRadiusModel}
                 radiusScale={style.atomRadius / 100}
                 opacity={componentOpacity.atoms / 100}
@@ -1169,39 +1230,141 @@ function applyStandardCameraPose(
 function Atom({
   atom,
   colorScheme,
+  inspected,
   meshDetail,
+  onInspect,
+  onPulse,
   opacity,
+  pulseToken,
   radiusModel,
   radiusScale,
 }: {
   atom: AtomSpec;
   colorScheme: StyleState["colorScheme"];
+  inspected: boolean;
   meshDetail: SceneMeshDetail;
+  onInspect?: (atomId: string | null) => void;
+  onPulse?: (atomId: string) => void;
   opacity: number;
+  pulseToken: number;
   radiusModel: AtomRadiusModel;
   radiusScale: number;
 }) {
+  const haloMaterialRef = useRef<MeshBasicMaterial | null>(null);
+  const haloMeshRef = useRef<Mesh | null>(null);
+  const pulseStartTimeRef = useRef<number | null>(null);
+  const [isPulsing, setIsPulsing] = useState(false);
   const isTransparent = opacity < 1;
   const radius = atomRadiusForModel(atom, radiusModel);
+  const scaledRadius = radius * radiusScale;
   const color = atomColorForScheme(atom, colorScheme);
+  const showHalo = inspected || isPulsing;
+  const haloScale = inspected ? ATOM_HALO_SELECTED_SCALE : ATOM_HALO_PULSE_MIN_SCALE;
+  const haloOpacity = inspected ? ATOM_HALO_SELECTED_OPACITY : 0;
+
+  useEffect(() => {
+    if (pulseToken === 0) {
+      pulseStartTimeRef.current = null;
+      setIsPulsing(false);
+      return;
+    }
+
+    pulseStartTimeRef.current = performance.now();
+    setIsPulsing(true);
+  }, [pulseToken]);
+
+  useFrame(() => {
+    const haloMesh = haloMeshRef.current;
+    const haloMaterial = haloMaterialRef.current;
+    if (!haloMesh || !haloMaterial) {
+      return;
+    }
+
+    if (inspected) {
+      haloMesh.scale.setScalar(ATOM_HALO_SELECTED_SCALE);
+      haloMaterial.opacity = ATOM_HALO_SELECTED_OPACITY;
+      return;
+    }
+
+    const pulseStartTime = pulseStartTimeRef.current;
+    if (pulseStartTime === null) {
+      haloMesh.scale.setScalar(ATOM_HALO_PULSE_MIN_SCALE);
+      haloMaterial.opacity = 0;
+      return;
+    }
+
+    const progress = Math.min(1, (performance.now() - pulseStartTime) / ATOM_HALO_PULSE_MS);
+    const fadeIn = Math.min(1, progress / 0.28);
+    const fadeOut = progress < 0.28 ? 1 : 1 - (progress - 0.28) / 0.72;
+    const fade = fadeIn * Math.max(0, fadeOut) ** 0.72;
+    const easeOut = 1 - (1 - progress) ** 3;
+    const scale = ATOM_HALO_PULSE_MIN_SCALE +
+      (ATOM_HALO_PULSE_SCALE - ATOM_HALO_PULSE_MIN_SCALE) * easeOut;
+    haloMesh.scale.setScalar(scale);
+    haloMaterial.opacity = ATOM_HALO_PULSE_OPACITY * fade;
+
+    if (progress >= 1) {
+      pulseStartTimeRef.current = null;
+      setIsPulsing(false);
+    }
+  });
+
+  const handleClick = useCallback(
+    (event: ThreeEvent<MouseEvent>) => {
+      event.stopPropagation();
+      onPulse?.(atom.id);
+    },
+    [atom.id, onPulse],
+  );
+
+  const handleDoubleClick = useCallback(
+    (event: ThreeEvent<MouseEvent>) => {
+      event.stopPropagation();
+      onInspect?.(atom.id);
+    },
+    [atom.id, onInspect],
+  );
 
   return (
-    <mesh position={atom.position}>
-      <sphereGeometry
-        args={[
-          radius * radiusScale,
-          meshDetail.sphereWidthSegments,
-          meshDetail.sphereHeightSegments,
-        ]}
-      />
-      <meshLambertMaterial
-        key={isTransparent ? "transparent" : "opaque"}
-        color={color}
-        depthWrite={!isTransparent}
-        opacity={opacity}
-        transparent={isTransparent}
-      />
-    </mesh>
+    <group position={atom.position}>
+      {showHalo ? (
+        <mesh ref={haloMeshRef} renderOrder={2}>
+          <sphereGeometry
+            args={[
+              scaledRadius,
+              meshDetail.sphereWidthSegments,
+              meshDetail.sphereHeightSegments,
+            ]}
+          />
+          <meshBasicMaterial
+            ref={haloMaterialRef}
+            color={ATOM_HALO_COLOR}
+            depthWrite={false}
+            opacity={haloOpacity}
+            transparent
+          />
+        </mesh>
+      ) : null}
+      <mesh
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+      >
+        <sphereGeometry
+          args={[
+            scaledRadius,
+            meshDetail.sphereWidthSegments,
+            meshDetail.sphereHeightSegments,
+          ]}
+        />
+        <meshLambertMaterial
+          key={isTransparent ? "transparent" : "opaque"}
+          color={color}
+          depthWrite={!isTransparent}
+          opacity={opacity}
+          transparent={isTransparent}
+        />
+      </mesh>
+    </group>
   );
 }
 

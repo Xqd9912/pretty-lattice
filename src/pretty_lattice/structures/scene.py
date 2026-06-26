@@ -74,6 +74,7 @@ class StructureSummarySpec(TypedDict):
 class AtomSpec(TypedDict):
     id: str
     siteId: str
+    siteIndex: int
     element: str
     position: list[float]
     fractionalPosition: list[float]
@@ -375,6 +376,7 @@ def _atom_record_to_spec(
     return {
         "id": _atom_instance_id(atom.site.site_id, atom.image_offset),
         "siteId": atom.site.site_id,
+        "siteIndex": atom.site.index,
         "element": atom.site.element_symbol,
         "position": _atom_record_cartesian_position(atom, cell_vectors),
         "fractionalPosition": shifted_fractional_position,
