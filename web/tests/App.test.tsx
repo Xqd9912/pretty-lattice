@@ -17,6 +17,8 @@ interface FetchCall {
 
 class MockControls {
   enabled = true;
+  maxZoom = Infinity;
+  minZoom = 0;
   mouseButtons: Record<string, unknown> = {};
   noPan = false;
   noRotate = false;
@@ -24,9 +26,13 @@ class MockControls {
   target = new Vector3();
   touches: Record<string, unknown> = {};
 
+  addEventListener() {}
+
   dispose() {}
 
   handleResize() {}
+
+  removeEventListener() {}
 
   update() {}
 }

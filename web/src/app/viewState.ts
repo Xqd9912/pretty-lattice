@@ -12,7 +12,6 @@ export const MAX_VIEW_SCALE = 5;
 export const DEFAULT_VIEW_SCALE = 1;
 export const ZOOM_SLIDER_SNAP_POSITION = 0.5;
 export const ZOOM_SLIDER_SNAP_THRESHOLD = 0.03;
-const WHEEL_ZOOM_STEP = 360;
 
 export const INTERACTION_MODE_OPTIONS: readonly {
   label: string;
@@ -97,10 +96,6 @@ export function snapZoomSliderPosition(position: number): number {
   }
 
   return position;
-}
-
-export function applyWheelZoomDelta(viewScale: number, deltaY: number): number {
-  return clampViewScale(viewScale * 2 ** (-deltaY / WHEEL_ZOOM_STEP));
 }
 
 export function formatZoomPercent(viewScale: number): string {

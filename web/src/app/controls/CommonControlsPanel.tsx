@@ -138,19 +138,19 @@ const UNICOLOR_2D_TOKEN_STYLE = {
 } as const;
 const JMOL_TOKEN_STYLE = {
   background:
-    "linear-gradient(90deg, #ffffff 0 22%, #909090 22% 44%, #3050f8 44% 66%, #ff0d0d 66% 100%)",
+    "linear-gradient(90deg, #ffffff 0 25%, #909090 25% 50%, #3050f8 50% 75%, #ff0d0d 75% 100%)",
 } as const;
 const JMOL_SOFT_TOKEN_STYLE = {
   background:
-    "linear-gradient(90deg, #dedede 0 22%, #919191 22% 44%, #506dc2 44% 66%, #d2685a 66% 100%)",
+    "linear-gradient(90deg, #dedede 0 25%, #919191 25% 50%, #506dc2 50% 75%, #d2685a 75% 100%)",
 } as const;
 const VESTA_TOKEN_STYLE = {
   background:
-    "linear-gradient(90deg, #ffcccc 0 22%, #814929 22% 44%, #b0bae6 44% 66%, #ff0300 66% 100%)",
+    "linear-gradient(90deg, #ffcccc 0 25%, #814929 25% 50%, #b0bae6 50% 75%, #ff0300 75% 100%)",
 } as const;
 const VESTA_SOFT_TOKEN_STYLE = {
   background:
-    "linear-gradient(90deg, #f2c0c0 0 22%, #8d5434 22% 44%, #a9b3df 44% 66%, #d16759 66% 100%)",
+    "linear-gradient(90deg, #f2c0c0 0 25%, #8d5434 25% 50%, #a9b3df 50% 75%, #d16759 75% 100%)",
 } as const;
 
 export function CommonControlsPanel({

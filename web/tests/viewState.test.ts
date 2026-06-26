@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  applyWheelZoomDelta,
   clampViewScale,
   createPreviewViewState,
   formatZoomPercent,
@@ -68,9 +67,4 @@ describe("preview view state", () => {
     expect(parseZoomPercentInput("not a number")).toBeNull();
   });
 
-  test("applies wheel zoom through the same clamp", () => {
-    expect(applyWheelZoomDelta(1, -360)).toBe(2);
-    expect(applyWheelZoomDelta(1, 1080)).toBe(0.2);
-    expect(applyWheelZoomDelta(4.9, -360)).toBe(5);
-  });
 });
