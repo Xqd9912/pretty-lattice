@@ -1,13 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
 import {
   COLOR_SCHEME_OPTIONS,
   elementColorForScheme,
   hasElementColor,
 } from "../src/app/colorSchemes";
-
-const ELEMENT_DECLARATION_RE = /^\[elements\.([^\]]+)\]$/gm;
+import { elementRadiusSymbols } from "../src/app/elementRadii";
 
 describe("color schemes", () => {
   test("orders softened schemes before their source schemes", () => {
@@ -19,11 +17,11 @@ describe("color schemes", () => {
     ]);
   });
 
-  test("cover every backend element symbol", () => {
-    const backendElements = backendElementSymbols();
+  test("cover every frontend element radius symbol", () => {
+    const radiusElements = elementRadiusSymbols();
 
     for (const { value } of COLOR_SCHEME_OPTIONS) {
-      const missingElements = backendElements.filter(
+      const missingElements = radiusElements.filter(
         (element) => !hasElementColor(element, value),
       );
 
@@ -48,12 +46,3 @@ describe("color schemes", () => {
     expect(elementColorForScheme("Si", "vesta-soft")).toBe("#4064c2");
   });
 });
-
-function backendElementSymbols(): string[] {
-  const elementsToml = readFileSync(
-    new URL("../../src/pretty_lattice/data/elements.toml", import.meta.url),
-    "utf8",
-  );
-
-  return [...elementsToml.matchAll(ELEMENT_DECLARATION_RE)].map((match) => match[1]!);
-}

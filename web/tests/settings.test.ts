@@ -459,7 +459,6 @@ function atom(
     visibilityDependencies,
     visibilityDependencyGroups,
     position: imageOffset,
-    radius: 0.5,
     siteId: id.split("-image-", 1)[0]!,
   };
 }

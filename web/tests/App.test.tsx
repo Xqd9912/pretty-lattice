@@ -1274,13 +1274,6 @@ function atom(
     visibilityDependencies,
     visibilityDependencyGroups,
     position: imageOffset,
-    radius: 0.5,
-    radii: {
-      atomic: 0.7,
-      ionic: 0.9,
-      uniform: 0.5,
-      vdw: 1.4,
-    },
     siteId: id.split("-image-", 1)[0]!,
   };
 }

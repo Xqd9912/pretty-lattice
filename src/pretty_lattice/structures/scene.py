@@ -12,11 +12,6 @@ from pymatgen.core.sites import PeriodicSite
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from scipy.spatial import Delaunay, QhullError
 
-from pretty_lattice.structures.elements import (
-    ElementRecord,
-    ElementRegistry,
-    load_element_registry,
-)
 from pretty_lattice.structures.symmetry import point_group_schoenflies_symbol
 
 _BOUNDARY_TOLERANCE = 1e-6
@@ -26,7 +21,6 @@ AUTO_BOND_ALGORITHM_ATOM_COUNT_THRESHOLD = 200
 DEFAULT_BOND_ALGORITHM = "crystal-nn"
 
 BondAlgorithm = Literal["crystal-nn", "minimum-distance", "vesta"]
-AtomRadiusModel = Literal["uniform", "atomic", "vdw", "ionic"]
 ImageReason = Literal["boundary", "bonded"]
 VisibilityDependency = Literal["boundaryAtoms", "oneHopBondedAtoms"]
 type _AtomKey = tuple[int, tuple[int, int, int]]
@@ -88,15 +82,6 @@ class AtomSpec(TypedDict):
     imageReasons: list[ImageReason]
     visibilityDependencies: list[VisibilityDependency]
     visibilityDependencyGroups: list[list[VisibilityDependency]]
-    radius: float
-    radii: AtomRadiiSpec
-
-
-class AtomRadiiSpec(TypedDict):
-    uniform: float
-    atomic: float
-    vdw: float
-    ionic: float
 
 
 class BondSpec(TypedDict):
@@ -136,8 +121,6 @@ class _SiteRenderData:
     site_id: str
     element_symbol: str
     fractional_position: list[float]
-    radius: float
-    radii: AtomRadiiSpec
 
 
 @dataclass
@@ -179,13 +162,11 @@ def build_scene_response(
     structure: Structure,
     *,
     bond_algorithm: str | None = None,
-    element_registry: ElementRegistry | None = None,
 ) -> SceneSpec:
     normalized_bond_algorithm = normalize_bond_algorithm(bond_algorithm)
     selected_bond_algorithm = normalized_bond_algorithm or _default_bond_algorithm_for_structure(
         structure
     )
-    elements = element_registry or load_element_registry()
     cell_vectors = [_vector3(vector) for vector in structure.lattice.matrix]
     can_generate_periodic_images = _has_valid_3d_periodic_cell(structure)
 
@@ -193,10 +174,9 @@ def build_scene_response(
     atom_records: dict[_AtomKey, _AtomRecord] = {}
     canonical_source_keys: list[_AtomKey] = []
     for index, site in enumerate(structure):
-        symbol = _site_element_symbol(site)
+        symbol = _normalize_element_symbol(_site_element_symbol(site))
         fractional_position = _vector3(site.frac_coords)
-        element = elements.resolve(symbol)
-        site_id = f"{element.symbol}-{index}"
+        site_id = f"{symbol}-{index}"
         canonical_fractional_position = fractional_position
         boundary_axes: tuple[int, ...] = ()
 
@@ -208,10 +188,8 @@ def build_scene_response(
         site_data = _SiteRenderData(
             index=index,
             site_id=site_id,
-            element_symbol=element.symbol,
+            element_symbol=symbol,
             fractional_position=canonical_fractional_position,
-            radius=element.uniform_radius,
-            radii=_element_radii(element),
         )
         site_render_data.append(site_data)
 
@@ -334,15 +312,6 @@ def _default_bond_algorithm_for_structure(structure: Structure) -> BondAlgorithm
     return DEFAULT_BOND_ALGORITHM
 
 
-def _element_radii(element: ElementRecord) -> AtomRadiiSpec:
-    return {
-        "uniform": element.uniform_radius,
-        "atomic": element.atomic_radius,
-        "vdw": element.vdw_radius,
-        "ionic": element.ionic_radius,
-    }
-
-
 def _vector3(values: Sequence[float]) -> list[float]:
     return [_clean_float(values[0]), _clean_float(values[1]), _clean_float(values[2])]
 
@@ -358,6 +327,13 @@ def _site_element_symbol(site: PeriodicSite) -> str:
     specie = _site_specie(site)
     symbol = getattr(specie, "symbol", str(specie))
     return str(symbol)
+
+
+def _normalize_element_symbol(symbol: str) -> str:
+    normalized = symbol.strip()
+    if not normalized:
+        raise ValueError("Element symbol cannot be empty.")
+    return normalized[0].upper() + normalized[1:].lower()
 
 
 def _site_specie(site: PeriodicSite):
@@ -417,8 +393,6 @@ def _atom_record_to_spec(
         "visibilityDependencyGroups": _ordered_visibility_dependency_groups(
             atom.visibility_dependency_groups
         ),
-        "radius": atom.site.radius,
-        "radii": atom.site.radii,
     }
 
 

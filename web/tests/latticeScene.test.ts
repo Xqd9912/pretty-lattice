@@ -179,11 +179,11 @@ describe("computeSceneLayout", () => {
     expect(positions.slice(-6)).toEqual([1, 3, 2, 5, 3, 2]);
   });
 
-  test("fits the preview layout from raw scene atom radii", () => {
+  test("fits the preview layout from frontend element radii", () => {
     const scene = sceneWithOffCenterAtoms();
 
     expect(computeSceneLayout(scene).span).toBeCloseTo(6);
-    expect(computeSceneLayout(scene, "vdw").span).toBeCloseTo(8);
+    expect(computeSceneLayout(scene, "vdw").span).toBeCloseTo(9.2);
   });
 
   test("tracks the Standard-view projected fit size for slender structures", () => {
@@ -578,13 +578,6 @@ function atom(id: string, position: [number, number, number]): AtomSpec {
     visibilityDependencies: [],
     visibilityDependencyGroups: [],
     position,
-    radius: 0.5,
-    radii: {
-      atomic: 0.7,
-      ionic: 1,
-      uniform: 0.5,
-      vdw: 1.5,
-    },
     siteId: id,
   };
 }

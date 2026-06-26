@@ -64,11 +64,7 @@ export interface AtomSpec {
   imageReasons: ImageReason[];
   visibilityDependencies: VisibilityDependency[];
   visibilityDependencyGroups: VisibilityDependency[][];
-  radius: number;
-  radii?: AtomRadii;
 }
-
-export type AtomRadii = Record<AtomRadiusModel, number>;
 
 export type ImageReason = "boundary" | "bonded";
 

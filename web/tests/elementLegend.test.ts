@@ -94,7 +94,6 @@ function sceneWithAtoms(atoms: TestAtom[]): SceneSpec {
       imageReasons: isPeriodicImage ? ["boundary"] : [],
       visibilityDependencies: isPeriodicImage ? ["boundaryAtoms"] : [],
       visibilityDependencyGroups: isPeriodicImage ? [["boundaryAtoms"]] : [],
-      radius: 1,
     })),
     bonds: [],
     polyhedra: [],

@@ -6,7 +6,6 @@ import pytest
 from pymatgen.core import Lattice, Structure
 
 import pretty_lattice.structures.scene as scene_module
-from pretty_lattice.structures.elements import load_element_registry
 from pretty_lattice.structures.readers import (
     StructureReadError,
     read_structure,
@@ -150,17 +149,7 @@ def test_point_group_schoenflies_mapping_covers_crystallographic_point_groups() 
     assert point_group_schoenflies_symbol("not-a-point-group") is None
 
 
-def test_element_radius_resolution() -> None:
-    element_registry = load_element_registry()
-
-    oxygen = element_registry.resolve("O")
-
-    assert oxygen.atomic_radius == pytest.approx(0.74)
-    assert oxygen.vdw_radius == pytest.approx(1.52)
-    assert oxygen.uniform_radius == pytest.approx(0.50)
-
-
-def test_scene_response_shape_uses_radius_defaults_without_renderer_colors() -> None:
+def test_scene_response_shape_excludes_renderer_visual_data() -> None:
     structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
 
     scene = build_scene_response(structure)
@@ -181,15 +170,10 @@ def test_scene_response_shape_uses_radius_defaults_without_renderer_colors() -> 
         "imageReasons": [],
         "visibilityDependencies": [],
         "visibilityDependencyGroups": [],
-        "radius": pytest.approx(0.50),
-        "radii": {
-            "uniform": pytest.approx(0.50),
-            "atomic": pytest.approx(2.15),
-            "vdw": pytest.approx(2.02),
-            "ionic": pytest.approx(1.26),
-        },
     }
     assert "color" not in canonical_atoms[0]
+    assert "radius" not in canonical_atoms[0]
+    assert "radii" not in canonical_atoms[0]
     assert [atom["element"] for atom in canonical_atoms] == [
         "Sr",
         "Ti",
@@ -228,23 +212,6 @@ def test_scene_response_shape_uses_radius_defaults_without_renderer_colors() -> 
         },
     }
     assert scene.keys() == {"cell", "atoms", "bonds", "polyhedra", "summary"}
-
-
-def test_scene_response_includes_all_atom_radius_models() -> None:
-    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif")
-
-    scene = build_scene_response(structure)
-    oxygen = next(
-        atom for atom in scene["atoms"] if atom["element"] == "O" and not atom["isPeriodicImage"]
-    )
-
-    assert oxygen["radius"] == pytest.approx(0.50)
-    assert oxygen["radii"] == {
-        "uniform": pytest.approx(0.50),
-        "atomic": pytest.approx(0.74),
-        "vdw": pytest.approx(1.52),
-        "ionic": pytest.approx(1.40),
-    }
 
 
 @pytest.mark.parametrize(
