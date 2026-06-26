@@ -131,6 +131,7 @@ export function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [cameraCommandVersion, setCameraCommandVersion] = useState(0);
+  const [cameraAnimatedCommandVersion, setCameraAnimatedCommandVersion] = useState(0);
   const [cameraOrientationVersion, setCameraOrientationVersion] = useState(0);
   const [viewState, setViewState] = useState(createPreviewViewState);
   const [lockedInteractionFeedbackCount, setLockedInteractionFeedbackCount] = useState(0);
@@ -203,6 +204,7 @@ export function App() {
   const handleCameraStateChange = useCallback((cameraState: CrystalCameraState) => {
     setViewState((currentViewState) => setPreviewCameraState(currentViewState, cameraState));
     setCameraCommandVersion((version) => version + 1);
+    setCameraAnimatedCommandVersion((version) => version + 1);
   }, []);
 
   const handleCameraPrimaryChange = useCallback(
@@ -262,6 +264,7 @@ export function App() {
         ),
       );
       setCameraCommandVersion((version) => version + 1);
+      setCameraAnimatedCommandVersion((version) => version + 1);
     },
     [visibleScene],
   );
@@ -689,6 +692,7 @@ export function App() {
       >
         {visibleScene ? (
           <LatticeScene
+            cameraAnimatedCommandVersion={cameraAnimatedCommandVersion}
             cameraCommandVersion={cameraCommandVersion}
             cameraState={viewState.camera}
             cameraOrientationRef={cameraOrientationRef}

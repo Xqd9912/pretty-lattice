@@ -100,6 +100,9 @@ const NARROW_VIEWPORT_SAFE_AREA: PreviewSafeArea = {
   top: 476,
 };
 const CAMERA_TARGET = new Vector3(0, 0, 0);
+const CAMERA_LOCAL_FORWARD = new Vector3(0, 0, 1);
+const CAMERA_LOCAL_UP = new Vector3(0, 1, 0);
+const CAMERA_COMMAND_ANIMATION_DURATION_MS = 260;
 const VIEW_SCALE_SYNC_EPSILON = 0.0005;
 const FRUSTUM_SYNC_EPSILON = 0.000001;
 export const BOND_COLOR = "#c7cbd1";
@@ -155,6 +158,7 @@ export const EXPORT_SCENE_MESH_DETAIL_PRESETS: Record<ExportMeshQuality, SceneMe
 
 export function LatticeScene({
   cameraOrientationRef,
+  cameraAnimatedCommandVersion = 0,
   cameraState,
   cameraCommandVersion,
   componentOpacity,
@@ -173,6 +177,7 @@ export function LatticeScene({
   viewScale,
 }: {
   cameraOrientationRef?: CameraOrientationRef;
+  cameraAnimatedCommandVersion?: number;
   cameraCommandVersion: number;
   cameraState: CrystalCameraState;
   componentOpacity: ComponentOpacityState;
@@ -220,6 +225,7 @@ export function LatticeScene({
       <ambientLight intensity={PREVIEW_AMBIENT_LIGHT_INTENSITY} />
       <CameraHeadlight />
       <PreviewCameraController
+        cameraAnimatedCommandVersion={cameraAnimatedCommandVersion}
         cameraCommandVersion={cameraCommandVersion}
         cameraPose={layout.cameraPose}
         interactionLocked={interactionLocked}
@@ -438,6 +444,7 @@ const MemoizedStructureSceneObjects = memo(StructureSceneObjects);
 type CameraControls = OrbitControls | TrackballControls;
 
 function PreviewCameraController({
+  cameraAnimatedCommandVersion,
   cameraCommandVersion,
   cameraPose,
   interactionLocked,
@@ -448,6 +455,7 @@ function PreviewCameraController({
   safeArea,
   viewScale,
 }: {
+  cameraAnimatedCommandVersion: number;
   cameraCommandVersion: number;
   cameraPose: CrystalCameraPose;
   interactionLocked: boolean;
@@ -460,7 +468,13 @@ function PreviewCameraController({
 }) {
   const { camera, gl, size } = useThree();
   const controlsRef = useRef<CameraControls | null>(null);
+  const cameraAnimationRef = useRef<CameraPoseAnimation | null>(null);
   const cameraPoseRef = useRef(cameraPose);
+  const hasAppliedInitialPoseRef = useRef(false);
+  const lastCameraAnimatedCommandVersionRef = useRef(cameraAnimatedCommandVersion);
+  const lastCameraCommandVersionRef = useRef(cameraCommandVersion);
+  const lastLayoutSpanRef = useRef(layout.span);
+  const lastResetCounterRef = useRef(resetCounter);
   const syncedViewScaleRef = useRef(viewScale);
   cameraPoseRef.current = cameraPose;
   const effectiveSafeArea = useMemo(
@@ -477,10 +491,35 @@ function PreviewCameraController({
   }, [viewScale]);
 
   useLayoutEffect(() => {
+    const commandChanged = cameraCommandVersion !== lastCameraCommandVersionRef.current;
+    const animatedCommandChanged =
+      cameraAnimatedCommandVersion !== lastCameraAnimatedCommandVersionRef.current;
+    const resetChanged = resetCounter !== lastResetCounterRef.current;
+    const layoutSpanChanged = Math.abs(layout.span - lastLayoutSpanRef.current) > 1e-8;
+    const shouldAnimate =
+      hasAppliedInitialPoseRef.current &&
+      commandChanged &&
+      animatedCommandChanged &&
+      !resetChanged &&
+      !layoutSpanChanged &&
+      !prefersReducedCameraMotion();
+
+    lastCameraCommandVersionRef.current = cameraCommandVersion;
+    lastCameraAnimatedCommandVersionRef.current = cameraAnimatedCommandVersion;
+    lastResetCounterRef.current = resetCounter;
+    lastLayoutSpanRef.current = layout.span;
+    hasAppliedInitialPoseRef.current = true;
+
+    if (shouldAnimate) {
+      cameraAnimationRef.current = createCameraPoseAnimation(camera, cameraPoseRef.current, layout.span);
+      return;
+    }
+
+    cameraAnimationRef.current = null;
     applyStandardCameraPose(camera, cameraPoseRef.current, layout.span);
     controlsRef.current?.target.copy(CAMERA_TARGET);
     controlsRef.current?.update();
-  }, [camera, cameraCommandVersion, layout.span, resetCounter]);
+  }, [camera, cameraAnimatedCommandVersion, cameraCommandVersion, layout.span, resetCounter]);
 
   useLayoutEffect(() => {
     if (!(camera instanceof OrthographicCamera)) {
@@ -497,14 +536,19 @@ function PreviewCameraController({
       interactionMode === "trackball"
         ? new TrackballControls(camera, gl.domElement)
         : new OrbitControls(camera, gl.domElement);
+    function handleControlsStart() {
+      cameraAnimationRef.current = null;
+    }
 
     configureCameraControls(controls, interactionMode, interactionLocked, fitZoom);
     controls.target.copy(CAMERA_TARGET);
     resizeCameraControls(controls);
+    controls.addEventListener("start", handleControlsStart);
     controls.update();
     controlsRef.current = controls;
 
     return () => {
+      controls.removeEventListener("start", handleControlsStart);
       controls.dispose();
       if (controlsRef.current === controls) {
         controlsRef.current = null;
@@ -556,7 +600,17 @@ function PreviewCameraController({
   }, [camera, effectiveSafeArea, fitZoom, onViewScaleChange, size.height, size.width]);
 
   useFrame(() => {
-    controlsRef.current?.update();
+    const animation = cameraAnimationRef.current;
+    if (animation) {
+      const isComplete = applyCameraPoseAnimationFrame(camera, animation, performance.now());
+      if (isComplete) {
+        cameraAnimationRef.current = null;
+      }
+      controlsRef.current?.target.copy(CAMERA_TARGET);
+      controlsRef.current?.update();
+    } else {
+      controlsRef.current?.update();
+    }
 
     if (camera instanceof OrthographicCamera) {
       syncOrthographicFrustumToCameraZoom(
@@ -570,6 +624,83 @@ function PreviewCameraController({
   });
 
   return null;
+}
+
+interface CameraPoseAnimation {
+  durationMs: number;
+  startDistance: number;
+  startQuaternion: Quaternion;
+  startTimeMs: number;
+  targetDistance: number;
+  targetPose: CrystalCameraPose;
+  targetQuaternion: Quaternion;
+  targetSpan: number;
+}
+
+function createCameraPoseAnimation(
+  camera: { position: Vector3; quaternion: Quaternion },
+  targetPose: CrystalCameraPose,
+  targetSpan: number,
+): CameraPoseAnimation {
+  return {
+    durationMs: CAMERA_COMMAND_ANIMATION_DURATION_MS,
+    startDistance: Math.max(camera.position.distanceTo(CAMERA_TARGET), 1e-6),
+    startQuaternion: camera.quaternion.clone().normalize(),
+    startTimeMs: performance.now(),
+    targetDistance: Math.max(targetPose.distance, 1e-6),
+    targetPose,
+    targetQuaternion: targetPose.quaternion.clone().normalize(),
+    targetSpan,
+  };
+}
+
+function applyCameraPoseAnimationFrame(
+  camera: {
+    lookAt: (x: number, y: number, z: number) => void;
+    position: Vector3;
+    quaternion: Quaternion;
+    up: Vector3;
+  },
+  animation: CameraPoseAnimation,
+  nowMs: number,
+): boolean {
+  const progress = Math.max(
+    0,
+    Math.min(1, (nowMs - animation.startTimeMs) / animation.durationMs),
+  );
+
+  if (progress >= 1) {
+    applyStandardCameraPose(camera, animation.targetPose, animation.targetSpan);
+    return true;
+  }
+
+  const easedProgress = easeOutCubic(progress);
+  const quaternion = animation.startQuaternion.clone().slerp(
+    animation.targetQuaternion,
+    easedProgress,
+  );
+  const outward = CAMERA_LOCAL_FORWARD.clone().applyQuaternion(quaternion).normalize();
+  const up = CAMERA_LOCAL_UP.clone().applyQuaternion(quaternion).normalize();
+  const distance =
+    animation.startDistance +
+    (animation.targetDistance - animation.startDistance) * easedProgress;
+
+  camera.position.copy(outward.multiplyScalar(distance));
+  camera.up.copy(up);
+  camera.lookAt(CAMERA_TARGET.x, CAMERA_TARGET.y, CAMERA_TARGET.z);
+  return false;
+}
+
+function easeOutCubic(progress: number): number {
+  return 1 - (1 - progress) ** 3;
+}
+
+function prefersReducedCameraMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
 }
 
 function syncOrthographicFrustumToCameraZoom(

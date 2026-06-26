@@ -1,5 +1,5 @@
-import { render } from "@testing-library/react";
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { act, render } from "@testing-library/react";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import {
   Children,
   isValidElement,
@@ -36,9 +36,11 @@ class MockOrbitControls extends MockControls {}
 class MockTrackballControls extends MockControls {}
 
 let mockCamera = new OrthographicCamera();
+let latestFrameCallback: (() => void) | null = null;
 
 function resetMockCamera() {
   mockCamera = new OrthographicCamera();
+  latestFrameCallback = null;
 }
 
 mock.module("@react-three/fiber", () => ({
@@ -56,7 +58,9 @@ mock.module("@react-three/fiber", () => ({
       )}
     </div>
   ),
-  useFrame: () => {},
+  useFrame: (callback: () => void) => {
+    latestFrameCallback = callback;
+  },
   useThree: () => ({
     camera: mockCamera,
     gl: {
@@ -130,6 +134,58 @@ describe("LatticeScene camera commands", () => {
     expect(Math.abs(mockCamera.position.x)).toBeLessThan(1e-8);
     expect(mockCamera.position.y).toBeGreaterThan(0);
     expect(Math.abs(mockCamera.position.z)).toBeLessThan(1e-8);
+  });
+
+  test("animates flagged camera commands from the current pose to the target pose", () => {
+    let now = 0;
+    const nowSpy = spyOn(performance, "now").mockImplementation(() => now);
+    const scene = orthogonalScene();
+    const defaultCamera = createDefaultCrystalCameraState();
+    const aCamera = stateWithDirectAxis(scene.cell.vectors, defaultCamera, "a");
+    const props = {
+      cameraAnimatedCommandVersion: 0,
+      cameraCommandVersion: 0,
+      cameraState: defaultCamera,
+      componentOpacity: createDefaultComponentOpacity(),
+      interactionLocked: false,
+      interactionMode: "trackball" as const,
+      onViewScaleChange: () => {},
+      renderBackend: "webgl" as const,
+      resetCounter: 0,
+      scene,
+      style: createDefaultStyle(),
+      viewScale: 1,
+    };
+
+    try {
+      const { rerender } = render(<LatticeScene {...props} />);
+      expect(Math.abs(mockCamera.position.x)).toBeLessThan(1e-8);
+      expect(mockCamera.position.z).toBeGreaterThan(0);
+
+      rerender(
+        <LatticeScene
+          {...props}
+          cameraAnimatedCommandVersion={1}
+          cameraCommandVersion={1}
+          cameraState={aCamera}
+        />,
+      );
+      expect(Math.abs(mockCamera.position.x)).toBeLessThan(1e-8);
+      expect(mockCamera.position.z).toBeGreaterThan(0);
+
+      now = 130;
+      act(() => latestFrameCallback?.());
+      expect(mockCamera.position.x).toBeGreaterThan(0);
+      expect(mockCamera.position.z).toBeGreaterThan(0);
+
+      now = 280;
+      act(() => latestFrameCallback?.());
+      expect(mockCamera.position.x).toBeGreaterThan(0);
+      expect(Math.abs(mockCamera.position.y)).toBeLessThan(1e-8);
+      expect(Math.abs(mockCamera.position.z)).toBeLessThan(1e-8);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });
 
