@@ -123,7 +123,7 @@ const COMMON_PANEL_TABS: {
   value: CommonPanelTab;
 }[] = [
   { Icon: DisplayIcon, label: "Display", value: "display" },
-  { Icon: CameraIcon, label: "Camera", value: "camera" },
+  { Icon: CameraIcon, label: "Pose", value: "camera" },
   { Icon: Palette, label: "Style", value: "style" },
   { Icon: ImageDown, label: "Export", value: "export" },
 ];

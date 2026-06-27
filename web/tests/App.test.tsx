@@ -933,9 +933,9 @@ describe("App", () => {
       within(commonControls)
         .getAllByRole("tab")
         .map((tab) => tab.getAttribute("aria-label")),
-    ).toEqual(["Display", "Camera", "Style", "Export"]);
+    ).toEqual(["Display", "Pose", "Style", "Export"]);
     const displayTab = within(commonControls).getByRole("tab", { name: "Display" });
-    const cameraTab = within(commonControls).getByRole("tab", { name: "Camera" });
+    const cameraTab = within(commonControls).getByRole("tab", { name: "Pose" });
     expect(displayTab.className).toContain("!bg-transparent");
     expect(displayTab.className).toContain("!h-6");
     expect(displayTab.style.flexGrow).toBe("");
@@ -961,16 +961,16 @@ describe("App", () => {
     await user.click(cameraTab);
 
     expect(content?.className).not.toContain("h-[");
-    expect(within(commonControls).getByRole("tab", { name: "Camera" }).className).toContain(
+    expect(within(commonControls).getByRole("tab", { name: "Pose" }).className).toContain(
       "!bg-transparent",
     );
-    expect(within(commonControls).getByRole("tab", { name: "Camera" }).textContent).toContain(
-      "Camera",
+    expect(within(commonControls).getByRole("tab", { name: "Pose" }).textContent).toContain(
+      "Pose",
     );
     expect(tabsList?.style.gridTemplateColumns).toContain("1.65fr");
     expect(
       within(commonControls)
-        .getByRole("tab", { name: "Camera" })
+        .getByRole("tab", { name: "Pose" })
         .querySelector("[data-slot='common-controls-tab-label']")
         ?.className,
     ).toContain("max-w-16");
@@ -1005,7 +1005,7 @@ describe("App", () => {
     await renderLoadedStructure(user);
 
     const commonControls = screen.getByRole("complementary", { name: "Common controls" });
-    await user.click(within(commonControls).getByRole("tab", { name: "Camera" }));
+    await user.click(within(commonControls).getByRole("tab", { name: "Pose" }));
 
     expect(within(commonControls).queryByText("No controls")).toBeNull();
     expect(within(commonControls).getByText("Primary Axis").isConnected).toBe(true);
@@ -1083,7 +1083,7 @@ describe("App", () => {
     await renderLoadedStructure(user);
 
     const commonControls = screen.getByRole("complementary", { name: "Common controls" });
-    await user.click(within(commonControls).getByRole("tab", { name: "Camera" }));
+    await user.click(within(commonControls).getByRole("tab", { name: "Pose" }));
 
     const rollInput = within(commonControls).getByRole("textbox", {
       name: "Roll value",
@@ -1132,7 +1132,7 @@ describe("App", () => {
     await renderLoadedStructure(user);
 
     const commonControls = screen.getByRole("complementary", { name: "Common controls" });
-    await user.click(within(commonControls).getByRole("tab", { name: "Camera" }));
+    await user.click(within(commonControls).getByRole("tab", { name: "Pose" }));
 
     const outwardA = within(commonControls).getByRole("textbox", {
       name: "z a",
@@ -1186,7 +1186,7 @@ describe("App", () => {
     await renderLoadedStructure(user);
 
     const commonControls = screen.getByRole("complementary", { name: "Common controls" });
-    await user.click(within(commonControls).getByRole("tab", { name: "Camera" }));
+    await user.click(within(commonControls).getByRole("tab", { name: "Pose" }));
     await user.click(within(commonControls).getByRole("button", { name: "Y Up" }));
 
     expect(
@@ -1247,7 +1247,7 @@ describe("App", () => {
 
     await user.click(screen.getByRole("button", { name: "gizmo a" }));
     const commonControls = screen.getByRole("complementary", { name: "Common controls" });
-    await user.click(within(commonControls).getByRole("tab", { name: "Camera" }));
+    await user.click(within(commonControls).getByRole("tab", { name: "Pose" }));
 
     expect(
       within(commonControls).getByRole("textbox", { name: "z a" }),
