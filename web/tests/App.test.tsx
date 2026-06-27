@@ -930,10 +930,10 @@ describe("App", () => {
 
     expect(within(commonControls).queryByText("No controls")).toBeNull();
     expect(within(commonControls).getByText("Fixed-axis rotation").isConnected).toBe(true);
-    expect(within(commonControls).getByText("Primary Axis").isConnected).toBe(true);
+    expect(within(commonControls).getByText("Primary direction").isConnected).toBe(true);
     expect(
       within(commonControls)
-        .getByRole("tablist", { name: "Primary Axis" })
+        .getByRole("tablist", { name: "Primary direction" })
         .getAttribute("aria-orientation"),
     ).toBe("vertical");
     expect(
@@ -958,6 +958,9 @@ describe("App", () => {
     ).toContain("group-focus-visible:ring-[2px]");
 
     expect(within(commonControls).getByText("Manual input").isConnected).toBe(true);
+    expect(
+      within(commonControls).getByRole("button", { name: "Manual input rules" }).isConnected,
+    ).toBe(true);
     expect(
       within(commonControls)
         .getAllByRole("textbox")
@@ -1097,7 +1100,7 @@ describe("App", () => {
     expect(outwardA.value).toBe("1.00");
   });
 
-  test("swaps camera vector bases when Primary Axis changes", async () => {
+  test("swaps camera vector bases when primary direction changes", async () => {
     const user = userEvent.setup();
 
     await renderLoadedStructure(user);
@@ -1141,7 +1144,7 @@ describe("App", () => {
     expect(within(commonControls).queryByRole("textbox", { name: "Outward c" })).toBeNull();
   });
 
-  test("routes gizmo clicks through the selected camera Primary Axis", async () => {
+  test("routes gizmo clicks through the selected camera primary direction", async () => {
     const user = userEvent.setup();
 
     await renderLoadedStructure(user);

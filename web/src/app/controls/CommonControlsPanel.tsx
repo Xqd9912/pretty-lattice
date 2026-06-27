@@ -2,6 +2,7 @@ import {
   AlertTriangleIcon,
   Check,
   ImageDown,
+  Info,
   Link,
   Palette,
   RotateCcw,
@@ -1366,7 +1367,7 @@ function CameraTabContent({
               id="camera-primary-label"
               className="whitespace-nowrap px-0.5 text-[0.68rem] font-semibold leading-none text-muted-foreground"
             >
-              Primary Axis
+              Primary direction
             </h3>
             <Tabs
               value={cameraState.primary}
@@ -1779,12 +1780,33 @@ function VectorEditor({
   return (
     <section aria-labelledby="camera-manual-label" className="mt-1 grid gap-1.5 px-1.5 pb-1">
       <div className="flex h-7 items-center justify-between gap-2">
-        <h2
-          id="camera-manual-label"
-          className="text-xs font-bold leading-tight text-muted-foreground"
-        >
-          Manual input
-        </h2>
+        <div className="flex min-w-0 items-center gap-1">
+          <h2
+            id="camera-manual-label"
+            className="text-xs font-bold leading-tight text-muted-foreground"
+          >
+            Manual input
+          </h2>
+          <Tooltip delayDuration={650}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="Manual input rules"
+                className="inline-flex size-4 items-center justify-center rounded-md text-muted-foreground/75 outline-none transition-colors hover:text-foreground focus-visible:ring-[2px] focus-visible:ring-ring/30"
+              >
+                <Info aria-hidden="true" className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-56">
+              <div className="grid gap-1">
+                <span>
+                  Constraint: <strong>out</strong> · <strong>up</strong> = 0
+                </span>
+                <span>If not, primary direction is kept and the other is orthogonalized.</span>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </div>
         <div className="flex items-center justify-end gap-1">
           <Button
             variant="ghost"
