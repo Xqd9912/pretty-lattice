@@ -734,6 +734,12 @@ function TwoToneBondCylinder({
     [endColor, length, radialSegments, radius, startColor],
   );
 
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
+
   return (
     <mesh geometry={geometry} position={position} quaternion={quaternion}>
       <StructureMaterial

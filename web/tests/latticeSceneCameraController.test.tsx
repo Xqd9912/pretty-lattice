@@ -60,11 +60,13 @@ class MockTrackballControls extends MockControls {}
 let mockCamera = new OrthographicCamera();
 let latestFrameCallback: (() => void) | null = null;
 let latestControls: MockControls | null = null;
+let latticeSceneRenderCount = 0;
 
 function resetMockCamera() {
   mockCamera = new OrthographicCamera();
   latestFrameCallback = null;
   latestControls = null;
+  latticeSceneRenderCount = 0;
 }
 
 mock.module("@react-three/fiber", () => ({
@@ -113,6 +115,11 @@ const {
   createDefaultCrystalCameraState,
   stateWithDirectAxis,
 } = await import("../src/scene/crystalCamera");
+
+function CountedLatticeScene(props: Parameters<typeof LatticeScene>[0]) {
+  latticeSceneRenderCount += 1;
+  return <LatticeScene {...props} />;
+}
 
 afterEach(() => {
   resetMockCamera();
@@ -248,6 +255,31 @@ describe("LatticeScene camera commands", () => {
     expect(controls.updateCalls).toBe(0);
   });
 
+  test("applies external zoom without rerendering the preview tree", () => {
+    const scene = orthogonalScene();
+    const defaultCamera = createDefaultCrystalCameraState();
+    const cameraInteractionStore = createCameraInteractionStore();
+
+    render(
+      <CountedLatticeScene
+        cameraCommandVersion={0}
+        cameraInteractionStore={cameraInteractionStore}
+        cameraState={defaultCamera}
+        componentOpacity={createDefaultComponentOpacity()}
+        interactionLocked={false}
+        interactionMode="trackball"
+        resetCounter={0}
+        scene={scene}
+        style={createDefaultStyle()}
+      />,
+    );
+
+    const initialRenderCount = latticeSceneRenderCount;
+    act(() => cameraInteractionStore.requestViewScale(2));
+
+    expect(latticeSceneRenderCount).toBe(initialRenderCount);
+  });
+
   test("syncs control zoom to the interaction store without emitting commands", () => {
     const scene = orthogonalScene();
     const defaultCamera = createDefaultCrystalCameraState();
@@ -317,6 +349,33 @@ describe("LatticeScene camera commands", () => {
     expect(cameraInteractionStore.getViewScaleCommandSnapshot().version).toBe(
       initialCommandVersion,
     );
+  });
+
+  test("keeps missed control zoom snapshots out of preview tree renders", () => {
+    const scene = orthogonalScene();
+    const defaultCamera = createDefaultCrystalCameraState();
+    const cameraInteractionStore = createCameraInteractionStore();
+
+    render(
+      <CountedLatticeScene
+        cameraCommandVersion={0}
+        cameraInteractionStore={cameraInteractionStore}
+        cameraState={defaultCamera}
+        componentOpacity={createDefaultComponentOpacity()}
+        interactionLocked={false}
+        interactionMode="trackball"
+        resetCounter={0}
+        scene={scene}
+        style={createDefaultStyle()}
+      />,
+    );
+
+    const initialRenderCount = latticeSceneRenderCount;
+    const initialZoom = mockCamera.zoom;
+    mockCamera.zoom = initialZoom * 1.006;
+    act(() => latestFrameCallback?.());
+
+    expect(latticeSceneRenderCount).toBe(initialRenderCount);
   });
 
   test("applies camera state commands from the interaction store without rerendering", () => {

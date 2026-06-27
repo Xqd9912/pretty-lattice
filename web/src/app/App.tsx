@@ -117,6 +117,33 @@ type RedispatchedContextMenuEvent = MouseEvent & {
   [REDISPATCHED_CONTEXT_MENU_EVENT]?: boolean;
 };
 
+function isRedispatchedContextMenuEvent(event: MouseEvent): boolean {
+  return Boolean((event as RedispatchedContextMenuEvent)[REDISPATCHED_CONTEXT_MENU_EVENT]);
+}
+
+function isCanvasContextMenuTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest("canvas") !== null;
+}
+
+function redispatchContextMenuEvent(
+  event: ReactMouseEvent<HTMLElement>,
+  nativeEvent: MouseEvent,
+) {
+  const redispatchedEvent = new MouseEvent("contextmenu", {
+    bubbles: true,
+    button: nativeEvent.button,
+    buttons: nativeEvent.buttons,
+    cancelable: true,
+    clientX: nativeEvent.clientX,
+    clientY: nativeEvent.clientY,
+    ctrlKey: nativeEvent.ctrlKey,
+    metaKey: nativeEvent.metaKey,
+    shiftKey: nativeEvent.shiftKey,
+  }) as RedispatchedContextMenuEvent;
+  redispatchedEvent[REDISPATCHED_CONTEXT_MENU_EVENT] = true;
+  event.currentTarget.dispatchEvent(redispatchedEvent);
+}
+
 export function App() {
   const isStaticScenePreview = hasStaticScenePreview();
   const [scene, setScene] = useState<SceneSpec | null>(null);
@@ -843,32 +870,18 @@ export function App() {
   }, []);
 
   const handleSceneContextMenuCapture = useCallback((event: ReactMouseEvent<HTMLElement>) => {
-    const nativeEvent = event.nativeEvent as RedispatchedContextMenuEvent;
-    if (nativeEvent[REDISPATCHED_CONTEXT_MENU_EVENT]) {
+    const nativeEvent = event.nativeEvent;
+    if (isRedispatchedContextMenuEvent(nativeEvent)) {
       return;
     }
 
-    const target = event.target;
-    if (!(target instanceof Element) || !target.closest("canvas")) {
+    if (!isCanvasContextMenuTarget(event.target)) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-
-    const redispatchedEvent = new MouseEvent("contextmenu", {
-      bubbles: true,
-      button: nativeEvent.button,
-      buttons: nativeEvent.buttons,
-      cancelable: true,
-      clientX: nativeEvent.clientX,
-      clientY: nativeEvent.clientY,
-      ctrlKey: nativeEvent.ctrlKey,
-      metaKey: nativeEvent.metaKey,
-      shiftKey: nativeEvent.shiftKey,
-    }) as RedispatchedContextMenuEvent;
-    redispatchedEvent[REDISPATCHED_CONTEXT_MENU_EVENT] = true;
-    event.currentTarget.dispatchEvent(redispatchedEvent);
+    redispatchContextMenuEvent(event, nativeEvent);
   }, []);
 
   return (
