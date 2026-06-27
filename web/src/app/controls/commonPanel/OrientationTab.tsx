@@ -1,7 +1,14 @@
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Check, Info, RotateCcw } from "lucide-react";
-import { Quaternion, Vector3 } from "three";
 import {
+  Color,
+  type Mesh,
+  type MeshBasicMaterial,
+  Quaternion,
+  Vector3,
+} from "three";
+import {
+  type CSSProperties,
   type ChangeEvent,
   type FocusEvent,
   Fragment,
@@ -176,8 +183,9 @@ const SCREEN_AXIS_ARROW_RADIUS = 0.083;
 const SCREEN_AXIS_ARROW_SELECTED_RADIUS = 0.101;
 const SCREEN_AXIS_ORIGIN_RADIUS = 0.1;
 const SCREEN_AXIS_SELECTED_COLOR = "#505050";
-const SCREEN_AXIS_HOVER_COLOR = "#909090";
+const SCREEN_AXIS_HOVER_COLOR = "#a0a0a0";
 const SCREEN_AXIS_MUTED_COLOR = "#d6d6d6";
+const SCREEN_AXIS_TRANSITION_SECONDS = 0.09;
 const SCREEN_AXIS_OUTWARD_ARROW_LENGTH = 2.56;
 const SCREEN_AXIS_OUTWARD_CONE_RADIUS = 0.1;
 const SCREEN_AXIS_OUTWARD_SHAFT_TIP_RADIUS_SCALE = 0.6;
@@ -191,6 +199,58 @@ const SCREEN_AXIS_GIZMO_AXES: readonly {
   { direction: "upward", label: "y", vector: [0, 1, 0] },
   { direction: "outward", label: "z", vector: [0, 0, 1] },
 ];
+
+const SCREEN_AXIS_HITBOX_ORIGIN = [4.05, 3.8] as const;
+const SCREEN_AXIS_HITBOX_START_WIDTH_REM = 1.3;
+const SCREEN_AXIS_HITBOXES: Record<
+  CrystalCameraScreenDirection,
+  {
+    angleOffset: number;
+    endWidth: number;
+    target: readonly [number, number];
+  }
+> = {
+  outward: { angleOffset: -10, endWidth: 3, target: [0.3, 6.95] },
+  right: { angleOffset: 8, endWidth: 3.1, target: [9.65, 4.55] },
+  upward: { angleOffset: 0, endWidth: 2.7, target: [4.0, -0.25] },
+};
+
+function screenAxisTransitionAlpha(deltaSeconds: number) {
+  return 1 - Math.pow(0.001, deltaSeconds / SCREEN_AXIS_TRANSITION_SECONDS);
+}
+
+function screenAxisColorDistanceSquared(a: Color, b: Color) {
+  const red = a.r - b.r;
+  const green = a.g - b.g;
+  const blue = a.b - b.b;
+  return red * red + green * green + blue * blue;
+}
+
+function screenAxisLerpScale(current: number, target: number, alpha: number) {
+  const next = current + (target - current) * alpha;
+  return Math.abs(next - target) < 0.001 ? target : next;
+}
+
+function screenAxisHitboxStyle(direction: CrystalCameraScreenDirection): CSSProperties {
+  const hitbox = SCREEN_AXIS_HITBOXES[direction];
+  const [originX, originY] = SCREEN_AXIS_HITBOX_ORIGIN;
+  const [targetX, targetY] = hitbox.target;
+  const deltaX = targetX - originX;
+  const deltaY = targetY - originY;
+  const length = Math.hypot(deltaX, deltaY);
+  const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI) + hitbox.angleOffset;
+  const startInset = 50 - (SCREEN_AXIS_HITBOX_START_WIDTH_REM / hitbox.endWidth) * 50;
+
+  return {
+    clipPath: `polygon(0 ${startInset}%, 100% 0, 100% 100%, 0 ${100 - startInset}%)`,
+    height: `${hitbox.endWidth}rem`,
+    left: `${originX}rem`,
+    top: `${originY}rem`,
+    transform: `translateY(-50%) rotate(${angle}deg)`,
+    transformOrigin: "left center",
+    width: `${length}rem`,
+  };
+}
 
 function ScreenAxisChooser({
   ariaLabelledBy,
@@ -234,7 +294,7 @@ function ScreenAxisChooser({
         direction="upward"
         hoveredAxis={hoveredAxis}
         selectedAxis={value}
-        className="left-[4.325rem] top-[0.4rem]"
+        className="left-[4.325rem] top-[0.65rem]"
       >
         y
       </ScreenAxisOverlayLabel>
@@ -242,7 +302,7 @@ function ScreenAxisChooser({
         direction="right"
         hoveredAxis={hoveredAxis}
         selectedAxis={value}
-        className="left-[8.05rem] top-[5.15rem]"
+        className="left-[7.8rem] top-[5.15rem]"
       >
         x
       </ScreenAxisOverlayLabel>
@@ -250,7 +310,7 @@ function ScreenAxisChooser({
         direction="outward"
         hoveredAxis={hoveredAxis}
         selectedAxis={value}
-        className="left-[1.6rem] top-[6.5rem]"
+        className="left-[1.6rem] top-[6.375rem]"
       >
         z
       </ScreenAxisOverlayLabel>
@@ -258,25 +318,31 @@ function ScreenAxisChooser({
         type="button"
         aria-label="X Right"
         aria-pressed={value === "right"}
-        className="absolute left-[2.85rem] top-[3.55rem] z-10 h-[3.15rem] w-[7.35rem] cursor-pointer rounded-md outline-none focus-visible:ring-[2px] focus-visible:ring-ring/25"
+        className="absolute z-10 cursor-pointer outline-none focus-visible:ring-[2px] focus-visible:ring-ring/25"
+        style={screenAxisHitboxStyle("right")}
         onClick={() => onValueChange("right")}
         onMouseEnter={() => setHoveredAxis("right")}
+        onMouseLeave={() => setHoveredAxis(null)}
       />
       <button
         type="button"
         aria-label="Y Up"
         aria-pressed={value === "upward"}
-        className="absolute left-[2rem] top-0 z-10 h-[6.25rem] w-[4.1rem] cursor-pointer rounded-md outline-none focus-visible:ring-[2px] focus-visible:ring-ring/25"
+        className="absolute z-10 cursor-pointer outline-none focus-visible:ring-[2px] focus-visible:ring-ring/25"
+        style={screenAxisHitboxStyle("upward")}
         onClick={() => onValueChange("upward")}
         onMouseEnter={() => setHoveredAxis("upward")}
+        onMouseLeave={() => setHoveredAxis(null)}
       />
       <button
         type="button"
         aria-label="Z Out"
         aria-pressed={value === "outward"}
-        className="absolute left-0 top-[4.6rem] z-10 h-[3rem] w-[5.1rem] cursor-pointer rounded-md outline-none focus-visible:ring-[2px] focus-visible:ring-ring/25"
+        className="absolute z-10 cursor-pointer outline-none focus-visible:ring-[2px] focus-visible:ring-ring/25"
+        style={screenAxisHitboxStyle("outward")}
         onClick={() => onValueChange("outward")}
         onMouseEnter={() => setHoveredAxis("outward")}
+        onMouseLeave={() => setHoveredAxis(null)}
       />
     </div>
   );
@@ -375,6 +441,11 @@ function ScreenAxisArrow({
   hovered: boolean;
   selected: boolean;
 }) {
+  const shaftMaterialRef = useRef<MeshBasicMaterial | null>(null);
+  const coneMaterialRef = useRef<MeshBasicMaterial | null>(null);
+  const shaftMeshRef = useRef<Mesh | null>(null);
+  const coneMeshRef = useRef<Mesh | null>(null);
+  const invalidate = useThree((state) => state.invalidate);
   const axisDirection = useMemo(() => new Vector3(...axis.vector).normalize(), [axis.vector]);
   const axisRotation = useMemo(
     () => new Quaternion().setFromUnitVectors(SCREEN_AXIS_Y, axisDirection),
@@ -386,10 +457,16 @@ function ScreenAxisArrow({
     : hovered
       ? SCREEN_AXIS_HOVER_COLOR
       : SCREEN_AXIS_MUTED_COLOR;
-  const shaftRadius = isHighlighted ? SCREEN_AXIS_ARROW_SELECTED_RADIUS : SCREEN_AXIS_ARROW_RADIUS;
+  const targetColor = useMemo(() => new Color(axisColor), [axisColor]);
+  const initialAxisColorRef = useRef(axisColor);
   const shaftLength = axis.direction === "outward"
     ? SCREEN_AXIS_OUTWARD_ARROW_LENGTH
     : SCREEN_AXIS_ARROW_LENGTH;
+  const shaftRadius = SCREEN_AXIS_ARROW_SELECTED_RADIUS;
+  const targetShaftScale = isHighlighted
+    ? 1
+    : SCREEN_AXIS_ARROW_RADIUS / SCREEN_AXIS_ARROW_SELECTED_RADIUS;
+  const initialShaftScaleRef = useRef(targetShaftScale);
   const shaftTopRadius = axis.direction === "outward"
     ? shaftRadius * SCREEN_AXIS_OUTWARD_SHAFT_TIP_RADIUS_SCALE
     : shaftRadius;
@@ -398,27 +475,77 @@ function ScreenAxisArrow({
   const coneRadius = axis.direction === "outward"
     ? SCREEN_AXIS_OUTWARD_CONE_RADIUS
     : SCREEN_AXIS_ARROW_CONE_RADIUS;
+  const targetConeScale = isHighlighted ? 1 : 1 / 1.04;
+  const initialConeScaleRef = useRef(targetConeScale);
+
+  useEffect(() => {
+    invalidate();
+  }, [invalidate, targetColor, targetConeScale, targetShaftScale]);
+
+  useFrame((_, delta) => {
+    const alpha = screenAxisTransitionAlpha(delta);
+    let shouldContinue = false;
+
+    for (const material of [shaftMaterialRef.current, coneMaterialRef.current]) {
+      if (material === null) {
+        continue;
+      }
+
+      if (screenAxisColorDistanceSquared(material.color, targetColor) < 0.00002) {
+        material.color.copy(targetColor);
+        continue;
+      }
+
+      material.color.lerp(targetColor, alpha);
+      shouldContinue = true;
+    }
+
+    const shaftMesh = shaftMeshRef.current;
+    if (shaftMesh !== null) {
+      const nextScale = screenAxisLerpScale(shaftMesh.scale.x, targetShaftScale, alpha);
+      shaftMesh.scale.set(nextScale, 1, nextScale);
+      shouldContinue ||= nextScale !== targetShaftScale;
+    }
+
+    const coneMesh = coneMeshRef.current;
+    if (coneMesh !== null) {
+      const nextScale = screenAxisLerpScale(coneMesh.scale.x, targetConeScale, alpha);
+      coneMesh.scale.set(nextScale, 1, nextScale);
+      shouldContinue ||= nextScale !== targetConeScale;
+    }
+
+    if (shouldContinue) {
+      invalidate();
+    }
+  });
 
   return (
     <group quaternion={axisRotation}>
-      <mesh position={[0, shaftLength / 2, 0]} renderOrder={isHighlighted ? 8 : 2}>
+      <mesh
+        ref={shaftMeshRef}
+        position={[0, shaftLength / 2, 0]}
+        renderOrder={isHighlighted ? 8 : 2}
+        scale={[initialShaftScaleRef.current, 1, initialShaftScaleRef.current]}
+      >
         <cylinderGeometry
           args={[shaftTopRadius, shaftBottomRadius, shaftLength, 24]}
         />
-        <meshBasicMaterial color={axisColor} />
+        <meshBasicMaterial ref={shaftMaterialRef} color={initialAxisColorRef.current} />
       </mesh>
       <mesh
+        ref={coneMeshRef}
         position={[0, shaftLength + coneLength / 2, 0]}
         renderOrder={isHighlighted ? 9 : 3}
+        scale={[initialConeScaleRef.current, 1, initialConeScaleRef.current]}
       >
         <coneGeometry
           args={[
-            isHighlighted ? coneRadius * 1.04 : coneRadius,
+            coneRadius * 1.04,
             coneLength,
             32,
           ]}
         />
-        <meshBasicMaterial color={axisColor} />
+        <meshBasicMaterial ref={coneMaterialRef} color={initialAxisColorRef.current} />
       </mesh>
     </group>
   );
