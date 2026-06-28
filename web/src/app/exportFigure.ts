@@ -1,7 +1,13 @@
+import type { PDFDocument, PDFFont } from "pdf-lib";
+
 import type { SceneSpec } from "../api/scene";
 import { deriveElementLegendEntries, type ElementLegendEntry } from "./elementLegend";
 import { createCameraPoseSnapshot, type CameraPoseSnapshot } from "../scene/cameraPose";
-import type { RasterExportImage, RasterExportTextItem } from "../scene/exportRenderer";
+import type {
+  RasterExportBounds,
+  RasterExportImage,
+  RasterExportTextItem,
+} from "../scene/exportRenderer";
 import type {
   ComponentOpacityState,
   ComponentVisibilityState,
@@ -40,6 +46,8 @@ export interface FigureExportFile {
 }
 
 const LEGEND_FONT_FAMILY = "Geist, Helvetica Neue, Arial, sans-serif";
+const GEIST_PDF_REGULAR_FONT_URL = new URL("../assets/fonts/Geist-Regular.ttf", import.meta.url).href;
+const GEIST_PDF_ITALIC_FONT_URL = new URL("../assets/fonts/Geist-MediumItalic.ttf", import.meta.url).href;
 type RasterExportFileFormat = Exclude<ExportFormat, "pdf">;
 interface LegendExportStyle {
   fontSize: number;
@@ -52,7 +60,10 @@ interface LegendExportStyle {
 }
 
 const LEGEND_EXPORT_FONT_RATIO = 0.045;
-const LATTICE_VECTOR_EXPORT_SIZE_RATIO = 0.5;
+const LEGEND_SWATCH_STROKE_RATIO = 0.1;
+const LATTICE_VECTOR_EXPORT_SIZE_RATIO = 1;
+const EXPORT_ACCESSORY_PADDING_RATIO = 0.08;
+const EXPORT_ACCESSORY_LONG_SIDE_WEIGHT = 0.25;
 const JPG_EXPORT_QUALITY = 0.95;
 const EXPORT_BACKGROUND_COLORS: Record<Exclude<ExportBackground, "transparent">, string> = {
   black: "#111111",
@@ -63,6 +74,25 @@ const LIGHT_BACKGROUND_TEXT_COLOR = "#202020";
 const DARK_BACKGROUND_TEXT_HALO_COLOR = "#111111";
 const LIGHT_BACKGROUND_TEXT_HALO_COLOR = "#fafafa";
 const DARK_BACKGROUND_UNIT_CELL_LINE_COLOR = "#bbbbbb";
+
+interface CombinedExportRasterOptions {
+  atomRenderingMode: AtomRenderingMode;
+  bondRenderingMode: BondRenderingMode;
+  cameraPose: CameraPoseSnapshot;
+  componentOpacity: ComponentOpacityState;
+  componentVisibility: ComponentVisibilityState;
+  scene: SceneSpec;
+  settings: ExportSettingsState;
+  style: StyleState;
+  visibleScene: SceneSpec | null;
+}
+
+interface CombinedExportLayer {
+  image: RasterExportImage;
+  textItems: RasterExportTextItem[];
+  x: number;
+  y: number;
+}
 
 export async function createFigureExportFiles({
   cameraOrientationRef,
@@ -78,6 +108,22 @@ export async function createFigureExportFiles({
   const validation = validateExportSettings(settings);
   if (!validation.valid) {
     throw new Error(validation.message ?? "Export settings are invalid.");
+  }
+
+  if (settings.combineComponents) {
+    return [
+      await createCombinedExportFile({
+        cameraOrientationRef,
+        atomRenderingMode,
+        bondRenderingMode,
+        componentOpacity,
+        componentVisibility,
+        fileName,
+        scene,
+        settings,
+        style,
+      }),
+    ];
   }
 
   const files: FigureExportFile[] = [];
@@ -128,6 +174,49 @@ export async function createFigureExportFiles({
   }
 
   return files;
+}
+
+async function createCombinedExportFile({
+  cameraOrientationRef,
+  atomRenderingMode,
+  bondRenderingMode,
+  componentOpacity,
+  componentVisibility,
+  fileName,
+  scene,
+  settings,
+  style,
+}: CreateFigureExportOptions): Promise<FigureExportFile> {
+  const visibleScene = visibleSceneForComponents(scene, componentVisibility);
+  const cameraPose = createCameraPoseSnapshot(cameraOrientationRef.current);
+  const rasterImage = await renderCombinedExportRaster({
+    atomRenderingMode,
+    bondRenderingMode,
+    cameraPose,
+    componentOpacity,
+    componentVisibility,
+    scene,
+    settings,
+    style,
+    visibleScene,
+  });
+
+  if (settings.format === "pdf") {
+    return {
+      blob: await encodeRasterTextPdf(rasterImage, {
+        background: settings.background,
+        halo: false,
+      }),
+      fileName: `${exportFileStem(fileName)}.pdf`,
+      format: "pdf",
+    };
+  }
+
+  return {
+    blob: rasterImage.blob,
+    fileName: `${exportFileStem(fileName)}.${settings.format}`,
+    format: settings.format,
+  };
 }
 
 export async function createFigureExportFile({
@@ -294,6 +383,7 @@ function renderLegendCanvas({
   layout,
   style,
   supersampling,
+  textBackground = background,
 }: {
   background: ExportBackground;
   entries: ElementLegendEntry[];
@@ -301,14 +391,17 @@ function renderLegendCanvas({
   layout: "horizontal" | "vertical";
   style: LegendExportStyle;
   supersampling: number;
+  textBackground?: ExportBackground;
 }) {
   const metrics = measureLegend(entries, layout, style);
-  const canvasWidth = Math.max(1, metrics.width * supersampling);
-  const canvasHeight = Math.max(1, metrics.height * supersampling);
-  assertExportCanvasSize(canvasWidth, canvasHeight, "legend");
+  const outputWidth = Math.max(1, metrics.width);
+  const outputHeight = Math.max(1, metrics.height);
+  const renderWidth = outputWidth * supersampling;
+  const renderHeight = outputHeight * supersampling;
+  assertExportCanvasSize(renderWidth, renderHeight, "legend");
   const canvas = document.createElement("canvas");
-  canvas.width = canvasWidth;
-  canvas.height = canvasHeight;
+  canvas.width = renderWidth;
+  canvas.height = renderHeight;
   const context = canvas.getContext("2d");
   if (!context) {
     throw new Error("Could not prepare the legend export canvas.");
@@ -318,7 +411,7 @@ function renderLegendCanvas({
   fillCanvasBackground(context, metrics.width, metrics.height, background);
   context.font = legendFont(style);
   context.textBaseline = "middle";
-  context.fillStyle = exportTextColor(background);
+  context.fillStyle = exportTextColor(textBackground);
 
   const textItems: RasterExportTextItem[] = [];
   for (const item of metrics.items) {
@@ -329,19 +422,19 @@ function renderLegendCanvas({
       fontStyle: "normal",
       fontWeight: 400,
       label: item.entry.element,
-      size: style.fontSize * supersampling,
-      x: textX * supersampling,
-      y: textY * supersampling,
+      size: style.fontSize,
+      x: textX,
+      y: textY,
     });
 
     if (includeText) {
-      context.fillStyle = exportTextColor(background);
+      context.fillStyle = exportTextColor(textBackground);
       context.fillText(item.entry.element, textX, textY);
     }
   }
 
   return {
-    canvas,
+    canvas: supersampling === 1 ? canvas : downsampleCanvas(canvas, outputWidth, outputHeight),
     textItems,
   };
 }
@@ -404,8 +497,11 @@ function legendFont(style: LegendExportStyle) {
   return `400 ${style.fontSize}px ${LEGEND_FONT_FAMILY}`;
 }
 
-function legendExportStyle(settings: ExportSettingsState): LegendExportStyle {
-  const reference = Math.min(settings.width, settings.height);
+function legendExportStyle(
+  settings: ExportSettingsState,
+  referenceSize = exportAccessoryReferenceSize(settings),
+): LegendExportStyle {
+  const reference = referenceSize;
   const fontSize = Math.round(reference * LEGEND_EXPORT_FONT_RATIO);
 
   return {
@@ -419,8 +515,24 @@ function legendExportStyle(settings: ExportSettingsState): LegendExportStyle {
   };
 }
 
-function latticeVectorExportSize(settings: ExportSettingsState): number {
-  return Math.round(Math.min(settings.width, settings.height) * LATTICE_VECTOR_EXPORT_SIZE_RATIO);
+function latticeVectorExportSize(
+  settings: ExportSettingsState,
+  referenceSize = exportAccessoryReferenceSize(settings),
+): number {
+  return Math.round(referenceSize * LATTICE_VECTOR_EXPORT_SIZE_RATIO);
+}
+
+function exportAccessoryReferenceSize(settings: ExportSettingsState): number {
+  const shortSide = Math.min(settings.width, settings.height);
+  const longSide = Math.max(settings.width, settings.height);
+  return (
+    shortSide ** (1 - EXPORT_ACCESSORY_LONG_SIDE_WEIGHT) *
+    longSide ** EXPORT_ACCESSORY_LONG_SIDE_WEIGHT
+  );
+}
+
+function exportAccessoryReferenceSizeFromBounds(bounds: RasterExportBounds): number {
+  return Math.sqrt(bounds.width * bounds.height);
 }
 
 function assertExportCanvasSize(width: number, height: number, label: string) {
@@ -441,30 +553,30 @@ function drawLegendSwatch(
   x: number,
   y: number,
   size: number,
-  background: ExportBackground,
+  _background: ExportBackground,
 ) {
   const radius = size / 2;
   const centerX = x + radius;
   const centerY = y + radius;
-  const gradient = context.createRadialGradient(
-    centerX - radius * 0.32,
-    centerY - radius * 0.36,
-    radius * 0.1,
-    centerX,
-    centerY,
-    radius,
+  const highlight = context.createLinearGradient(
+    x + size,
+    y,
+    x,
+    y + size,
   );
-  gradient.addColorStop(0, "#ffffff");
-  gradient.addColorStop(0.34, color);
-  gradient.addColorStop(1, shadeHexColor(color, 0.78));
+  highlight.addColorStop(0, "rgba(255, 255, 255, 0.38)");
+  highlight.addColorStop(0.14, "rgba(255, 255, 255, 0.38)");
+  highlight.addColorStop(0.42, "rgba(255, 255, 255, 0)");
 
   context.save();
   context.beginPath();
   context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-  context.fillStyle = gradient;
+  context.fillStyle = color;
   context.fill();
-  context.strokeStyle = background === "black" ? "rgba(255, 255, 255, 0.28)" : "rgba(0, 0, 0, 0.12)";
-  context.lineWidth = 1;
+  context.fillStyle = highlight;
+  context.fill();
+  context.strokeStyle = "rgba(0, 0, 0, 0.1)";
+  context.lineWidth = size * LEGEND_SWATCH_STROKE_RATIO;
   context.stroke();
   context.restore();
 }
@@ -492,6 +604,8 @@ async function createLatticeVectorsExportFile({
     cameraPose,
     cellVectors: scene.cell.vectors,
     imageFormat: rasterFormatForExportFormat(format),
+    labelColor: exportTextColor(background),
+    showLabelHalo: false,
     showLabels: format !== "pdf",
     size,
     supersampling,
@@ -499,7 +613,7 @@ async function createLatticeVectorsExportFile({
 
   if (format === "pdf") {
     return {
-      blob: await encodeRasterTextPdf(rasterImage, { background, halo: true }),
+      blob: await encodeRasterTextPdf(rasterImage, { background, halo: false }),
       fileName,
       format,
     };
@@ -521,8 +635,7 @@ async function encodeRasterTextPdf(
   const page = pdf.addPage([rasterImage.width, rasterImage.height]);
   const imageBytes = new Uint8Array(await rasterImage.blob.arrayBuffer());
   const image = await pdf.embedPng(imageBytes);
-  const regularFont = await pdf.embedFont(StandardFonts.Helvetica);
-  const italicFont = await pdf.embedFont(StandardFonts.HelveticaOblique);
+  const { regularFont, italicFont } = await embedPdfTextFonts(pdf, StandardFonts);
   const textColor = rgb(...hexColorToRgbComponents(exportTextColor(options.background)));
   const textHaloColor = rgb(...hexColorToRgbComponents(exportTextHaloColor(options.background)));
 
@@ -572,11 +685,66 @@ async function encodeRasterTextPdf(
   return new Blob([pdfBuffer], { type: "application/pdf" });
 }
 
+async function embedPdfTextFonts(
+  pdf: PDFDocument,
+  standardFonts: typeof import("pdf-lib").StandardFonts,
+): Promise<{ regularFont: PDFFont; italicFont: PDFFont }> {
+  type PdfFontkit = Parameters<PDFDocument["registerFontkit"]>[0];
+  type PdfFontkitModule = typeof import("@pdf-lib/fontkit") & { default?: PdfFontkit };
+  const fallbackFonts = async () => ({
+    italicFont: await pdf.embedFont(standardFonts.HelveticaOblique),
+    regularFont: await pdf.embedFont(standardFonts.Helvetica),
+  });
+
+  try {
+    const fontkitModule = (await import("@pdf-lib/fontkit")) as PdfFontkitModule;
+    const fontkit = fontkitModule.default ?? fontkitModule;
+    pdf.registerFontkit(fontkit);
+    const [regularFontBytes, italicFontBytes] = await Promise.all([
+      fetchFontBytes(GEIST_PDF_REGULAR_FONT_URL),
+      fetchFontBytes(GEIST_PDF_ITALIC_FONT_URL),
+    ]);
+
+    return {
+      italicFont: await pdf.embedFont(italicFontBytes),
+      regularFont: await pdf.embedFont(regularFontBytes),
+    };
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn("Falling back to PDF standard fonts because Geist embedding failed.", error);
+    }
+    return fallbackFonts();
+  }
+}
+
+async function fetchFontBytes(url: string): Promise<Uint8Array> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to load PDF font asset: ${url}`);
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}
+
 function canvasToRasterBlob(
   canvas: HTMLCanvasElement,
   format: RasterExportFileFormat,
 ): Promise<Blob> {
   return format === "jpg" ? canvasToJpgBlob(canvas) : canvasToPngBlob(canvas);
+}
+
+function downsampleCanvas(sourceCanvas: HTMLCanvasElement, width: number, height: number) {
+  const outputCanvas = document.createElement("canvas");
+  outputCanvas.width = width;
+  outputCanvas.height = height;
+  const context = outputCanvas.getContext("2d");
+  if (!context) {
+    throw new Error("Could not prepare the legend export downsampling canvas.");
+  }
+
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(sourceCanvas, 0, 0, width, height);
+  return outputCanvas;
 }
 
 function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
@@ -619,24 +787,6 @@ function canvasToJpgBlob(canvas: HTMLCanvasElement): Promise<Blob> {
       JPG_EXPORT_QUALITY,
     );
   });
-}
-
-function shadeHexColor(color: string, factor: number): string {
-  const normalized = color.trim();
-  const match = /^#?([0-9a-f]{6})$/i.exec(normalized);
-  if (!match) {
-    return color;
-  }
-
-  const value = match[1] ?? "";
-  const red = Math.round(Number.parseInt(value.slice(0, 2), 16) * factor);
-  const green = Math.round(Number.parseInt(value.slice(2, 4), 16) * factor);
-  const blue = Math.round(Number.parseInt(value.slice(4, 6), 16) * factor);
-  return `#${hexByte(red)}${hexByte(green)}${hexByte(blue)}`;
-}
-
-function hexByte(value: number): string {
-  return Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0");
 }
 
 interface ZipEntryData {
@@ -821,6 +971,239 @@ async function renderExportRaster({
       settings.background === "black" ? DARK_BACKGROUND_UNIT_CELL_LINE_COLOR : undefined,
     width: settings.width,
   });
+}
+
+async function renderCombinedExportRaster({
+  atomRenderingMode,
+  bondRenderingMode,
+  cameraPose,
+  componentOpacity,
+  componentVisibility,
+  scene,
+  settings,
+  style,
+  visibleScene,
+}: CombinedExportRasterOptions): Promise<RasterExportImage> {
+  const layers: CombinedExportLayer[] = [];
+  let structureBounds: RasterExportBounds = fullLayerBounds(settings.width, settings.height);
+
+  if (settings.components.structure) {
+    if (!visibleScene) {
+      throw new Error("No structure is available to export.");
+    }
+
+    const structureImage = await renderExportRaster({
+      atomRenderingMode,
+      bondRenderingMode,
+      cameraPose,
+      componentOpacity,
+      componentVisibility,
+      settings,
+      style,
+      visibleScene,
+    });
+    structureBounds = structureImage.contentBounds ?? structureBounds;
+    layers.push({
+      image: structureImage,
+      textItems: [],
+      x: 0,
+      y: 0,
+    });
+  }
+
+  const accessoryReferenceSize = exportAccessoryReferenceSizeFromBounds(structureBounds);
+  const accessoryPadding = Math.round(accessoryReferenceSize * EXPORT_ACCESSORY_PADDING_RATIO);
+
+  if (settings.components.legend) {
+    const renderedLegend = renderLegendCanvas({
+      background: "transparent",
+      entries: deriveElementLegendEntries(scene, style.colorScheme),
+      includeText: settings.format !== "pdf",
+      layout: settings.legendLayout,
+      style: legendExportStyle(settings, accessoryReferenceSize),
+      supersampling: settings.supersampling,
+      textBackground: settings.background,
+    });
+    const position = combinedLegendPosition(
+      settings.legendLayout,
+      structureBounds,
+      renderedLegend.canvas.width,
+      renderedLegend.canvas.height,
+      accessoryPadding,
+    );
+    layers.push({
+      image: {
+        blob: await canvasToPngBlob(renderedLegend.canvas),
+        height: renderedLegend.canvas.height,
+        width: renderedLegend.canvas.width,
+      },
+      textItems: settings.format === "pdf" ? renderedLegend.textItems : [],
+      x: position.x,
+      y: position.y,
+    });
+  }
+
+  if (settings.components.latticeVectors) {
+    const { renderLatticeVectorsRasterImage } = await import("../scene/exportRenderer");
+    const latticeVectorsImage = await renderLatticeVectorsRasterImage({
+      backgroundColor: null,
+      cameraPose,
+      cellVectors: scene.cell.vectors,
+      imageFormat: "png",
+      labelColor: exportTextColor(settings.background),
+      showLabelHalo: false,
+      showLabels: settings.format !== "pdf",
+      size: latticeVectorExportSize(settings, accessoryReferenceSize),
+      supersampling: settings.supersampling,
+    });
+    const position = combinedLatticeVectorsPosition(
+      structureBounds,
+      latticeVectorsImage.width,
+      latticeVectorsImage.height,
+      accessoryPadding,
+    );
+    layers.push({
+      image: latticeVectorsImage,
+      textItems: settings.format === "pdf" ? latticeVectorsImage.textItems ?? [] : [],
+      x: position.x,
+      y: position.y,
+    });
+  }
+
+  const outputBounds = combinedLayerBounds(layers, settings.width, settings.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = outputBounds.width;
+  canvas.height = outputBounds.height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Could not prepare the combined export canvas.");
+  }
+
+  fillCanvasBackground(context, outputBounds.width, outputBounds.height, settings.background);
+  const textItems: RasterExportTextItem[] = [];
+  const shiftX = -outputBounds.minX;
+  const shiftY = -outputBounds.minY;
+  for (const layer of layers) {
+    const x = layer.x + shiftX;
+    const y = layer.y + shiftY;
+    await drawRasterExportImage(context, layer.image, x, y);
+    textItems.push(...offsetTextItems(layer.textItems, x, y));
+  }
+
+  const blob =
+    settings.format === "pdf"
+      ? await canvasToPngBlob(canvas)
+      : await canvasToRasterBlob(canvas, rasterFormatForExportFormat(settings.format));
+  return {
+    blob,
+    height: outputBounds.height,
+    textItems,
+    width: outputBounds.width,
+  };
+}
+
+function combinedLegendPosition(
+  legendLayout: "horizontal" | "vertical",
+  structureBounds: RasterExportBounds,
+  layerWidth: number,
+  layerHeight: number,
+  padding: number,
+) {
+  const centerY = (structureBounds.minY + structureBounds.maxY) / 2;
+  if (legendLayout === "vertical") {
+    return {
+      x: structureBounds.maxX + padding,
+      y: Math.round(centerY - layerHeight / 2),
+    };
+  }
+
+  const centerX = (structureBounds.minX + structureBounds.maxX) / 2;
+  return {
+    x: Math.round(centerX - layerWidth / 2),
+    y: structureBounds.maxY + padding,
+  };
+}
+
+function combinedLatticeVectorsPosition(
+  structureBounds: RasterExportBounds,
+  layerWidth: number,
+  layerHeight: number,
+  padding: number,
+) {
+  return {
+    x: structureBounds.minX - layerWidth - padding,
+    y: structureBounds.maxY - layerHeight,
+  };
+}
+
+function fullLayerBounds(width: number, height: number): RasterExportBounds {
+  return {
+    height,
+    maxX: width,
+    maxY: height,
+    minX: 0,
+    minY: 0,
+    width,
+  };
+}
+
+function combinedLayerBounds(
+  layers: CombinedExportLayer[],
+  baseWidth: number,
+  baseHeight: number,
+) {
+  const bounds = layers.reduce(
+    (current, layer) => ({
+      maxX: Math.max(current.maxX, layer.x + layer.image.width),
+      maxY: Math.max(current.maxY, layer.y + layer.image.height),
+      minX: Math.min(current.minX, layer.x),
+      minY: Math.min(current.minY, layer.y),
+    }),
+    {
+      maxX: baseWidth,
+      maxY: baseHeight,
+      minX: 0,
+      minY: 0,
+    },
+  );
+  const minX = Math.floor(bounds.minX);
+  const minY = Math.floor(bounds.minY);
+  const maxX = Math.ceil(bounds.maxX);
+  const maxY = Math.ceil(bounds.maxY);
+  return {
+    height: Math.max(1, maxY - minY),
+    maxX,
+    maxY,
+    minX,
+    minY,
+    width: Math.max(1, maxX - minX),
+  };
+}
+
+function offsetTextItems(
+  textItems: RasterExportTextItem[],
+  offsetX: number,
+  offsetY: number,
+): RasterExportTextItem[] {
+  return textItems.map((item) => ({
+    ...item,
+    x: item.x + offsetX,
+    y: item.y + offsetY,
+  }));
+}
+
+async function drawRasterExportImage(
+  context: CanvasRenderingContext2D,
+  image: RasterExportImage,
+  x: number,
+  y: number,
+) {
+  const bitmap = await createImageBitmap(image.blob);
+  try {
+    context.drawImage(bitmap, x, y, image.width, image.height);
+  } finally {
+    bitmap.close();
+  }
 }
 
 async function encodeRasterPdf(rasterImage: RasterExportImage): Promise<Blob> {

@@ -18,7 +18,7 @@ import {
 import { ExportSceneContent } from "./ExportSceneContent";
 import { CameraHeadlight } from "./CameraHeadlight";
 import { computeSceneLayout } from "./sceneLayout";
-import { computeStructureExportFramePlan } from "./exportFrame";
+import { computeStructureExportFramePlan, type StructureExportFramePlan } from "./exportFrame";
 import { resolveStructureMaterialFamilyForStyle } from "./materialPresetResolver";
 import { DEFAULT_RENDERER_PARAMETERS } from "./rendererParameters";
 import {
@@ -35,12 +35,22 @@ import {
 
 export interface RasterExportImage {
   blob: Blob;
+  contentBounds?: RasterExportBounds;
   height: number;
   textItems?: RasterExportTextItem[];
   width: number;
 }
 
 export type RasterExportImageFormat = "jpg" | "png";
+
+export interface RasterExportBounds {
+  height: number;
+  maxX: number;
+  maxY: number;
+  minX: number;
+  minY: number;
+  width: number;
+}
 
 export interface RasterExportTextItem {
   fontStyle?: "italic" | "normal";
@@ -75,6 +85,8 @@ export interface RenderLatticeVectorsRasterOptions {
   cellVectors: SceneSpec["cell"]["vectors"];
   cropPaddingRatio?: number;
   imageFormat: RasterExportImageFormat;
+  labelColor?: string;
+  showLabelHalo?: boolean;
   showLabels?: boolean;
   size: number;
   supersampling: ExportSupersampling;
@@ -196,11 +208,46 @@ export async function renderStructureRasterImage({
     const outputCanvas =
       supersampling === 1 ? canvas : downsampleCanvas(canvas, width, height);
     const blob = await canvasToRasterBlob(outputCanvas, imageFormat, backgroundColor);
-    return { blob, height, width };
+    return {
+      blob,
+      contentBounds: structureFrameContentBounds(exportFramePlan, supersampling),
+      height,
+      width,
+    };
   } finally {
     root.unmount();
     canvas.remove();
   }
+}
+
+function structureFrameContentBounds(
+  framePlan: StructureExportFramePlan,
+  supersampling: number,
+): RasterExportBounds | undefined {
+  const bounds = framePlan.bounds;
+  if (!bounds) {
+    return undefined;
+  }
+
+  const minX =
+    ((bounds.minX - framePlan.centerX) * framePlan.zoom + framePlan.width / 2) / supersampling;
+  const maxX =
+    ((bounds.maxX - framePlan.centerX) * framePlan.zoom + framePlan.width / 2) / supersampling;
+  const minY =
+    (framePlan.height / 2 - (bounds.maxY - framePlan.centerY) * framePlan.zoom) /
+    supersampling;
+  const maxY =
+    (framePlan.height / 2 - (bounds.minY - framePlan.centerY) * framePlan.zoom) /
+    supersampling;
+
+  return {
+    height: Math.max(0, maxY - minY),
+    maxX,
+    maxY,
+    minX,
+    minY,
+    width: Math.max(0, maxX - minX),
+  };
 }
 
 export async function renderLatticeVectorsRasterImage({
@@ -209,6 +256,8 @@ export async function renderLatticeVectorsRasterImage({
   cellVectors,
   cropPaddingRatio = 0.04,
   imageFormat,
+  labelColor,
+  showLabelHalo = true,
   showLabels = true,
   size,
   supersampling,
@@ -269,6 +318,8 @@ export async function renderLatticeVectorsRasterImage({
         <StaticOrientationGizmoScene
           axes={axes}
           cameraPose={cameraPose}
+          labelColor={labelColor}
+          showLabelHalo={showLabelHalo}
           showLabels={showLabels}
         />
         <RenderReady onReady={() => resolveMounted?.()} />
@@ -291,7 +342,7 @@ export async function renderLatticeVectorsRasterImage({
       rootState: state,
       supersampling,
     });
-    const output = cropTransparentCanvas(
+    const cropped = cropTransparentCanvas(
       canvas,
       cropPaddingRatio,
       showLabels ? [] : textBounds(projectedTextItems),
@@ -300,11 +351,20 @@ export async function renderLatticeVectorsRasterImage({
       ? undefined
       : projectedTextItems.map((item) => ({
           ...item,
-          x: item.x - output.crop.sourceX,
-          y: item.y - output.crop.sourceY,
+          size: item.size / supersampling,
+          x: (item.x - cropped.crop.sourceX) / supersampling,
+          y: (item.y - cropped.crop.sourceY) / supersampling,
         }));
-    const blob = await canvasToRasterBlob(output.canvas, imageFormat, backgroundColor);
-    return { blob, height: output.canvas.height, textItems, width: output.canvas.width };
+    const outputCanvas =
+      supersampling === 1
+        ? cropped.canvas
+        : downsampleCanvas(
+            cropped.canvas,
+            Math.max(1, Math.round(cropped.canvas.width / supersampling)),
+            Math.max(1, Math.round(cropped.canvas.height / supersampling)),
+          );
+    const blob = await canvasToRasterBlob(outputCanvas, imageFormat, backgroundColor);
+    return { blob, height: outputCanvas.height, textItems, width: outputCanvas.width };
   } finally {
     root.unmount();
     canvas.remove();

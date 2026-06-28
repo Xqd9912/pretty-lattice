@@ -131,6 +131,18 @@ async function createFigureExportFilesMock(
     throw exportFailure;
   }
 
+  if (options.settings.combineComponents) {
+    return [
+      {
+        blob: new Blob(["combined"], {
+          type: exportMimeType(options.settings.format),
+        }),
+        fileName: `NaCl.${options.settings.format}`,
+        format: options.settings.format,
+      },
+    ];
+  }
+
   const files: FigureExportFile[] = [];
   if (options.settings.components.structure) {
     files.push({
@@ -1073,6 +1085,9 @@ describe("App", () => {
     const legendCheckbox = within(commonControls).getByRole("checkbox", {
       name: "Export Legend",
     });
+    const combineSwitch = within(commonControls).getByRole("switch", {
+      name: "Combine selected components",
+    });
     const horizontalLegendLayout = within(commonControls).getByRole("tab", {
       name: "Horizontal legend layout",
     });
@@ -1085,12 +1100,16 @@ describe("App", () => {
     expect(structureCheckbox.getAttribute("aria-checked")).toBe("true");
     expect(latticeVectorsCheckbox.getAttribute("aria-checked")).toBe("false");
     expect(legendCheckbox.getAttribute("aria-checked")).toBe("false");
+    expect(combineSwitch.getAttribute("aria-checked")).toBe("true");
     expect(horizontalLegendLayout.getAttribute("aria-selected")).toBe("true");
     expect(verticalLegendLayout.getAttribute("disabled")).not.toBeNull();
     expect(twoXSupersampling.getAttribute("aria-selected")).toBe("true");
     expect(highMeshQuality.getAttribute("aria-selected")).toBe("true");
     expect(formatSelect.textContent).toContain("PNG");
     expect(exportPngButton.isConnected).toBe(true);
+
+    await user.click(combineSwitch);
+    expect(combineSwitch.getAttribute("aria-checked")).toBe("false");
 
     await user.click(latticeVectorsCheckbox);
     await user.click(legendCheckbox);
@@ -1214,6 +1233,14 @@ describe("App", () => {
       "NaCl-latt-vec.jpg",
       "NaCl-legend.jpg",
     ]);
+
+    await user.click(combineSwitch);
+    await user.click(exportJpgButton);
+    await waitFor(() => expect(exportRequests).toHaveLength(4));
+
+    expect(exportRequests[3]?.settings.combineComponents).toBe(true);
+    expect(exportDirectDownloads[0]?.sourceFileName).toBe("NaCl.cif");
+    expect(exportDirectDownloads[0]?.file.fileName).toBe("NaCl.jpg");
   });
 
   test("shows recoverable export errors without losing the loaded scene", async () => {

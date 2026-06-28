@@ -20,6 +20,7 @@ export interface ExportProjectedSize {
 export interface ExportSettingsState {
   aspectRatioLocked: boolean;
   background: ExportBackground;
+  combineComponents: boolean;
   components: ExportComponentSelection;
   format: ExportFormat;
   height: number;
@@ -69,6 +70,7 @@ export const MESH_QUALITY_LABELS: Record<MeshQuality, string> = {
 export const DEFAULT_EXPORT_SETTINGS: ExportSettingsState = {
   aspectRatioLocked: false,
   background: "transparent",
+  combineComponents: true,
   components: {
     legend: false,
     latticeVectors: false,
@@ -210,6 +212,16 @@ export function isExportBackgroundAllowed(
   background: ExportBackground,
 ): boolean {
   return format !== "jpg" || background !== "transparent";
+}
+
+export function setExportCombineComponents(
+  settings: ExportSettingsState,
+  combineComponents: boolean,
+): ExportSettingsState {
+  return {
+    ...settings,
+    combineComponents,
+  };
 }
 
 export function setExportComponentSelected(

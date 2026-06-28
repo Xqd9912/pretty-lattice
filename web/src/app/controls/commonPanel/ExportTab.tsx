@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ import {
   parseExportDimensionInput,
   setExportAspectRatioLocked,
   setExportBackground,
+  setExportCombineComponents,
   setExportComponentSelected,
   setExportDimension,
   setExportFormat,
@@ -136,12 +138,20 @@ export function ExportTabContent({
   return (
     <div className="flex flex-col gap-2.5">
       <section aria-labelledby="export-components-label">
-        <h2
-          id="export-components-label"
-          className={cn("px-1.5 leading-tight text-muted-foreground", COMMON_PANEL_SECTION_TITLE_TEXT_CLASS)}
-        >
-          Components
-        </h2>
+        <div className="flex items-center justify-between gap-3 px-1.5">
+          <h2
+            id="export-components-label"
+            className={cn("leading-tight text-muted-foreground", COMMON_PANEL_SECTION_TITLE_TEXT_CLASS)}
+          >
+            Components
+          </h2>
+          <ExportCombineSwitch
+            checked={settings.combineComponents}
+            onSettingsChange={(checked) =>
+              onSettingsChange(setExportCombineComponents(settings, checked))
+            }
+          />
+        </div>
         <div className="mt-2 grid gap-1 px-1.5">
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
             <ExportComponentCheckbox
@@ -170,7 +180,7 @@ export function ExportTabContent({
                 onSettingsChange(setExportComponentSelected(settings, component, checked))
               }
             />
-            <div className="w-[8.4rem]">
+            <div className="ml-auto w-[8.4rem]">
               <ExportLegendLayoutControl
                 disabled={!settings.components.legend}
                 value={settings.legendLayout}
@@ -482,6 +492,32 @@ function ExportComponentCheckbox({
         onCheckedChange={(nextChecked) => onSettingsChange(component, nextChecked === true)}
       />
       <span className="min-w-0 truncate leading-tight">{label}</span>
+    </label>
+  );
+}
+
+function ExportCombineSwitch({
+  checked,
+  onSettingsChange,
+}: {
+  checked: boolean;
+  onSettingsChange: (checked: boolean) => void;
+}) {
+  return (
+    <label
+      className={cn(
+        "inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md",
+        "text-[12px] font-medium leading-none text-foreground",
+      )}
+    >
+      <span>Combined</span>
+      <Switch
+        aria-label="Combine selected components"
+        checked={checked}
+        className="h-4 w-7 p-0.5"
+        thumbClassName="size-3 data-[state=checked]:translate-x-3"
+        onCheckedChange={onSettingsChange}
+      />
     </label>
   );
 }

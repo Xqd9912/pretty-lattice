@@ -81,6 +81,7 @@ describe("settings", () => {
     expect(createDefaultExportSettings()).toEqual({
       aspectRatioLocked: false,
       background: "transparent",
+      combineComponents: true,
       components: {
         legend: false,
         latticeVectors: false,

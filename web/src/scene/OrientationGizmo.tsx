@@ -310,10 +310,14 @@ function OrientationGizmoScene({
 export function StaticOrientationGizmoScene({
   axes,
   cameraPose,
+  labelColor = LABEL_FILL_COLOR,
+  showLabelHalo = true,
   showLabels = true,
 }: {
   axes: OrientationGizmoAxisSpec[];
   cameraPose: CameraPoseSnapshot;
+  labelColor?: string;
+  showLabelHalo?: boolean;
   showLabels?: boolean;
 }) {
   const rotation = useMemo(
@@ -323,7 +327,13 @@ export function StaticOrientationGizmoScene({
 
   return (
     <group quaternion={rotation}>
-      <OrientationGizmoAxes axes={axes} hoveredAxis={null} showLabels={showLabels} />
+      <OrientationGizmoAxes
+        axes={axes}
+        hoveredAxis={null}
+        labelColor={labelColor}
+        showLabelHalo={showLabelHalo}
+        showLabels={showLabels}
+      />
     </group>
   );
 }
@@ -331,10 +341,14 @@ export function StaticOrientationGizmoScene({
 function OrientationGizmoAxes({
   axes,
   hoveredAxis,
+  labelColor = LABEL_FILL_COLOR,
+  showLabelHalo = true,
   showLabels = true,
 }: {
   axes: OrientationGizmoAxisSpec[];
   hoveredAxis: OrientationGizmoAxisLabel | null;
+  labelColor?: string;
+  showLabelHalo?: boolean;
   showLabels?: boolean;
 }) {
   return (
@@ -344,6 +358,8 @@ function OrientationGizmoAxes({
           axis={axis}
           hovered={axis.label === hoveredAxis}
           key={axis.label}
+          labelColor={labelColor}
+          showLabelHalo={showLabelHalo}
           showLabel={showLabels}
         />
       ))}
@@ -358,10 +374,14 @@ function OrientationGizmoAxes({
 function AxisArrow({
   axis,
   hovered,
+  labelColor,
+  showLabelHalo,
   showLabel,
 }: {
   axis: OrientationGizmoAxisSpec;
   hovered: boolean;
+  labelColor: string;
+  showLabelHalo: boolean;
   showLabel: boolean;
 }) {
   const axisRotation = useMemo(
@@ -393,6 +413,8 @@ function AxisArrow({
         <AxisLabel
           hovered={hovered}
           label={axis.label}
+          labelColor={labelColor}
+          showHalo={showLabelHalo}
           position={[0, ORIENTATION_GIZMO_LABEL_DISTANCE, 0]}
         />
       ) : null}
@@ -403,13 +425,20 @@ function AxisArrow({
 function AxisLabel({
   hovered,
   label,
+  labelColor,
   position,
+  showHalo,
 }: {
   hovered: boolean;
   label: string;
+  labelColor: string;
   position: VectorTuple;
+  showHalo: boolean;
 }) {
-  const texture = useMemo(() => createLabelTexture(label, hovered), [hovered, label]);
+  const texture = useMemo(
+    () => createLabelTexture(label, hovered, labelColor, showHalo),
+    [hovered, label, labelColor, showHalo],
+  );
 
   useEffect(() => () => texture.dispose(), [texture]);
 
@@ -429,7 +458,12 @@ function AxisLabel({
   );
 }
 
-function createLabelTexture(label: string, hovered: boolean) {
+function createLabelTexture(
+  label: string,
+  hovered: boolean,
+  labelColor: string,
+  showHalo: boolean,
+) {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
 
@@ -443,10 +477,12 @@ function createLabelTexture(label: string, hovered: boolean) {
     context.textBaseline = "middle";
     context.lineJoin = "round";
     context.miterLimit = 2;
-    context.strokeStyle = LABEL_HALO_COLOR;
-    context.lineWidth = 40;
-    context.strokeText(label, canvas.width / 2, canvas.height / 2 + 2);
-    context.fillStyle = hovered ? "#111111" : LABEL_FILL_COLOR;
+    if (showHalo) {
+      context.strokeStyle = LABEL_HALO_COLOR;
+      context.lineWidth = 40;
+      context.strokeText(label, canvas.width / 2, canvas.height / 2 + 2);
+    }
+    context.fillStyle = hovered ? "#111111" : labelColor;
     context.fillText(label, canvas.width / 2, canvas.height / 2 + 2);
   }
 
