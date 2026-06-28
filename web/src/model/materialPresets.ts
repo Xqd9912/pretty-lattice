@@ -1,6 +1,7 @@
 import materialPresetCatalogData from "../data/material-presets/catalog.json";
+import twoDPresetData from "../data/material-presets/presets/2d.json";
+import twoPointFiveDPresetData from "../data/material-presets/presets/2-5d.json";
 import classicMattePresetData from "../data/material-presets/presets/classic-matte.json";
-import flat2dPresetData from "../data/material-presets/presets/flat-2d.json";
 import glossyPresetData from "../data/material-presets/presets/glossy.json";
 import metallicPresetData from "../data/material-presets/presets/metallic.json";
 import modernMattePresetData from "../data/material-presets/presets/modern-matte.json";
@@ -68,7 +69,8 @@ export interface MaterialPresetOption {
 
 const BUNDLED_MATERIAL_PRESET_DATA = [
   classicMattePresetData,
-  flat2dPresetData,
+  twoPointFiveDPresetData,
+  twoDPresetData,
   glossyPresetData,
   metallicPresetData,
   modernMattePresetData,

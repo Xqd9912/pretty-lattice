@@ -243,19 +243,19 @@ describe("computeSceneLayout", () => {
     expect(atomFamily.material).toEqual({
       flatShading: false,
       kind: "standard",
-      metalness: 0.08,
-      roughness: 0.38,
+      metalness: 0,
+      roughness: 0.25,
     });
     expect(atomFamily.lighting.cameraLights).toHaveLength(1);
     expect(atomFamily.lighting.cameraLights[0]).toEqual({
-      intensity: 2.05,
+      intensity: 2,
       offset: [0.32, 0.22, 0],
     });
     expect(bondFamily).toEqual(atomFamily);
     expect(polyhedronFamily).toEqual(atomFamily);
     expect(resolveStructureMaterialFamilyForStyle({
       ...style,
-      materialPreset: "flat-2d",
+      materialPreset: "2d",
     }).material.kind).toBe("basic");
   });
 

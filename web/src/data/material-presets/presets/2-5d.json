@@ -1,0 +1,20 @@
+{
+  "id": "2-5d",
+  "label": "2.5D",
+  "description": "A softly shaded diagram style between flat color and matte 3D.",
+  "material": {
+    "kind": "standard",
+    "metalness": 0,
+    "roughness": 0.75,
+    "flatShading": false
+  },
+  "lighting": {
+    "ambientIntensity": 2.0,
+    "cameraLights": [
+      {
+        "intensity": 1.0,
+        "offset": [0.32, 0.22, 0]
+      }
+    ]
+  }
+}

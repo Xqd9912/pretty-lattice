@@ -9,7 +9,7 @@
     "flatShading": false
   },
   "lighting": {
-    "ambientIntensity": 0.8,
+    "ambientIntensity": 1.0,
     "cameraLights": [
       {
         "intensity": 2.0,

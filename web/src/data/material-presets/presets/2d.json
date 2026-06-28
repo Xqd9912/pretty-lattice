@@ -1,12 +1,12 @@
 {
-  "id": "flat-2d",
-  "label": "Flat 2D",
+  "id": "2d",
+  "label": "2D",
   "description": "Unlit flat color for diagram-like structure views.",
   "material": {
     "kind": "basic"
   },
   "lighting": {
-    "ambientIntensity": 1,
+    "ambientIntensity": 0.5,
     "cameraLights": []
   }
 }
