@@ -6,6 +6,7 @@ import type {
   ComponentOpacityState,
   ComponentVisibilityState,
   AtomRenderingMode,
+  ExportBackground,
   ExportFormat,
   ExportSettingsState,
   ExportSupersampling,
@@ -37,6 +38,7 @@ export interface FigureExportFile {
 }
 
 const LEGEND_FONT_FAMILY = "Geist, Helvetica Neue, Arial, sans-serif";
+type RasterExportFileFormat = Exclude<ExportFormat, "pdf">;
 interface LegendExportStyle {
   fontSize: number;
   horizontalGap: number;
@@ -49,6 +51,16 @@ interface LegendExportStyle {
 
 const LEGEND_EXPORT_FONT_RATIO = 0.045;
 const LATTICE_VECTOR_EXPORT_SIZE_RATIO = 0.5;
+const JPG_EXPORT_QUALITY = 0.95;
+const EXPORT_BACKGROUND_COLORS: Record<Exclude<ExportBackground, "transparent">, string> = {
+  black: "#111111",
+  white: "#ffffff",
+};
+const DARK_BACKGROUND_TEXT_COLOR = "#eeeeee";
+const LIGHT_BACKGROUND_TEXT_COLOR = "#202020";
+const DARK_BACKGROUND_TEXT_HALO_COLOR = "#111111";
+const LIGHT_BACKGROUND_TEXT_HALO_COLOR = "#fafafa";
+const DARK_BACKGROUND_UNIT_CELL_LINE_COLOR = "#bbbbbb";
 
 export async function createFigureExportFiles({
   cameraOrientationRef,
@@ -89,6 +101,7 @@ export async function createFigureExportFiles({
         cameraPose: createCameraPoseSnapshot(cameraOrientationRef.current),
         fileName: `${stem}-latt-vec.${settings.format}`,
         format: settings.format,
+        background: settings.background,
         scene,
         size: latticeVectorExportSize(settings),
         supersampling: settings.supersampling,
@@ -102,6 +115,7 @@ export async function createFigureExportFiles({
         entries: deriveElementLegendEntries(scene, style.colorScheme),
         fileName: `${stem}-legend.${settings.format}`,
         format: settings.format,
+        background: settings.background,
         layout: settings.legendLayout,
         style: legendExportStyle(settings),
         supersampling: settings.supersampling,
@@ -175,8 +189,8 @@ async function createStructureExportFile({
 
   return {
     blob: rasterImage.blob,
-    fileName: `${exportFileStem(fileName)}.png`,
-    format: "png",
+    fileName: `${exportFileStem(fileName)}.${settings.format}`,
+    format: settings.format,
   };
 }
 
@@ -217,6 +231,7 @@ export function downloadBlob(blob: Blob, fileName: string) {
 }
 
 async function createLegendExportFile({
+  background,
   entries,
   fileName,
   format,
@@ -224,6 +239,7 @@ async function createLegendExportFile({
   style,
   supersampling,
 }: {
+  background: ExportBackground;
   entries: ElementLegendEntry[];
   fileName: string;
   format: ExportFormat;
@@ -232,8 +248,9 @@ async function createLegendExportFile({
   supersampling: number;
 }): Promise<FigureExportFile> {
   const renderedLegend = renderLegendCanvas({
+    background,
     entries,
-    includeText: format === "png",
+    includeText: format !== "pdf",
     layout,
     style,
     supersampling,
@@ -248,7 +265,7 @@ async function createLegendExportFile({
           textItems: renderedLegend.textItems,
           width: renderedLegend.canvas.width,
         },
-        { halo: false },
+        { background, halo: false },
       ),
       fileName,
       format,
@@ -256,19 +273,21 @@ async function createLegendExportFile({
   }
 
   return {
-    blob: await canvasToPngBlob(renderedLegend.canvas),
+    blob: await canvasToRasterBlob(renderedLegend.canvas, rasterFormatForExportFormat(format)),
     fileName,
     format,
   };
 }
 
 function renderLegendCanvas({
+  background,
   entries,
   includeText,
   layout,
   style,
   supersampling,
 }: {
+  background: ExportBackground;
   entries: ElementLegendEntry[];
   includeText: boolean;
   layout: "horizontal" | "vertical";
@@ -288,14 +307,14 @@ function renderLegendCanvas({
   }
 
   context.scale(supersampling, supersampling);
-  context.clearRect(0, 0, metrics.width, metrics.height);
+  fillCanvasBackground(context, metrics.width, metrics.height, background);
   context.font = legendFont(style);
   context.textBaseline = "middle";
-  context.fillStyle = "#202020";
+  context.fillStyle = exportTextColor(background);
 
   const textItems: RasterExportTextItem[] = [];
   for (const item of metrics.items) {
-    drawLegendSwatch(context, item.entry.color, item.x, item.y, style.swatchSize);
+    drawLegendSwatch(context, item.entry.color, item.x, item.y, style.swatchSize, background);
     const textX = item.x + style.swatchSize + style.textGap;
     const textY = item.y + style.swatchSize / 2;
     textItems.push({
@@ -308,7 +327,7 @@ function renderLegendCanvas({
     });
 
     if (includeText) {
-      context.fillStyle = "#202020";
+      context.fillStyle = exportTextColor(background);
       context.fillText(item.entry.element, textX, textY);
     }
   }
@@ -414,6 +433,7 @@ function drawLegendSwatch(
   x: number,
   y: number,
   size: number,
+  background: ExportBackground,
 ) {
   const radius = size / 2;
   const centerX = x + radius;
@@ -435,13 +455,14 @@ function drawLegendSwatch(
   context.arc(centerX, centerY, radius, 0, Math.PI * 2);
   context.fillStyle = gradient;
   context.fill();
-  context.strokeStyle = "rgba(0, 0, 0, 0.12)";
+  context.strokeStyle = background === "black" ? "rgba(255, 255, 255, 0.28)" : "rgba(0, 0, 0, 0.12)";
   context.lineWidth = 1;
   context.stroke();
   context.restore();
 }
 
 async function createLatticeVectorsExportFile({
+  background,
   cameraPose,
   fileName,
   format,
@@ -449,6 +470,7 @@ async function createLatticeVectorsExportFile({
   size,
   supersampling,
 }: {
+  background: ExportBackground;
   cameraPose: CameraPoseSnapshot;
   fileName: string;
   format: ExportFormat;
@@ -456,18 +478,20 @@ async function createLatticeVectorsExportFile({
   size: number;
   supersampling: ExportSupersampling;
 }): Promise<FigureExportFile> {
-  const { renderLatticeVectorsRasterPng } = await import("../scene/exportRenderer");
-  const rasterImage = await renderLatticeVectorsRasterPng({
+  const { renderLatticeVectorsRasterImage } = await import("../scene/exportRenderer");
+  const rasterImage = await renderLatticeVectorsRasterImage({
+    backgroundColor: exportBackgroundColor(background),
     cameraPose,
     cellVectors: scene.cell.vectors,
-    showLabels: format === "png",
+    imageFormat: rasterFormatForExportFormat(format),
+    showLabels: format !== "pdf",
     size,
     supersampling,
   });
 
   if (format === "pdf") {
     return {
-      blob: await encodeRasterTextPdf(rasterImage, { halo: true }),
+      blob: await encodeRasterTextPdf(rasterImage, { background, halo: true }),
       fileName,
       format,
     };
@@ -482,7 +506,7 @@ async function createLatticeVectorsExportFile({
 
 async function encodeRasterTextPdf(
   rasterImage: RasterExportImage,
-  options: { halo: boolean },
+  options: { background: ExportBackground; halo: boolean },
 ): Promise<Blob> {
   const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
   const pdf = await PDFDocument.create();
@@ -491,6 +515,8 @@ async function encodeRasterTextPdf(
   const image = await pdf.embedPng(imageBytes);
   const regularFont = await pdf.embedFont(StandardFonts.Helvetica);
   const italicFont = await pdf.embedFont(StandardFonts.HelveticaOblique);
+  const textColor = rgb(...hexColorToRgbComponents(exportTextColor(options.background)));
+  const textHaloColor = rgb(...hexColorToRgbComponents(exportTextHaloColor(options.background)));
 
   page.drawImage(image, {
     height: rasterImage.height,
@@ -514,7 +540,7 @@ async function encodeRasterTextPdf(
         [0, 1],
       ] as const) {
         page.drawText(item.label, {
-          color: rgb(0.98, 0.98, 0.98),
+          color: textHaloColor,
           font,
           size: item.size,
           x: x + offsetX * haloOffset,
@@ -524,7 +550,7 @@ async function encodeRasterTextPdf(
     }
 
     page.drawText(item.label, {
-      color: rgb(0.125, 0.125, 0.125),
+      color: textColor,
       font,
       size: item.size,
       x,
@@ -538,6 +564,13 @@ async function encodeRasterTextPdf(
   return new Blob([pdfBuffer], { type: "application/pdf" });
 }
 
+function canvasToRasterBlob(
+  canvas: HTMLCanvasElement,
+  format: RasterExportFileFormat,
+): Promise<Blob> {
+  return format === "jpg" ? canvasToJpgBlob(canvas) : canvasToPngBlob(canvas);
+}
+
 function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -548,6 +581,35 @@ function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 
       resolve(blob);
     }, "image/png");
+  });
+}
+
+function canvasToJpgBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  const outputCanvas = document.createElement("canvas");
+  outputCanvas.width = canvas.width;
+  outputCanvas.height = canvas.height;
+  const context = outputCanvas.getContext("2d");
+  if (!context) {
+    throw new Error("Could not prepare the exported JPG image.");
+  }
+
+  context.fillStyle = EXPORT_BACKGROUND_COLORS.white;
+  context.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+  context.drawImage(canvas, 0, 0);
+
+  return new Promise((resolve, reject) => {
+    outputCanvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Could not encode the exported JPG image."));
+          return;
+        }
+
+        resolve(blob);
+      },
+      "image/jpeg",
+      JPG_EXPORT_QUALITY,
+    );
   });
 }
 
@@ -729,19 +791,23 @@ async function renderExportRaster({
   style: StyleState;
   visibleScene: SceneSpec;
 }): Promise<RasterExportImage> {
-  const { renderStructureRasterPng } = await import("../scene/exportRenderer");
+  const { renderStructureRasterImage } = await import("../scene/exportRenderer");
 
-  return renderStructureRasterPng({
+  return renderStructureRasterImage({
     atomRenderingMode,
+    backgroundColor: exportBackgroundColor(settings.background),
     cameraPose,
     componentOpacity,
     height: settings.height,
+    imageFormat: rasterFormatForExportFormat(settings.format),
     meshQuality: settings.meshQuality,
     scene: visibleScene,
     showAtoms: componentVisibility.atoms,
     showUnitCell: componentVisibility.unitCell,
     style,
     supersampling: settings.supersampling,
+    unitCellLineColor:
+      settings.background === "black" ? DARK_BACKGROUND_UNIT_CELL_LINE_COLOR : undefined,
     width: settings.width,
   });
 }
@@ -774,4 +840,50 @@ function exportFileStem(fileName: string | null): string {
     .replace(/^-+|-+$/g, "");
 
   return stem || "pretty-lattice";
+}
+
+function rasterFormatForExportFormat(format: ExportFormat): RasterExportFileFormat {
+  return format === "jpg" ? "jpg" : "png";
+}
+
+function exportBackgroundColor(background: ExportBackground): string | null {
+  return background === "transparent" ? null : EXPORT_BACKGROUND_COLORS[background];
+}
+
+function fillCanvasBackground(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  background: ExportBackground,
+) {
+  const backgroundColor = exportBackgroundColor(background);
+  if (!backgroundColor) {
+    context.clearRect(0, 0, width, height);
+    return;
+  }
+
+  context.fillStyle = backgroundColor;
+  context.fillRect(0, 0, width, height);
+}
+
+function exportTextColor(background: ExportBackground): string {
+  return background === "black" ? DARK_BACKGROUND_TEXT_COLOR : LIGHT_BACKGROUND_TEXT_COLOR;
+}
+
+function exportTextHaloColor(background: ExportBackground): string {
+  return background === "black" ? DARK_BACKGROUND_TEXT_HALO_COLOR : LIGHT_BACKGROUND_TEXT_HALO_COLOR;
+}
+
+function hexColorToRgbComponents(color: string): [number, number, number] {
+  const match = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!match) {
+    return [0, 0, 0];
+  }
+
+  const value = match[1] ?? "000000";
+  return [
+    Number.parseInt(value.slice(0, 2), 16) / 255,
+    Number.parseInt(value.slice(2, 4), 16) / 255,
+    Number.parseInt(value.slice(4, 6), 16) / 255,
+  ];
 }

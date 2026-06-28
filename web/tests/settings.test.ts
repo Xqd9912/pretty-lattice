@@ -18,6 +18,7 @@ import {
   PREVIEW_PERFORMANCE_ATOM_COUNT_THRESHOLD,
   parseExportDimensionInput,
   setExportAspectRatioLocked,
+  setExportBackground,
   setExportComponentSelected,
   setExportDimension,
   setExportFormat,
@@ -74,6 +75,7 @@ describe("settings", () => {
   test("defaults figure export settings to PNG with separate 2D and 3D quality controls", () => {
     expect(createDefaultExportSettings()).toEqual({
       aspectRatioLocked: false,
+      background: "transparent",
       components: {
         legend: false,
         latticeVectors: false,
@@ -195,10 +197,26 @@ describe("settings", () => {
       structure: true,
     });
     expect(setExportLegendLayout(defaultSettings, "vertical").legendLayout).toBe("vertical");
+    expect(setExportBackground(defaultSettings, "black").background).toBe("black");
     expect(setExportFormat(defaultSettings, "pdf")).toEqual({
       ...defaultSettings,
       format: "pdf",
     });
+    expect(setExportFormat(defaultSettings, "jpg")).toEqual({
+      ...defaultSettings,
+      background: "white",
+      format: "jpg",
+    });
+    expect(
+      setExportBackground(
+        {
+          ...defaultSettings,
+          background: "white",
+          format: "jpg",
+        },
+        "transparent",
+      ).background,
+    ).toBe("white");
     expect(validateExportSettings(defaultSettings).valid).toBe(true);
     expect(validateExportSettings({
       ...defaultSettings,
@@ -216,6 +234,16 @@ describe("settings", () => {
     ).toEqual({
       message: "Select at least one export component.",
       valid: false,
+    });
+    expect(
+      validateExportSettings({
+        ...defaultSettings,
+        background: "transparent",
+        format: "jpg",
+      }),
+    ).toEqual({
+      valid: false,
+      message: "JPG exports need a white or black background.",
     });
     expect(
       validateExportSettings({

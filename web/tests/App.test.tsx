@@ -13,7 +13,10 @@ import {
   createFigureExportZipBlob as actualCreateFigureExportZipBlob,
   createZipBlob as actualCreateZipBlob,
 } from "../src/app/exportFigure";
-import { PREVIEW_PERFORMANCE_ATOM_COUNT_THRESHOLD } from "../src/app/settings";
+import {
+  PREVIEW_PERFORMANCE_ATOM_COUNT_THRESHOLD,
+  type ExportFormat,
+} from "../src/app/settings";
 
 interface FetchCall {
   input: RequestInfo | URL;
@@ -131,7 +134,7 @@ async function createFigureExportFilesMock(
   if (options.settings.components.structure) {
     files.push({
       blob: new Blob([options.settings.format], {
-        type: options.settings.format === "pdf" ? "application/pdf" : "image/png",
+        type: exportMimeType(options.settings.format),
       }),
       fileName: `NaCl.${options.settings.format}`,
       format: options.settings.format,
@@ -140,7 +143,7 @@ async function createFigureExportFilesMock(
   if (options.settings.components.latticeVectors) {
     files.push({
       blob: new Blob(["lattice vectors"], {
-        type: options.settings.format === "pdf" ? "application/pdf" : "image/png",
+        type: exportMimeType(options.settings.format),
       }),
       fileName: `NaCl-latt-vec.${options.settings.format}`,
       format: options.settings.format,
@@ -149,13 +152,21 @@ async function createFigureExportFilesMock(
   if (options.settings.components.legend) {
     files.push({
       blob: new Blob(["legend"], {
-        type: options.settings.format === "pdf" ? "application/pdf" : "image/png",
+        type: exportMimeType(options.settings.format),
       }),
       fileName: `NaCl-legend.${options.settings.format}`,
       format: options.settings.format,
     });
   }
   return files;
+}
+
+function exportMimeType(format: ExportFormat) {
+  if (format === "pdf") {
+    return "application/pdf";
+  }
+
+  return format === "jpg" ? "image/jpeg" : "image/png";
 }
 
 async function downloadFigureExportZipMock(
@@ -1021,6 +1032,9 @@ describe("App", () => {
     const formatSelect = within(commonControls).getByRole("combobox", {
       name: "Format",
     });
+    let backgroundButton = within(commonControls).getByRole("button", {
+      name: "Background: Transparent",
+    });
     const exportPngButton = within(commonControls).getByRole("button", {
       name: "Export PNG",
     });
@@ -1055,11 +1069,19 @@ describe("App", () => {
     await user.click(latticeVectorsCheckbox);
     await user.click(legendCheckbox);
     await user.click(verticalLegendLayout);
+    await user.click(backgroundButton);
+    expect(await screen.findByText("Background")).toBeTruthy();
+    await user.click(await screen.findByRole("option", { name: "Black" }));
+    backgroundButton = within(commonControls).getByRole("button", {
+      name: "Background: Black",
+    });
+    expect(backgroundButton.isConnected).toBe(true);
 
     await user.click(exportPngButton);
     await waitFor(() => expect(exportRequests).toHaveLength(1));
 
     expect(exportRequests[0]?.settings.format).toBe("png");
+    expect(exportRequests[0]?.settings.background).toBe("black");
     expect(exportRequests[0]?.settings.components).toEqual({
       legend: true,
       latticeVectors: true,
@@ -1094,6 +1116,9 @@ describe("App", () => {
     await user.click(formatSelect);
     await user.click(await screen.findByRole("option", { name: "PDF" }));
     expect(formatSelect.textContent).toContain("PDF");
+    backgroundButton = within(commonControls).getByRole("button", {
+      name: "Background: Black",
+    });
     expect(oneXSupersampling.getAttribute("aria-selected")).toBe("true");
     expect(xHighMeshQuality.getAttribute("aria-selected")).toBe("true");
 
@@ -1105,6 +1130,9 @@ describe("App", () => {
     expect(twoXSupersampling.getAttribute("aria-selected")).toBe("true");
     expect(highMeshQuality.getAttribute("aria-selected")).toBe("true");
     expect(formatSelect.textContent).toContain("PDF");
+    backgroundButton = within(commonControls).getByRole("button", {
+      name: "Background: Black",
+    });
     expect(
       within(commonControls).getByRole("button", { name: "Lock aspect ratio" }).isConnected,
     ).toBe(true);
@@ -1117,6 +1145,7 @@ describe("App", () => {
 
     expect(exportRequests[1]?.settings).toMatchObject({
       aspectRatioLocked: false,
+      background: "black",
       format: "pdf",
       height: 2000,
       meshQuality: "high",
@@ -1128,6 +1157,36 @@ describe("App", () => {
       "NaCl.pdf",
       "NaCl-latt-vec.pdf",
       "NaCl-legend.pdf",
+    ]);
+
+    await user.click(formatSelect);
+    await user.click(await screen.findByRole("option", { name: "JPG" }));
+    expect(formatSelect.textContent).toContain("JPG");
+    backgroundButton = within(commonControls).getByRole("button", {
+      name: "Background: Black",
+    });
+    await user.click(backgroundButton);
+    expect(screen.queryByRole("option", { name: "Transparent" })).toBeNull();
+    await user.click(await screen.findByRole("option", { name: "White" }));
+    backgroundButton = within(commonControls).getByRole("button", {
+      name: "Background: White",
+    });
+    expect(backgroundButton.isConnected).toBe(true);
+
+    const exportJpgButton = within(commonControls).getByRole("button", {
+      name: "Export JPG",
+    });
+    await user.click(exportJpgButton);
+    await waitFor(() => expect(exportRequests).toHaveLength(3));
+
+    expect(exportRequests[2]?.settings).toMatchObject({
+      background: "white",
+      format: "jpg",
+    });
+    expect(exportZipDownloads[2]?.files.map((file) => file.fileName)).toEqual([
+      "NaCl.jpg",
+      "NaCl-latt-vec.jpg",
+      "NaCl-legend.jpg",
     ]);
   });
 

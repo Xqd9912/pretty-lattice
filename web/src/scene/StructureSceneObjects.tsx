@@ -263,6 +263,7 @@ export function StructureSceneObjects({
   showAtoms,
   showUnitCell,
   style,
+  unitCellLineColor,
   unitCellLineWidthScale = 1,
 }: {
   atomById: Map<string, AtomSpec>;
@@ -282,6 +283,7 @@ export function StructureSceneObjects({
   showAtoms: boolean;
   showUnitCell: boolean;
   style: StyleState;
+  unitCellLineColor?: string;
   unitCellLineWidthScale?: number;
 }) {
   const handlePointerMissed = useCallback(() => {
@@ -297,6 +299,7 @@ export function StructureSceneObjects({
       <group position={groupPosition}>
         {showUnitCell ? (
           <CellFrame
+            color={unitCellLineColor}
             lineWidthScale={unitCellLineWidthScale}
             opacity={componentOpacity.unitCell / 100}
             vectors={scene.cell.vectors}
@@ -953,10 +956,12 @@ function Polyhedron({
 }
 
 function CellFrame({
+  color = CELL_FRAME_COLOR,
   lineWidthScale,
   opacity,
   vectors,
 }: {
+  color?: string;
   lineWidthScale: number;
   opacity: number;
   vectors: VectorTuple[];
@@ -967,7 +972,7 @@ function CellFrame({
     const lineWidth = CELL_FRAME_LINE_WIDTH_PIXELS * lineWidthScale;
     const material = new LineMaterial({
       alphaToCoverage: true,
-      color: CELL_FRAME_COLOR,
+      color,
       depthWrite: opacity >= 1,
       fog: false,
       linewidth: lineWidth,
@@ -976,7 +981,7 @@ function CellFrame({
       worldUnits: false,
     });
     return new LineSegments2(geometry, material);
-  }, [lineWidthScale, opacity, vectors]);
+  }, [color, lineWidthScale, opacity, vectors]);
 
   useEffect(() => {
     return () => {

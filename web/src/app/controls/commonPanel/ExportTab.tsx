@@ -1,9 +1,10 @@
 import { AlertTriangleIcon, ImageDown, Link, RotateCcw, Unlink } from "lucide-react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -19,13 +20,16 @@ import { cn } from "@/lib/utils";
 
 import {
   createDefaultExportSettings,
+  EXPORT_BACKGROUND_OPTIONS,
   EXPORT_FORMAT_OPTIONS,
   EXPORT_LEGEND_LAYOUT_OPTIONS,
   EXPORT_SUPERSAMPLING_OPTIONS,
+  isExportBackgroundAllowed,
   MESH_QUALITY_LABELS,
   MESH_QUALITY_OPTIONS,
   parseExportDimensionInput,
   setExportAspectRatioLocked,
+  setExportBackground,
   setExportComponentSelected,
   setExportDimension,
   setExportFormat,
@@ -33,6 +37,7 @@ import {
   setExportMeshQuality,
   setExportSupersampling,
   validateExportSettings,
+  type ExportBackground,
   type ExportComponentId,
   type ExportFormat,
   type ExportLegendLayout,
@@ -54,8 +59,14 @@ import {
 } from "./styles";
 
 const EXPORT_FORMAT_LABELS: Record<ExportFormat, string> = {
+  jpg: "JPG",
   pdf: "PDF",
   png: "PNG",
+};
+const EXPORT_BACKGROUND_LABELS: Record<ExportBackground, string> = {
+  black: "Black",
+  transparent: "Transparent",
+  white: "White",
 };
 const EXPORT_LEGEND_LAYOUT_LABELS: Record<ExportLegendLayout, string> = {
   horizontal: "Horizontal",
@@ -273,43 +284,50 @@ export function ExportTabContent({
         />
       </section>
 
-      <div className="mb-1.5 flex min-h-8 items-end justify-between gap-2 px-1.5">
-        <label className="grid min-w-0 gap-1">
+      <div className="mb-1.5 grid min-h-8 grid-cols-[auto_auto] items-end justify-between gap-2 px-1.5">
+        <div className="grid min-w-0 gap-1">
           <span className={cn("truncate px-0.5 leading-none text-muted-foreground", COMMON_PANEL_FIELD_LABEL_TEXT_CLASS)}>
             Format
           </span>
-          <Select
-            value={settings.format}
-            onValueChange={(value) =>
-              onSettingsChange(setExportFormat(settings, value as ExportFormat))
-            }
-          >
-            <SelectTrigger
-              size="sm"
-              aria-label="Format"
-              className="!h-6 w-20 !px-2 !py-0 text-xs"
+          <div className="flex items-center">
+            <Select
+              value={settings.format}
+              onValueChange={(value) =>
+                onSettingsChange(setExportFormat(settings, value as ExportFormat))
+              }
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent
-              position="popper"
-              className="!bg-background !text-foreground"
-            >
-              <SelectGroup>
-                {EXPORT_FORMAT_OPTIONS.map((option) => (
-                  <SelectItem
-                    key={option}
-                    value={option}
-                    textValue={EXPORT_FORMAT_LABELS[option]}
-                    className={cn("min-h-6 py-0.5", COMMON_PANEL_BODY_TEXT_CLASS)}
-                  >
-                    {EXPORT_FORMAT_LABELS[option]}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </label>
+              <SelectTrigger
+                size="sm"
+                aria-label="Format"
+                className="!h-6 w-[4.25rem] rounded-r-none border-r-0 !px-1.5 !py-0 text-xs"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent
+                position="popper"
+                className="!bg-background !text-foreground"
+              >
+                <SelectGroup>
+                  {EXPORT_FORMAT_OPTIONS.map((option) => (
+                    <SelectItem
+                      key={option}
+                      value={option}
+                      textValue={EXPORT_FORMAT_LABELS[option]}
+                      className={cn("min-h-6 py-0.5", COMMON_PANEL_BODY_TEXT_CLASS)}
+                    >
+                      {EXPORT_FORMAT_LABELS[option]}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <ExportBackgroundPopover
+              format={settings.format}
+              value={settings.background}
+              onCommit={(value) => onSettingsChange(setExportBackground(settings, value))}
+            />
+          </div>
+        </div>
 
         <div className="flex items-center gap-1.5">
           <Button
@@ -343,6 +361,99 @@ export function ExportTabContent({
       </div>
     </div>
   );
+}
+
+function ExportBackgroundPopover({
+  format,
+  onCommit,
+  value,
+}: {
+  format: ExportFormat;
+  onCommit: (value: ExportBackground) => void;
+  value: ExportBackground;
+}) {
+  const [open, setOpen] = useState(false);
+  const options = EXPORT_BACKGROUND_OPTIONS.filter((option) =>
+    isExportBackgroundAllowed(format, option),
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Background: ${EXPORT_BACKGROUND_LABELS[value]}`}
+          title="Background"
+          className="-ml-px inline-flex h-6 w-8 items-center justify-center rounded-l-none rounded-r-md border border-input bg-transparent shadow-xs transition-[background-color,border-color,box-shadow] duration-150 hover:bg-accent/60 focus-visible:z-10 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+        >
+          <ExportBackgroundToken value={value} className="h-4 w-5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-36"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        <div className={cn("px-2 pb-1 pt-1.5 leading-none text-muted-foreground", COMMON_PANEL_FIELD_LABEL_TEXT_CLASS)}>
+          Background
+        </div>
+        <div role="listbox" aria-label="Background" className="grid gap-0.5">
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="option"
+              aria-selected={option === value}
+              className={cn(
+                "flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground",
+                COMMON_PANEL_BODY_TEXT_CLASS,
+                option === value ? "bg-accent/55 text-foreground" : "text-foreground",
+              )}
+              onClick={() => {
+                onCommit(option);
+                setOpen(false);
+              }}
+            >
+              <ExportBackgroundToken value={option} />
+              <span className="min-w-0 truncate">{EXPORT_BACKGROUND_LABELS[option]}</span>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ExportBackgroundToken({
+  className,
+  value,
+}: {
+  className?: string;
+  value: ExportBackground;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn("h-3.5 w-5 shrink-0 rounded-[4px] border border-border", className)}
+      style={exportBackgroundTokenStyle(value)}
+    />
+  );
+}
+
+function exportBackgroundTokenStyle(value: ExportBackground): CSSProperties {
+  if (value === "transparent") {
+    return {
+      background:
+        "conic-gradient(#d9d9d9 0 25%, #ffffff 0 50%, #d9d9d9 0 75%, #ffffff 0)",
+      backgroundSize: "6px 6px",
+    };
+  }
+
+  if (value === "black") {
+    return { background: "#111111" };
+  }
+
+  return { background: "#ffffff" };
 }
 
 function ExportComponentCheckbox({

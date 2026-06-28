@@ -39,6 +39,8 @@ export interface RasterExportImage {
   width: number;
 }
 
+export type RasterExportImageFormat = "jpg" | "png";
+
 export interface RasterExportTextItem {
   fontStyle?: "italic" | "normal";
   fontWeight?: number;
@@ -50,38 +52,46 @@ export interface RasterExportTextItem {
 
 export interface RenderStructureRasterOptions {
   atomRenderingMode: AtomRenderingMode;
+  backgroundColor: string | null;
   cameraPose: CameraPoseSnapshot;
   componentOpacity: ComponentOpacityState;
   height: number;
+  imageFormat: RasterExportImageFormat;
   meshQuality: ExportMeshQuality;
   scene: SceneSpec;
   showAtoms: boolean;
   showUnitCell: boolean;
   style: StyleState;
   supersampling: ExportSupersampling;
+  unitCellLineColor?: string;
   width: number;
 }
 
 export interface RenderLatticeVectorsRasterOptions {
+  backgroundColor: string | null;
   cameraPose: CameraPoseSnapshot;
   cellVectors: SceneSpec["cell"]["vectors"];
   cropPaddingRatio?: number;
+  imageFormat: RasterExportImageFormat;
   showLabels?: boolean;
   size: number;
   supersampling: ExportSupersampling;
 }
 
-export async function renderStructureRasterPng({
+export async function renderStructureRasterImage({
   atomRenderingMode,
+  backgroundColor,
   cameraPose,
   componentOpacity,
   height,
+  imageFormat,
   meshQuality,
   scene,
   showAtoms,
   showUnitCell,
   style,
   supersampling,
+  unitCellLineColor,
   width,
 }: RenderStructureRasterOptions): Promise<RasterExportImage> {
   const renderWidth = width * supersampling;
@@ -134,6 +144,7 @@ export async function renderStructureRasterPng({
       gl: DEFAULT_RENDERER_PARAMETERS,
       onCreated: (state) => {
         rootState = state;
+        state.gl.setClearColor(backgroundColor ?? "#000000", backgroundColor ? 1 : 0);
       },
       orthographic: true,
       size: {
@@ -166,6 +177,7 @@ export async function renderStructureRasterPng({
           showAtoms={showAtoms}
           showUnitCell={showUnitCell}
           style={style}
+          unitCellLineColor={unitCellLineColor}
           unitCellLineWidthScale={supersampling}
         />
         <RenderReady onReady={() => resolveMounted?.()} />
@@ -179,7 +191,7 @@ export async function renderStructureRasterPng({
 
     const outputCanvas =
       supersampling === 1 ? canvas : downsampleCanvas(canvas, width, height);
-    const blob = await canvasToPngBlob(outputCanvas);
+    const blob = await canvasToRasterBlob(outputCanvas, imageFormat, backgroundColor);
     return { blob, height, width };
   } finally {
     root.unmount();
@@ -187,10 +199,12 @@ export async function renderStructureRasterPng({
   }
 }
 
-export async function renderLatticeVectorsRasterPng({
+export async function renderLatticeVectorsRasterImage({
+  backgroundColor,
   cameraPose,
   cellVectors,
   cropPaddingRatio = 0.04,
+  imageFormat,
   showLabels = true,
   size,
   supersampling,
@@ -285,7 +299,7 @@ export async function renderLatticeVectorsRasterPng({
           x: item.x - output.crop.sourceX,
           y: item.y - output.crop.sourceY,
         }));
-    const blob = await canvasToPngBlob(output.canvas);
+    const blob = await canvasToRasterBlob(output.canvas, imageFormat, backgroundColor);
     return { blob, height: output.canvas.height, textItems, width: output.canvas.width };
   } finally {
     root.unmount();
@@ -486,15 +500,50 @@ function alphaBounds(data: Uint8ClampedArray, width: number, height: number) {
     : null;
 }
 
-function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error("Could not encode the exported PNG image."));
-        return;
-      }
+function canvasToRasterBlob(
+  canvas: HTMLCanvasElement,
+  imageFormat: RasterExportImageFormat,
+  backgroundColor: string | null,
+): Promise<Blob> {
+  const outputCanvas = canvasWithRasterBackground(canvas, imageFormat, backgroundColor);
+  const mimeType = imageFormat === "jpg" ? "image/jpeg" : "image/png";
+  const quality = imageFormat === "jpg" ? 0.95 : undefined;
 
-      resolve(blob);
-    }, "image/png");
+  return new Promise((resolve, reject) => {
+    outputCanvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error(`Could not encode the exported ${imageFormat.toUpperCase()} image.`));
+          return;
+        }
+
+        resolve(blob);
+      },
+      mimeType,
+      quality,
+    );
   });
+}
+
+function canvasWithRasterBackground(
+  canvas: HTMLCanvasElement,
+  imageFormat: RasterExportImageFormat,
+  backgroundColor: string | null,
+) {
+  if (backgroundColor === null && imageFormat === "png") {
+    return canvas;
+  }
+
+  const outputCanvas = document.createElement("canvas");
+  outputCanvas.width = canvas.width;
+  outputCanvas.height = canvas.height;
+  const context = outputCanvas.getContext("2d");
+  if (!context) {
+    throw new Error("Could not prepare the raster export background.");
+  }
+
+  context.fillStyle = backgroundColor ?? "#ffffff";
+  context.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+  context.drawImage(canvas, 0, 0);
+  return outputCanvas;
 }

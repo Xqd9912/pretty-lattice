@@ -1,4 +1,5 @@
-export type ExportFormat = "png" | "pdf";
+export type ExportFormat = "png" | "jpg" | "pdf";
+export type ExportBackground = "transparent" | "white" | "black";
 export type ExportComponentId = "legend" | "latticeVectors" | "structure";
 export type ExportLegendLayout = "horizontal" | "vertical";
 export type MeshQuality = "low" | "medium" | "high" | "xhigh";
@@ -18,6 +19,7 @@ export interface ExportProjectedSize {
 
 export interface ExportSettingsState {
   aspectRatioLocked: boolean;
+  background: ExportBackground;
   components: ExportComponentSelection;
   format: ExportFormat;
   height: number;
@@ -40,7 +42,12 @@ export const EXPORT_RENDER_PIXEL_MAX = EXPORT_RENDER_DIMENSION_MAX * EXPORT_REND
 export const EXPORT_SUPERSAMPLING_OPTIONS: readonly ExportSupersampling[] = [1, 2, 4];
 const EXPORT_SUPERSAMPLING_MIN: ExportSupersampling = 1;
 const EXPORT_SUPERSAMPLING_MAX: ExportSupersampling = 4;
-export const EXPORT_FORMAT_OPTIONS: readonly ExportFormat[] = ["png", "pdf"];
+export const EXPORT_FORMAT_OPTIONS: readonly ExportFormat[] = ["png", "jpg", "pdf"];
+export const EXPORT_BACKGROUND_OPTIONS: readonly ExportBackground[] = [
+  "transparent",
+  "white",
+  "black",
+];
 export const EXPORT_LEGEND_LAYOUT_OPTIONS: readonly ExportLegendLayout[] = [
   "horizontal",
   "vertical",
@@ -61,6 +68,7 @@ export const MESH_QUALITY_LABELS: Record<MeshQuality, string> = {
 
 export const DEFAULT_EXPORT_SETTINGS: ExportSettingsState = {
   aspectRatioLocked: false,
+  background: "transparent",
   components: {
     legend: false,
     latticeVectors: false,
@@ -182,8 +190,26 @@ export function setExportFormat(
 ): ExportSettingsState {
   return {
     ...settings,
+    background: normalizeExportBackgroundForFormat(format, settings.background),
     format,
   };
+}
+
+export function setExportBackground(
+  settings: ExportSettingsState,
+  background: ExportBackground,
+): ExportSettingsState {
+  return {
+    ...settings,
+    background: normalizeExportBackgroundForFormat(settings.format, background),
+  };
+}
+
+export function isExportBackgroundAllowed(
+  format: ExportFormat,
+  background: ExportBackground,
+): boolean {
+  return format !== "jpg" || background !== "transparent";
 }
 
 export function setExportComponentSelected(
@@ -267,6 +293,13 @@ export function validateExportSettings(
     return {
       valid: false,
       message: "Supersampling must be 1x, 2x, or 4x.",
+    };
+  }
+
+  if (!isExportBackgroundAllowed(settings.format, settings.background)) {
+    return {
+      valid: false,
+      message: "JPG exports need a white or black background.",
     };
   }
 
@@ -388,6 +421,13 @@ function clampExportSupersampling(value: number): ExportSupersampling {
   }
 
   return EXPORT_SUPERSAMPLING_MAX;
+}
+
+function normalizeExportBackgroundForFormat(
+  format: ExportFormat,
+  background: ExportBackground,
+): ExportBackground {
+  return isExportBackgroundAllowed(format, background) ? background : "white";
 }
 
 function exportAspectRatioFromSettings(settings: ExportSettingsState): number {

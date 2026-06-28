@@ -24,6 +24,7 @@ export function ExportSceneContent({
   showAtoms,
   showUnitCell,
   style,
+  unitCellLineColor,
   unitCellLineWidthScale = 1,
 }: {
   atomRenderingMode: AtomRenderingMode;
@@ -37,6 +38,7 @@ export function ExportSceneContent({
   showAtoms: boolean;
   showUnitCell: boolean;
   style: StyleState;
+  unitCellLineColor?: string;
   unitCellLineWidthScale?: number;
 }) {
   const { camera } = useThree();
@@ -66,6 +68,7 @@ export function ExportSceneContent({
         showAtoms={showAtoms}
         showUnitCell={showUnitCell}
         style={style}
+        unitCellLineColor={unitCellLineColor}
         unitCellLineWidthScale={unitCellLineWidthScale}
       />
     </>
