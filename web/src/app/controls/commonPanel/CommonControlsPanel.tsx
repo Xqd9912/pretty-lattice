@@ -33,6 +33,7 @@ import type {
 import { GLASS_SURFACE_CLASS } from "../../surface";
 import { DisplayTabContent } from "./DisplayTab";
 import { ExportTabContent } from "./ExportTab";
+import { MaterialPresetTokenPreloadPool } from "./MaterialPresetToken3D";
 import { OrientationTabContent } from "./OrientationTab";
 import { StyleTabContent } from "./StyleTab";
 
@@ -256,6 +257,7 @@ export function CommonControlsPanel({
           GLASS_SURFACE_CLASS,
         )}
       >
+        <MaterialPresetTokenPreloadPool />
         <Tabs
           value={activeTab}
           onValueChange={handleTabValueChange}

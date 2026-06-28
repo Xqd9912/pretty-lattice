@@ -1,0 +1,18 @@
+{
+  "id": "classic-matte",
+  "label": "Classic Matte",
+  "description": "Soft diffuse shading close to the original preview look.",
+  "material": {
+    "kind": "lambert",
+    "flatShading": false
+  },
+  "lighting": {
+    "ambientIntensity": 0.68,
+    "cameraLights": [
+      {
+        "intensity": 1.78,
+        "offset": [0.32, 0.22, 0]
+      }
+    ]
+  }
+}

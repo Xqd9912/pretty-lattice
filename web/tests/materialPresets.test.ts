@@ -4,6 +4,7 @@ import {
   DEFAULT_MATERIAL_PRESET_ID,
   MATERIAL_PRESET_OPTIONS,
   MATERIAL_PRESETS,
+  buildMaterialPresetCatalog,
   materialPresetById,
   validateMaterialPresetData,
 } from "../src/app/materialPresets";
@@ -109,6 +110,51 @@ describe("material presets", () => {
     ).toThrow(
       "material presets.presets[0].lighting.cameraLights[0].offset[1] must be between -2 and 2.",
     );
+  });
+
+  test("builds split preset files in catalog order", () => {
+    const catalog = buildMaterialPresetCatalog(
+      {
+        defaultPresetId: "modern-matte",
+        presetOrder: ["modern-matte", "classic-matte"],
+        version: 1,
+      },
+      [
+        validPreset({ id: "classic-matte", label: "Classic Matte" }),
+        validPreset({
+          id: "modern-matte",
+          label: "Modern Matte",
+          material: {
+            flatShading: false,
+            kind: "standard",
+            metalness: 0,
+            roughness: 0.58,
+          },
+        }),
+      ],
+    );
+
+    expect(catalog.defaultPresetId).toBe("modern-matte");
+    expect(catalog.presets.map((preset) => preset.id)).toEqual([
+      "modern-matte",
+      "classic-matte",
+    ]);
+  });
+
+  test("rejects preset files not listed in catalog order", () => {
+    expect(() =>
+      buildMaterialPresetCatalog(
+        {
+          defaultPresetId: "classic-matte",
+          presetOrder: ["classic-matte"],
+          version: 1,
+        },
+        [
+          validPreset({ id: "classic-matte" }),
+          validPreset({ id: "glossy", label: "Glossy" }),
+        ],
+      ),
+    ).toThrow('Bundled material preset "glossy" is not listed');
   });
 
 });

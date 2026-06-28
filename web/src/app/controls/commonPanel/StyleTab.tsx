@@ -30,7 +30,6 @@ import {
 } from "../../../model/colorSchemes";
 import {
   MATERIAL_PRESET_OPTIONS,
-  materialPresetById,
   type MaterialPresetId,
 } from "../../../model/materialPresets";
 import {
@@ -56,6 +55,7 @@ import {
   COMMON_PANEL_ROW_STACK_CLASS,
   COMMON_PANEL_SECTION_TITLE_TEXT_CLASS,
 } from "./styles";
+import { MaterialPresetToken3D } from "./MaterialPresetToken3D";
 
 const BOND_COLOR_OPTIONS: { label: string; value: BondColorMode }[] = [
   { label: "By atom", value: "by-atom" },
@@ -154,6 +154,9 @@ export function StyleTabContent({
   const [fogResetFeedbackPhase, setFogResetFeedbackPhase] = useState<"a" | "b" | null>(null);
   const fogResetFeedbackTickRef = useRef(0);
   const fogResetFeedbackTimeoutRef = useRef<number | null>(null);
+  const selectedMaterialPresetOption =
+    MATERIAL_PRESET_OPTIONS.find((option) => option.value === style.materialPreset) ??
+    MATERIAL_PRESET_OPTIONS[0];
 
   useEffect(
     () => () => {
@@ -355,7 +358,12 @@ export function StyleTabContent({
               aria-label="Material"
               className={cn("!h-6 w-full !px-2 !py-0", COMMON_PANEL_BODY_TEXT_CLASS)}
             >
-              <SelectValue />
+              {selectedMaterialPresetOption ? (
+                <MaterialPresetOptionLabel
+                  label={selectedMaterialPresetOption.label}
+                  value={selectedMaterialPresetOption.value}
+                />
+              ) : null}
             </SelectTrigger>
             <SelectContent
               position="popper"
@@ -367,7 +375,10 @@ export function StyleTabContent({
                     key={option.value}
                     value={option.value}
                     textValue={option.label}
-                    className={cn("min-h-6 py-0.5", COMMON_PANEL_BODY_TEXT_CLASS)}
+                    className={cn(
+                      "min-h-6 justify-start py-0.5 *:[span]:last:min-w-0 *:[span]:last:flex-1 *:[span]:last:justify-start",
+                      COMMON_PANEL_BODY_TEXT_CLASS,
+                    )}
                   >
                     <MaterialPresetOptionLabel
                       label={option.label}
@@ -522,38 +533,11 @@ function MaterialPresetOptionLabel({
   value: MaterialPresetId;
 }) {
   return (
-    <span className="inline-flex min-w-0 items-center gap-2">
-      <span
-        aria-hidden="true"
-        className="h-3 w-6 shrink-0 rounded-full border border-border"
-        style={materialPresetTokenStyle(value)}
-      />
-      <span className="min-w-0 truncate">{label}</span>
+    <span className="flex w-full min-w-0 items-center justify-start gap-2 text-left">
+      <MaterialPresetToken3D presetId={value} />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
     </span>
   );
-}
-
-function materialPresetTokenStyle(value: MaterialPresetId): CSSProperties {
-  const preset = materialPresetById(value);
-  if (preset.material.kind === "basic") {
-    return {
-      background: "linear-gradient(180deg, #d8dde5 0%, #929aa8 100%)",
-    };
-  }
-
-  if (preset.material.kind === "lambert") {
-    return {
-      background:
-        "linear-gradient(145deg, rgba(255, 255, 255, 0.56) 0 20%, rgba(255, 255, 255, 0) 42%), linear-gradient(180deg, #d7dce4 0%, #aab2be 100%)",
-    };
-  }
-
-  const highlightAlpha = Math.round((1 - preset.material.roughness) * 80) / 100;
-  return {
-    background:
-      `linear-gradient(145deg, rgba(255, 255, 255, ${highlightAlpha}) 0 16%, rgba(255, 255, 255, 0.18) 17% 30%, rgba(255, 255, 255, 0) 44%), ` +
-      "linear-gradient(180deg, #dde4ed 0%, #a0aebc 52%, #7f8996 100%)",
-  };
 }
 
 function BondStyleOptionLabel({

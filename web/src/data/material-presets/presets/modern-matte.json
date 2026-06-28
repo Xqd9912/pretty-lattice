@@ -1,0 +1,20 @@
+{
+  "id": "modern-matte",
+  "label": "Modern Matte",
+  "description": "A smoother physically based matte surface with broader highlights.",
+  "material": {
+    "kind": "standard",
+    "metalness": 0,
+    "roughness": 0.58,
+    "flatShading": false
+  },
+  "lighting": {
+    "ambientIntensity": 0.58,
+    "cameraLights": [
+      {
+        "intensity": 1.95,
+        "offset": [0.32, 0.22, 0]
+      }
+    ]
+  }
+}

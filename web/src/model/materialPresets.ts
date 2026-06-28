@@ -1,4 +1,8 @@
-import bundledMaterialPresetData from "../data/material-presets/bundled.json";
+import materialPresetCatalogData from "../data/material-presets/catalog.json";
+import classicMattePresetData from "../data/material-presets/presets/classic-matte.json";
+import flat2dPresetData from "../data/material-presets/presets/flat-2d.json";
+import glossyPresetData from "../data/material-presets/presets/glossy.json";
+import modernMattePresetData from "../data/material-presets/presets/modern-matte.json";
 
 export type MaterialPresetId = string;
 export type MaterialPresetKind = "basic" | "lambert" | "standard";
@@ -14,6 +18,12 @@ interface MaterialPresetBase {
 export interface MaterialPresetCatalog {
   defaultPresetId: MaterialPresetId;
   presets: MaterialPreset[];
+  version: 1;
+}
+
+export interface MaterialPresetCatalogIndex {
+  defaultPresetId: MaterialPresetId;
+  presetOrder: MaterialPresetId[];
   version: 1;
 }
 
@@ -55,6 +65,12 @@ export interface MaterialPresetOption {
   value: MaterialPresetId;
 }
 
+const BUNDLED_MATERIAL_PRESET_DATA = [
+  classicMattePresetData,
+  flat2dPresetData,
+  glossyPresetData,
+  modernMattePresetData,
+];
 const MATERIAL_PRESET_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SUPPORTED_MATERIAL_KINDS = new Set<MaterialPresetKind>([
   "basic",
@@ -62,8 +78,9 @@ const SUPPORTED_MATERIAL_KINDS = new Set<MaterialPresetKind>([
   "standard",
 ]);
 
-export const MATERIAL_PRESET_CATALOG = validateMaterialPresetData(
-  bundledMaterialPresetData,
+export const MATERIAL_PRESET_CATALOG = buildMaterialPresetCatalog(
+  materialPresetCatalogData,
+  BUNDLED_MATERIAL_PRESET_DATA,
 );
 export const MATERIAL_PRESETS = MATERIAL_PRESET_CATALOG.presets;
 export const DEFAULT_MATERIAL_PRESET_ID =
@@ -82,6 +99,95 @@ export function materialPresetById(id: MaterialPresetId): MaterialPreset {
   }
 
   return preset;
+}
+
+export function buildMaterialPresetCatalog(
+  catalogData: unknown,
+  presetData: unknown[],
+): MaterialPresetCatalog {
+  const catalogIndex = validateMaterialPresetCatalogIndex(catalogData);
+  const parsedPresets = presetData.map((entry, index) =>
+    parseMaterialPreset(entry, `material preset files[${index}]`),
+  );
+  const presetsById = new Map<string, MaterialPreset>();
+  for (const preset of parsedPresets) {
+    if (presetsById.has(preset.id)) {
+      throw new Error(`Duplicate material preset ID "${preset.id}".`);
+    }
+    presetsById.set(preset.id, preset);
+  }
+
+  const orderedPresets = catalogIndex.presetOrder.map((presetId, index) => {
+    const preset = presetsById.get(presetId);
+    if (!preset) {
+      throw new Error(
+        `material presets.presetOrder[${index}] "${presetId}" does not match a bundled preset file.`,
+      );
+    }
+    return preset;
+  });
+
+  if (orderedPresets.length !== presetsById.size) {
+    const orderedPresetIds = new Set(catalogIndex.presetOrder);
+    const unlistedPreset = parsedPresets.find(
+      (preset) => !orderedPresetIds.has(preset.id),
+    );
+    throw new Error(
+      `Bundled material preset "${unlistedPreset?.id ?? "unknown"}" is not listed in material presets.presetOrder.`,
+    );
+  }
+
+  return validateMaterialPresetData({
+    defaultPresetId: catalogIndex.defaultPresetId,
+    presets: orderedPresets,
+    version: catalogIndex.version,
+  });
+}
+
+export function validateMaterialPresetCatalogIndex(
+  data: unknown,
+): MaterialPresetCatalogIndex {
+  const root = expectRecord(data, "material presets");
+  assertKnownKeys(root, "material presets", [
+    "defaultPresetId",
+    "presetOrder",
+    "version",
+  ]);
+
+  const version = root.version;
+  if (version !== 1) {
+    throw new Error("material presets.version must be 1.");
+  }
+
+  const defaultPresetId = expectPresetId(
+    root.defaultPresetId,
+    "material presets.defaultPresetId",
+  );
+  if (!Array.isArray(root.presetOrder) || root.presetOrder.length === 0) {
+    throw new Error("material presets.presetOrder must be a non-empty array.");
+  }
+
+  const ids = new Set<string>();
+  const presetOrder = root.presetOrder.map((entry, index) => {
+    const presetId = expectPresetId(entry, `material presets.presetOrder[${index}]`);
+    if (ids.has(presetId)) {
+      throw new Error(`Duplicate material preset ID "${presetId}".`);
+    }
+    ids.add(presetId);
+    return presetId;
+  });
+
+  if (!ids.has(defaultPresetId)) {
+    throw new Error(
+      `material presets.defaultPresetId "${defaultPresetId}" does not match a bundled preset.`,
+    );
+  }
+
+  return {
+    defaultPresetId,
+    presetOrder,
+    version,
+  };
 }
 
 export function validateMaterialPresetData(data: unknown): MaterialPresetCatalog {

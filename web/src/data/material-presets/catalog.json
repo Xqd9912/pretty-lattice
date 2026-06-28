@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "defaultPresetId": "classic-matte",
+  "presetOrder": ["classic-matte", "modern-matte", "glossy", "flat-2d"]
+}

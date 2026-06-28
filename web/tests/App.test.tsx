@@ -17,6 +17,7 @@ import {
   PREVIEW_PERFORMANCE_ATOM_COUNT_THRESHOLD,
   type ExportFormat,
 } from "../src/app/settings";
+import { MATERIAL_PRESET_OPTIONS } from "../src/model/materialPresets";
 
 interface FetchCall {
   input: RequestInfo | URL;
@@ -275,6 +276,13 @@ describe("App", () => {
     expect(within(legend).getByText("Cl").isConnected).toBe(true);
     expect(screen.getByRole("complementary", { name: "View controls" }).isConnected).toBe(true);
     const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    const materialTokenPreloadPool = commonControls.querySelector(
+      "[data-slot='material-preset-token-preload-pool']",
+    );
+    expect(materialTokenPreloadPool).not.toBeNull();
+    expect(
+      materialTokenPreloadPool?.querySelectorAll("[data-slot='material-preset-token-renderer']").length,
+    ).toBe(MATERIAL_PRESET_OPTIONS.length);
     const displayTab = within(commonControls).getByRole("tab", { name: "Display" });
     expect(displayTab.isConnected).toBe(true);
     expect(displayTab.className).toContain("rounded-lg");
