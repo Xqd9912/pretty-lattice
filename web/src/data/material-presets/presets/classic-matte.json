@@ -7,10 +7,10 @@
     "flatShading": false
   },
   "lighting": {
-    "ambientIntensity": 0.68,
+    "ambientIntensity": 0.8,
     "cameraLights": [
       {
-        "intensity": 1.78,
+        "intensity": 1.8,
         "offset": [0.32, 0.22, 0]
       }
     ]

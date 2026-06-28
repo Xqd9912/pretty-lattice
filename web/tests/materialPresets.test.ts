@@ -16,22 +16,29 @@ describe("material presets", () => {
       "classic-matte",
       "modern-matte",
       "glossy",
+      "metallic",
       "flat-2d",
     ]);
     expect(MATERIAL_PRESET_OPTIONS).toEqual([
       { label: "Classic Matte", value: "classic-matte" },
       { label: "Modern Matte", value: "modern-matte" },
       { label: "Glossy", value: "glossy" },
+      { label: "Metallic", value: "metallic" },
       { label: "Flat 2D", value: "flat-2d" },
     ]);
     expect(materialPresetById("glossy").material).toMatchObject({
       kind: "standard",
-      metalness: 0.08,
-      roughness: 0.38,
+      metalness: 0,
+      roughness: 0.25,
+    });
+    expect(materialPresetById("metallic").material).toMatchObject({
+      kind: "standard",
+      metalness: 0.4,
+      roughness: 0.4,
     });
     expect(materialPresetById("glossy").lighting.cameraLights).toEqual([
       {
-        intensity: 2.05,
+        intensity: 2,
         offset: [0.32, 0.22, 0],
       },
     ]);

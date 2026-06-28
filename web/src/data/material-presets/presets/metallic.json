@@ -1,0 +1,20 @@
+{
+  "id": "metallic",
+  "label": "Metallic",
+  "description": "A reflective metal-like surface with compact highlights.",
+  "material": {
+    "kind": "standard",
+    "metalness": 0.4,
+    "roughness": 0.4,
+    "flatShading": false
+  },
+  "lighting": {
+    "ambientIntensity": 0.9,
+    "cameraLights": [
+      {
+        "intensity": 2.2,
+        "offset": [0.32, 0.22, 0]
+      }
+    ]
+  }
+}

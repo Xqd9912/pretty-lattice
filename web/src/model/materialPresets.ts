@@ -2,6 +2,7 @@ import materialPresetCatalogData from "../data/material-presets/catalog.json";
 import classicMattePresetData from "../data/material-presets/presets/classic-matte.json";
 import flat2dPresetData from "../data/material-presets/presets/flat-2d.json";
 import glossyPresetData from "../data/material-presets/presets/glossy.json";
+import metallicPresetData from "../data/material-presets/presets/metallic.json";
 import modernMattePresetData from "../data/material-presets/presets/modern-matte.json";
 
 export type MaterialPresetId = string;
@@ -69,6 +70,7 @@ const BUNDLED_MATERIAL_PRESET_DATA = [
   classicMattePresetData,
   flat2dPresetData,
   glossyPresetData,
+  metallicPresetData,
   modernMattePresetData,
 ];
 const MATERIAL_PRESET_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
