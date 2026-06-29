@@ -8,8 +8,6 @@ import type { PreviewSafeArea } from "../model/layout";
 import {
   DEFAULT_DRAG_SENSITIVITY,
   DEFAULT_PREVIEW_MESH_QUALITY,
-  type AtomRenderingMode,
-  type BondRenderingMode,
   type ComponentOpacityState,
   type MeshQuality,
   type StyleState,
@@ -81,8 +79,6 @@ const FPS_SMOOTHING_WEIGHT = 0.18;
 
 export function LatticeScene({
   cameraOrientationRef,
-  atomRenderingMode = "mesh",
-  bondRenderingMode = "mesh",
   cameraAnimatedCommandVersion = 0,
   cameraInteractionStore,
   cameraState,
@@ -116,8 +112,6 @@ export function LatticeScene({
   unitCellLineStyle = "solid",
 }: {
   cameraOrientationRef?: CameraOrientationRef;
-  atomRenderingMode?: AtomRenderingMode;
-  bondRenderingMode?: BondRenderingMode;
   cameraAnimatedCommandVersion?: number;
   cameraInteractionStore: CameraInteractionStore;
   cameraCommandVersion: number;
@@ -216,8 +210,6 @@ export function LatticeScene({
         safeArea={safeArea}
       />
       <PreviewSceneContent
-        atomRenderingMode={atomRenderingMode}
-        bondRenderingMode={bondRenderingMode}
         componentOpacity={componentOpacity}
         layout={layout}
         materialFamily={materialFamily}

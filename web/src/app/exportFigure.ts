@@ -40,8 +40,6 @@ const EXPORT_ACCESSORY_LONG_SIDE_WEIGHT = 0.25;
 
 export async function createFigureExportFiles({
   cameraOrientationRef,
-  atomRenderingMode,
-  bondRenderingMode,
   componentOpacity,
   componentVisibility,
   fileName,
@@ -61,8 +59,6 @@ export async function createFigureExportFiles({
     return [
       await createCombinedExportFile({
         cameraOrientationRef,
-        atomRenderingMode,
-        bondRenderingMode,
         componentOpacity,
         componentVisibility,
         fileName,
@@ -83,8 +79,6 @@ export async function createFigureExportFiles({
     files.push(
       await createStructureExportFile({
         cameraOrientationRef,
-        atomRenderingMode,
-        bondRenderingMode,
         componentOpacity,
         componentVisibility,
         fileName,
@@ -137,8 +131,6 @@ export async function createFigureExportFiles({
 
 export async function createFigureExportFile({
   cameraOrientationRef,
-  atomRenderingMode,
-  bondRenderingMode,
   componentOpacity,
   componentVisibility,
   fileName,
@@ -151,8 +143,6 @@ export async function createFigureExportFile({
 }: CreateFigureExportOptions): Promise<FigureExportFile> {
   return createStructureExportFile({
     cameraOrientationRef,
-    atomRenderingMode,
-    bondRenderingMode,
     componentOpacity,
     componentVisibility,
     fileName,

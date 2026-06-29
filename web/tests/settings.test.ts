@@ -10,8 +10,6 @@ import {
   STYLE_SCALE_MIN,
   DEFAULT_SHOW_CRYSTAL_AXIS_LABELS,
   DEFAULT_UNIT_CELL_LINE_STYLE,
-  defaultAtomRenderingModeForScene,
-  defaultBondRenderingModeForScene,
   defaultPreviewMeshQualityForScene,
   createDefaultExportSettings,
   createDefaultStyle,
@@ -39,19 +37,10 @@ import {
 } from "../src/model";
 
 describe("settings", () => {
-  test("defaults rendering modes to batched paths and keeps the large-scene mesh quality threshold", () => {
+  test("keeps the large-scene mesh quality threshold", () => {
     const belowThreshold = STRUCTURE_ATOM_COUNT_THRESHOLD - 1;
     const atThreshold = STRUCTURE_ATOM_COUNT_THRESHOLD;
     const aboveThreshold = STRUCTURE_ATOM_COUNT_THRESHOLD + 1;
-
-    expect(defaultAtomRenderingModeForScene(null)).toBe("instanced");
-    expect(defaultAtomRenderingModeForScene(sceneWithAtomCount(belowThreshold))).toBe("instanced");
-    expect(defaultAtomRenderingModeForScene(sceneWithAtomCount(atThreshold))).toBe("instanced");
-    expect(defaultAtomRenderingModeForScene(sceneWithAtomCount(aboveThreshold))).toBe("instanced");
-    expect(defaultBondRenderingModeForScene(null)).toBe("batched");
-    expect(defaultBondRenderingModeForScene(sceneWithAtomCount(belowThreshold))).toBe("batched");
-    expect(defaultBondRenderingModeForScene(sceneWithAtomCount(atThreshold))).toBe("batched");
-    expect(defaultBondRenderingModeForScene(sceneWithAtomCount(aboveThreshold))).toBe("batched");
 
     expect(defaultPreviewMeshQualityForScene(null)).toBe("medium");
     expect(defaultPreviewMeshQualityForScene(sceneWithAtomCount(belowThreshold))).toBe("medium");

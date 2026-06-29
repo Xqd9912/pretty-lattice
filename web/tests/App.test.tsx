@@ -374,7 +374,7 @@ describe("App", () => {
     ).toHaveProperty("value", defaultCamera.direct[2].toFixed(2));
   });
 
-  test("keeps preview rendering controls in the settings sidebar", async () => {
+  test("keeps preview quality in the settings sidebar without rendering backend toggles", async () => {
     const user = userEvent.setup();
 
     await renderLoadedStructure(user);
@@ -392,39 +392,31 @@ describe("App", () => {
     expect(within(sidebar).getByRole("heading", { name: "Rendering" })).toBeTruthy();
     expect(within(sidebar).getByRole("heading", { name: "Interaction" })).toBeTruthy();
     expect(within(sidebar).getByRole("heading", { name: "Analysis" })).toBeTruthy();
-    const atomRenderingSelect = within(sidebar).getByRole("combobox", {
-      name: "Atom rendering mode",
-    });
-    const bondRenderingSelect = within(sidebar).getByRole("combobox", {
-      name: "Bond rendering mode",
-    });
+    expect(
+      within(sidebar).queryByRole("combobox", {
+        name: "Atom rendering mode",
+      }),
+    ).toBeNull();
+    expect(
+      within(sidebar).queryByRole("combobox", {
+        name: "Bond rendering mode",
+      }),
+    ).toBeNull();
     const previewMeshSelect = within(sidebar).getByRole("combobox", {
       name: "Preview quality",
     });
 
-    expect(atomRenderingSelect.textContent).toContain("Instanced");
-    expect(bondRenderingSelect.textContent).toContain("Batched");
     expect(previewMeshSelect.textContent).toContain("Medium");
 
-    await user.click(atomRenderingSelect);
-    await user.click(await screen.findByRole("option", { name: "Independent" }));
-    await user.click(bondRenderingSelect);
-    await user.click(await screen.findByRole("option", { name: "Independent" }));
     await user.click(previewMeshSelect);
     await user.click(await screen.findByRole("option", { name: "XHigh" }));
 
-    expect(
-      within(sidebar).getByRole("combobox", { name: "Atom rendering mode" }).textContent,
-    ).toContain("Independent");
-    expect(
-      within(sidebar).getByRole("combobox", { name: "Bond rendering mode" }).textContent,
-    ).toContain("Independent");
     expect(
       within(sidebar).getByRole("combobox", { name: "Preview quality" }).textContent,
     ).toContain("XHigh");
   });
 
-  test("defaults large preview structures to instanced atoms and low mesh quality", async () => {
+  test("defaults large preview structures to low mesh quality", async () => {
     const user = userEvent.setup();
 
     await renderLoadedStructure(
@@ -437,13 +429,13 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Sidebar" }));
     const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
     expect(
-      within(sidebar).getByRole("combobox", {
+      within(sidebar).queryByRole("combobox", {
         name: "Atom rendering mode",
-      }).textContent,
-    ).toContain("Instanced");
+      }),
+    ).toBeNull();
     expect(
-      within(sidebar).getByRole("combobox", { name: "Bond rendering mode" }).textContent,
-    ).toContain("Batched");
+      within(sidebar).queryByRole("combobox", { name: "Bond rendering mode" }),
+    ).toBeNull();
     expect(
       within(sidebar).getByRole("combobox", { name: "Preview quality" }).textContent,
     ).toContain("Low");
@@ -641,11 +633,11 @@ describe("App", () => {
     expect(within(inspector).queryByText("Renderer")).toBeNull();
     expect(within(inspector).queryByRole("combobox", { name: "Renderer" })).toBeNull();
     expect(
-      within(inspector).getByRole("combobox", { name: "Atom rendering mode" }).textContent,
-    ).toContain("Instanced");
+      within(inspector).queryByRole("combobox", { name: "Atom rendering mode" }),
+    ).toBeNull();
     expect(
-      within(inspector).getByRole("combobox", { name: "Bond rendering mode" }).textContent,
-    ).toContain("Batched");
+      within(inspector).queryByRole("combobox", { name: "Bond rendering mode" }),
+    ).toBeNull();
     expect(screen.queryByTestId("fps-overlay")).toBeNull();
     const showFpsSwitch = within(inspector).getByRole("switch", { name: "Show FPS" });
     expect(showFpsSwitch.getAttribute("aria-checked")).toBe("false");
@@ -1162,7 +1154,7 @@ describe("App", () => {
     expect(fogAmountInput.disabled).toBe(false);
   });
 
-  test("selects material presets without re-uploading or changing independent controls", async () => {
+  test("selects material presets without re-uploading or changing other style controls", async () => {
     const user = userEvent.setup();
 
     await renderLoadedStructure(user);

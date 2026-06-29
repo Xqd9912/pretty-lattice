@@ -1,8 +1,6 @@
 import type { SceneSpec } from "../api/scene";
 import type { CameraOrientationRef } from "../scene/LatticeScene";
 import type {
-  AtomRenderingMode,
-  BondRenderingMode,
   ComponentOpacityState,
   ComponentVisibilityState,
   ExportFormat,
@@ -13,8 +11,6 @@ import type {
 
 export interface CreateFigureExportOptions {
   cameraOrientationRef: CameraOrientationRef;
-  atomRenderingMode: AtomRenderingMode;
-  bondRenderingMode: BondRenderingMode;
   componentOpacity: ComponentOpacityState;
   componentVisibility: ComponentVisibilityState;
   fileName: string | null;

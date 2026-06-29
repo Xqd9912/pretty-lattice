@@ -55,8 +55,6 @@ import { useAutoBlurSlider } from "../controls/commonPanel/sharedControls";
 import {
   MESH_QUALITY_LABELS,
   MESH_QUALITY_OPTIONS,
-  type AtomRenderingMode,
-  type BondRenderingMode,
   type MeshQuality,
   type UnitCellLineStyle,
 } from "../../model";
@@ -106,8 +104,6 @@ export function InspectorToggle({
 }
 
 export function InspectorSidebar({
-  atomRenderingMode,
-  bondRenderingMode,
   bondAlgorithm,
   distinguishSimilarColors,
   dragSensitivity,
@@ -120,8 +116,6 @@ export function InspectorSidebar({
   showFpsOverlay,
   showCrystalAxisLabels,
   unitCellLineStyle,
-  onAtomRenderingModeChange,
-  onBondRenderingModeChange,
   onBondAlgorithmChange,
   onDistinguishSimilarColorsChange,
   onDragSensitivityChange,
@@ -133,8 +127,6 @@ export function InspectorSidebar({
   onShowCrystalAxisLabelsChange,
   onUnitCellLineStyleChange,
 }: {
-  atomRenderingMode: AtomRenderingMode;
-  bondRenderingMode: BondRenderingMode;
   bondAlgorithm: BondAlgorithm;
   distinguishSimilarColors: boolean;
   dragSensitivity: number;
@@ -147,8 +139,6 @@ export function InspectorSidebar({
   showFpsOverlay: boolean;
   showCrystalAxisLabels: boolean;
   unitCellLineStyle: UnitCellLineStyle;
-  onAtomRenderingModeChange: (mode: AtomRenderingMode) => void;
-  onBondRenderingModeChange: (mode: BondRenderingMode) => void;
   onBondAlgorithmChange: (bondAlgorithm: BondAlgorithm) => void;
   onDistinguishSimilarColorsChange: (distinguishSimilarColors: boolean) => void;
   onDragSensitivityChange: (dragSensitivity: number) => void;
@@ -196,8 +186,6 @@ export function InspectorSidebar({
         >
           <TabsContent value="settings" className="m-0">
             <SettingsPanel
-              atomRenderingMode={atomRenderingMode}
-              bondRenderingMode={bondRenderingMode}
               bondAlgorithm={bondAlgorithm}
               distinguishSimilarColors={distinguishSimilarColors}
               dragSensitivity={dragSensitivity}
@@ -209,8 +197,6 @@ export function InspectorSidebar({
               showFpsOverlay={showFpsOverlay}
               showCrystalAxisLabels={showCrystalAxisLabels}
               unitCellLineStyle={unitCellLineStyle}
-              onAtomRenderingModeChange={onAtomRenderingModeChange}
-              onBondRenderingModeChange={onBondRenderingModeChange}
               onBondAlgorithmChange={onBondAlgorithmChange}
               onDistinguishSimilarColorsChange={onDistinguishSimilarColorsChange}
               onDragSensitivityChange={onDragSensitivityChange}
@@ -230,8 +216,6 @@ export function InspectorSidebar({
 }
 
 function SettingsPanel({
-  atomRenderingMode,
-  bondRenderingMode,
   bondAlgorithm,
   distinguishSimilarColors,
   dragSensitivity,
@@ -243,8 +227,6 @@ function SettingsPanel({
   showFpsOverlay,
   showCrystalAxisLabels,
   unitCellLineStyle,
-  onAtomRenderingModeChange,
-  onBondRenderingModeChange,
   onBondAlgorithmChange,
   onDistinguishSimilarColorsChange,
   onDragSensitivityChange,
@@ -256,8 +238,6 @@ function SettingsPanel({
   onShowCrystalAxisLabelsChange,
   onUnitCellLineStyleChange,
 }: {
-  atomRenderingMode: AtomRenderingMode;
-  bondRenderingMode: BondRenderingMode;
   bondAlgorithm: BondAlgorithm;
   distinguishSimilarColors: boolean;
   dragSensitivity: number;
@@ -269,8 +249,6 @@ function SettingsPanel({
   showFpsOverlay: boolean;
   showCrystalAxisLabels: boolean;
   unitCellLineStyle: UnitCellLineStyle;
-  onAtomRenderingModeChange: (mode: AtomRenderingMode) => void;
-  onBondRenderingModeChange: (mode: BondRenderingMode) => void;
   onBondAlgorithmChange: (bondAlgorithm: BondAlgorithm) => void;
   onDistinguishSimilarColorsChange: (distinguishSimilarColors: boolean) => void;
   onDragSensitivityChange: (dragSensitivity: number) => void;
@@ -346,56 +324,6 @@ function SettingsPanel({
       <Separator />
 
       <InspectorSettingsSection id="inspector-rendering-settings" title="Rendering">
-        <InspectorSelectRow label="Atom mesh">
-          <Select
-            value={atomRenderingMode}
-            onValueChange={(value) => onAtomRenderingModeChange(value as AtomRenderingMode)}
-          >
-            <SelectTrigger
-              size="sm"
-              aria-label="Atom rendering mode"
-              className={INSPECTOR_SELECT_TRIGGER_CLASS}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper" className="!bg-background !text-foreground">
-              <SelectGroup>
-                <SelectItem value="mesh" className={INSPECTOR_SELECT_ITEM_CLASS}>
-                  Independent
-                </SelectItem>
-                <SelectItem value="instanced" className={INSPECTOR_SELECT_ITEM_CLASS}>
-                  Instanced
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </InspectorSelectRow>
-
-        <InspectorSelectRow label="Bond mesh">
-          <Select
-            value={bondRenderingMode}
-            onValueChange={(value) => onBondRenderingModeChange(value as BondRenderingMode)}
-          >
-            <SelectTrigger
-              size="sm"
-              aria-label="Bond rendering mode"
-              className={INSPECTOR_SELECT_TRIGGER_CLASS}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper" className="!bg-background !text-foreground">
-              <SelectGroup>
-                <SelectItem value="mesh" className={INSPECTOR_SELECT_ITEM_CLASS}>
-                  Independent
-                </SelectItem>
-                <SelectItem value="batched" className={INSPECTOR_SELECT_ITEM_CLASS}>
-                  Batched
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </InspectorSelectRow>
-
         <InspectorSelectRow label="Preview quality">
           <Select
             value={previewMeshQuality}

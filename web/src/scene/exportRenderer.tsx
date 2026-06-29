@@ -5,8 +5,6 @@ import { Quaternion, Vector3 } from "three";
 import type { SceneSpec } from "../api/scene";
 import type {
   ComponentOpacityState,
-  AtomRenderingMode,
-  BondRenderingMode,
   ExportMeshQuality,
   ExportSupersampling,
   StyleState,
@@ -67,8 +65,6 @@ export interface RasterExportTextItem {
 }
 
 export interface RenderStructureRasterOptions {
-  atomRenderingMode: AtomRenderingMode;
-  bondRenderingMode: BondRenderingMode;
   backgroundColor: string | null;
   cameraPose: CameraPoseSnapshot;
   componentOpacity: ComponentOpacityState;
@@ -102,8 +98,6 @@ export interface RenderCrystalAxesRasterOptions {
 }
 
 export async function renderStructureRasterImage({
-  atomRenderingMode,
-  bondRenderingMode,
   backgroundColor,
   cameraPose,
   componentOpacity,
@@ -189,8 +183,6 @@ export async function renderStructureRasterImage({
           lighting={materialFamily.lighting}
         />
         <ExportSceneContent
-          atomRenderingMode={atomRenderingMode}
-          bondRenderingMode={bondRenderingMode}
           cameraPose={cameraPose}
           componentOpacity={componentOpacity}
           exportFramePlan={exportFramePlan}

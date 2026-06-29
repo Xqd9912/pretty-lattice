@@ -7,8 +7,6 @@ import {
   autoDistinctElementColorOverrides,
 } from "../model/colorSchemes";
 import type {
-  AtomRenderingMode,
-  BondRenderingMode,
   ComponentOpacityState,
   ExportMeshQuality,
   StyleState,
@@ -19,9 +17,7 @@ import type { ResolvedStructureMaterialFamily } from "./materialPresetResolver";
 import type { SceneLayout } from "./sceneLayout";
 import type { VectorTuple } from "./viewMath";
 import { InstancedAtoms } from "./InstancedAtoms";
-import { MemoizedAtomMesh } from "./AtomMesh";
 import { BatchedBonds } from "./BatchedBonds";
-import { MemoizedBondMesh } from "./BondMesh";
 import { createBondRenderItems } from "./BondRenderItems";
 import { CellFrame } from "./CellFrame";
 import { MemoizedPolyhedronMesh } from "./PolyhedronMesh";
@@ -68,8 +64,6 @@ export const EXPORT_SCENE_MESH_DETAIL_PRESETS: Record<ExportMeshQuality, SceneMe
 };
 
 export function PreviewSceneContent({
-  atomRenderingMode,
-  bondRenderingMode,
   componentOpacity,
   layout,
   materialFamily,
@@ -89,8 +83,6 @@ export function PreviewSceneContent({
   unitCellLineStyle = "solid",
   unitCellLineWidthScale = 1,
 }: {
-  atomRenderingMode: AtomRenderingMode;
-  bondRenderingMode: BondRenderingMode;
   componentOpacity: ComponentOpacityState;
   layout: SceneLayout;
   materialFamily: ResolvedStructureMaterialFamily;
@@ -114,8 +106,6 @@ export function PreviewSceneContent({
     <>
       <SceneFog layout={layout} style={style} />
       <MemoizedStructureSceneObjects
-        atomRenderingMode={atomRenderingMode}
-        bondRenderingMode={bondRenderingMode}
         componentOpacity={componentOpacity}
         groupPosition={layout.groupPosition}
         materialFamily={materialFamily}
@@ -235,8 +225,6 @@ function lerp(start: number, end: number, amount: number): number {
 }
 
 export function StructureSceneObjects({
-  atomRenderingMode = "mesh",
-  bondRenderingMode = "mesh",
   componentOpacity,
   groupPosition,
   interactionLocked = false,
@@ -257,8 +245,6 @@ export function StructureSceneObjects({
   unitCellLineStyle = "solid",
   unitCellLineWidthScale = 1,
 }: {
-  atomRenderingMode?: AtomRenderingMode;
-  bondRenderingMode?: BondRenderingMode;
   componentOpacity: ComponentOpacityState;
   groupPosition: VectorTuple;
   interactionLocked?: boolean;
@@ -340,29 +326,15 @@ export function StructureSceneObjects({
             lineWidthScale={polyhedronEdgeLineWidthScale}
           />
         ))}
-        {bondRenderingMode === "batched" ? (
-          <BatchedBonds
-            bondRenderItems={bondRenderItems}
-            colorMode={style.bondColorMode}
-            materialFamily={materialFamily}
-            meshDetail={meshDetail}
-            thicknessScale={style.bondThickness / 100}
-            opacity={componentOpacity.bonds / 100}
-          />
-        ) : (
-          bondRenderItems.map((bondRenderItem, bondIndex) => (
-            <MemoizedBondMesh
-              key={`${bondRenderItem.startAtomIndex}:${bondRenderItem.endAtomIndex}:${bondIndex}`}
-              bondRenderItem={bondRenderItem}
-              colorMode={style.bondColorMode}
-              materialFamily={materialFamily}
-              meshDetail={meshDetail}
-              thicknessScale={style.bondThickness / 100}
-              opacity={componentOpacity.bonds / 100}
-            />
-          ))
-        )}
-        {showAtoms && atomRenderingMode === "instanced" ? (
+        <BatchedBonds
+          bondRenderItems={bondRenderItems}
+          colorMode={style.bondColorMode}
+          materialFamily={materialFamily}
+          meshDetail={meshDetail}
+          thicknessScale={style.bondThickness / 100}
+          opacity={componentOpacity.bonds / 100}
+        />
+        {showAtoms ? (
           <InstancedAtoms
             atoms={scene.atoms}
             colorScheme={style.colorScheme}
@@ -380,26 +352,6 @@ export function StructureSceneObjects({
             radiusScale={style.atomRadius / 100}
             opacity={componentOpacity.atoms / 100}
           />
-        ) : showAtoms ? (
-          scene.atoms.map((atom) => (
-            <MemoizedAtomMesh
-              key={atom.id}
-              atom={atom}
-              colorScheme={style.colorScheme}
-              colorOverrides={colorOverrides}
-              inspected={inspectedAtomId === atom.id}
-              interactionLocked={interactionLocked}
-              materialFamily={materialFamily}
-              meshDetail={meshDetail}
-              onInspect={onAtomInspect}
-              onPulse={onAtomPulse}
-              onLockedInteractionAttempt={onLockedInteractionAttempt}
-              pulseToken={pulseAtomId === atom.id ? pulseToken : 0}
-              radiusModel={style.atomRadiusModel}
-              radiusScale={style.atomRadius / 100}
-              opacity={componentOpacity.atoms / 100}
-            />
-          ))
         ) : null}
       </group>
     </group>

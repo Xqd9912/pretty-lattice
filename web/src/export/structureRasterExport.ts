@@ -2,8 +2,6 @@ import type { SceneSpec } from "../api/scene";
 import type { CameraPoseSnapshot } from "../scene/cameraPose";
 import type { RasterExportImage } from "../scene/exportRenderer";
 import type {
-  AtomRenderingMode,
-  BondRenderingMode,
   ComponentOpacityState,
   ComponentVisibilityState,
   ExportSettingsState,
@@ -18,8 +16,6 @@ import {
 const DARK_BACKGROUND_UNIT_CELL_LINE_COLOR = "#bbbbbb";
 
 export async function renderExportRaster({
-  atomRenderingMode,
-  bondRenderingMode,
   cameraPose,
   componentOpacity,
   componentVisibility,
@@ -29,8 +25,6 @@ export async function renderExportRaster({
   unitCellLineStyle,
   visibleScene,
 }: {
-  atomRenderingMode: AtomRenderingMode;
-  bondRenderingMode: BondRenderingMode;
   cameraPose: CameraPoseSnapshot;
   componentOpacity: ComponentOpacityState;
   componentVisibility: ComponentVisibilityState;
@@ -43,8 +37,6 @@ export async function renderExportRaster({
   const { renderStructureRasterImage } = await import("../scene/exportRenderer");
 
   return renderStructureRasterImage({
-    atomRenderingMode,
-    bondRenderingMode,
     backgroundColor: exportBackgroundColor(settings.background),
     cameraPose,
     componentOpacity,

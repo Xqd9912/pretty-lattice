@@ -6,8 +6,6 @@ import type {
   RasterExportTextItem,
 } from "../scene/exportRenderer";
 import type {
-  AtomRenderingMode,
-  BondRenderingMode,
   ComponentOpacityState,
   ComponentVisibilityState,
   ExportSettingsState,
@@ -36,8 +34,6 @@ import {
 const EXPORT_ACCESSORY_PADDING_RATIO = 0.08;
 
 interface CombinedExportRasterOptions {
-  atomRenderingMode: AtomRenderingMode;
-  bondRenderingMode: BondRenderingMode;
   cameraPose: CameraPoseSnapshot;
   componentOpacity: ComponentOpacityState;
   componentVisibility: ComponentVisibilityState;
@@ -58,8 +54,6 @@ interface CombinedExportLayer {
 }
 
 export async function renderCombinedExportRaster({
-  atomRenderingMode,
-  bondRenderingMode,
   cameraPose,
   componentOpacity,
   componentVisibility,
@@ -80,8 +74,6 @@ export async function renderCombinedExportRaster({
     }
 
     const structureImage = await renderExportRaster({
-      atomRenderingMode,
-      bondRenderingMode,
       cameraPose,
       componentOpacity,
       componentVisibility,

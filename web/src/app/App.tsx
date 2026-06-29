@@ -58,11 +58,7 @@ import {
   createDefaultStyle,
   DEFAULT_SHOW_CRYSTAL_AXIS_LABELS,
   DEFAULT_UNIT_CELL_LINE_STYLE,
-  defaultAtomRenderingModeForScene,
-  defaultBondRenderingModeForScene,
   defaultPreviewMeshQualityForScene,
-  type AtomRenderingMode,
-  type BondRenderingMode,
   type MeshQuality,
   type UnitCellLineStyle,
   hasPolyhedra,
@@ -88,12 +84,6 @@ export function App() {
   );
   const [componentOpacity, setComponentOpacity] = useState(createDefaultComponentOpacity);
   const [style, setStyle] = useState(createDefaultStyle);
-  const [atomRenderingMode, setAtomRenderingMode] = useState<AtomRenderingMode>(
-    () => defaultAtomRenderingModeForScene(null),
-  );
-  const [bondRenderingMode, setBondRenderingMode] = useState<BondRenderingMode>(
-    () => defaultBondRenderingModeForScene(null),
-  );
   const [previewMeshQuality, setPreviewMeshQuality] = useState<MeshQuality>(
     () => defaultPreviewMeshQualityForScene(null),
   );
@@ -129,8 +119,6 @@ export function App() {
   const handleBondAlgorithmSceneLoaded = useCallback((nextScene: SceneSpec) => {
     setInspectedAtomId(null);
     setPulseAtom(null);
-    setAtomRenderingMode(defaultAtomRenderingModeForScene(nextScene));
-    setBondRenderingMode(defaultBondRenderingModeForScene(nextScene));
     setPreviewMeshQuality(defaultPreviewMeshQualityForScene(nextScene));
     setUnitCellLineStyle(DEFAULT_UNIT_CELL_LINE_STYLE);
     setShowCrystalAxisLabels(DEFAULT_SHOW_CRYSTAL_AXIS_LABELS);
@@ -206,8 +194,6 @@ export function App() {
     setExportError,
     syncProjectedSizeForExportTab,
   } = useFigureExportController({
-    atomRenderingMode,
-    bondRenderingMode,
     cameraOrientationRef,
     componentOpacity,
     componentVisibility,
@@ -268,8 +254,6 @@ export function App() {
       setComponentVisibility(createDefaultComponentVisibility(nextScene));
       setComponentOpacity(createDefaultComponentOpacity());
       setStyle(createDefaultStyle());
-      setAtomRenderingMode(defaultAtomRenderingModeForScene(nextScene));
-      setBondRenderingMode(defaultBondRenderingModeForScene(nextScene));
       setPreviewMeshQuality(defaultPreviewMeshQualityForScene(nextScene));
       setUnitCellLineStyle(DEFAULT_UNIT_CELL_LINE_STYLE);
       setShowCrystalAxisLabels(DEFAULT_SHOW_CRYSTAL_AXIS_LABELS);
@@ -290,15 +274,6 @@ export function App() {
   useLayoutEffect(() => {
     resetLoadedPreviewStateRef.current = resetLoadedPreviewState;
   }, [resetLoadedPreviewState]);
-
-  const handleAtomRenderingModeChange = useCallback((nextMode: AtomRenderingMode) => {
-    setPulseAtom(null);
-    setAtomRenderingMode(nextMode);
-  }, []);
-
-  const handleBondRenderingModeChange = useCallback((nextMode: BondRenderingMode) => {
-    setBondRenderingMode(nextMode);
-  }, []);
 
   const handlePreviewMeshQualityChange = useCallback((nextQuality: MeshQuality) => {
     setPreviewMeshQuality(nextQuality);
@@ -406,8 +381,6 @@ export function App() {
                 cameraAnimatedCommandVersion={cameraAnimatedCommandVersion}
                 cameraCommandVersion={cameraCommandVersion}
                 cameraState={viewState.camera}
-                atomRenderingMode={atomRenderingMode}
-                bondRenderingMode={bondRenderingMode}
                 cameraOrientationRef={cameraOrientationRef}
                 onCameraOrientationFrame={requestOrientationGizmoFrame}
                 onCameraOrientationChange={handleCameraOrientationChange}
@@ -620,8 +593,6 @@ export function App() {
           />
 
           <InspectorSidebar
-            atomRenderingMode={atomRenderingMode}
-            bondRenderingMode={bondRenderingMode}
             bondAlgorithm={bondAlgorithm}
             dragSensitivity={viewState.dragSensitivity}
             interactionMode={viewState.interactionMode}
@@ -634,8 +605,6 @@ export function App() {
             showFpsOverlay={viewState.showFpsOverlay}
             showCrystalAxisLabels={showCrystalAxisLabels}
             unitCellLineStyle={unitCellLineStyle}
-            onAtomRenderingModeChange={handleAtomRenderingModeChange}
-            onBondRenderingModeChange={handleBondRenderingModeChange}
             onBondAlgorithmChange={(nextBondAlgorithm) => {
               void handleBondAlgorithmChange(nextBondAlgorithm);
             }}

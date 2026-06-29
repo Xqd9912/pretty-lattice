@@ -16,8 +16,6 @@ import {
 import {
   createDefaultExportSettings,
   syncExportSettingsProjectedSize,
-  type AtomRenderingMode,
-  type BondRenderingMode,
   type ComponentOpacityState,
   type ComponentVisibilityState,
   type ExportProjectedSize,
@@ -27,8 +25,6 @@ import {
 } from "../../model";
 
 interface UseFigureExportControllerOptions {
-  atomRenderingMode: AtomRenderingMode;
-  bondRenderingMode: BondRenderingMode;
   cameraOrientationRef: RefObject<Quaternion>;
   componentOpacity: ComponentOpacityState;
   componentVisibility: ComponentVisibilityState;
@@ -42,8 +38,6 @@ interface UseFigureExportControllerOptions {
 }
 
 export function useFigureExportController({
-  atomRenderingMode,
-  bondRenderingMode,
   cameraOrientationRef,
   componentOpacity,
   componentVisibility,
@@ -152,8 +146,6 @@ export function useFigureExportController({
         cameraOrientationRef,
         componentOpacity,
         componentVisibility,
-        atomRenderingMode,
-        bondRenderingMode,
         fileName: selectedFileName,
         lightStrength,
         scene,
@@ -173,8 +165,6 @@ export function useFigureExportController({
       setIsExporting(false);
     }
   }, [
-    atomRenderingMode,
-    bondRenderingMode,
     cameraOrientationRef,
     componentOpacity,
     componentVisibility,

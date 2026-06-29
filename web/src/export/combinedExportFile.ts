@@ -10,8 +10,6 @@ import { exportFileStem } from "./fileNames";
 
 export async function createCombinedExportFile({
   cameraOrientationRef,
-  atomRenderingMode,
-  bondRenderingMode,
   componentOpacity,
   componentVisibility,
   fileName,
@@ -25,8 +23,6 @@ export async function createCombinedExportFile({
   const visibleScene = visibleSceneForComponents(scene, componentVisibility);
   const cameraPose = createCameraPoseSnapshot(cameraOrientationRef.current);
   const rasterImage = await renderCombinedExportRaster({
-    atomRenderingMode,
-    bondRenderingMode,
     cameraPose,
     componentOpacity,
     componentVisibility,

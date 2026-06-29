@@ -4,8 +4,6 @@ import { useThree } from "@react-three/fiber";
 
 import type { SceneSpec } from "../api/scene";
 import type {
-  AtomRenderingMode,
-  BondRenderingMode,
   ComponentOpacityState,
   StyleState,
   UnitCellLineStyle,
@@ -19,8 +17,6 @@ import { MemoizedStructureSceneObjects, SceneFog } from "./StructureSceneObjects
 import { applyOrthographicExportFrame, type StructureExportFramePlan } from "./exportFrame";
 
 export function ExportSceneContent({
-  atomRenderingMode,
-  bondRenderingMode,
   cameraPose,
   componentOpacity,
   exportFramePlan,
@@ -36,8 +32,6 @@ export function ExportSceneContent({
   unitCellLineStyle = "solid",
   unitCellLineWidthScale = 1,
 }: {
-  atomRenderingMode: AtomRenderingMode;
-  bondRenderingMode: BondRenderingMode;
   cameraPose: CameraPoseSnapshot;
   componentOpacity: ComponentOpacityState;
   exportFramePlan: StructureExportFramePlan;
@@ -69,8 +63,6 @@ export function ExportSceneContent({
     <>
       <SceneFog layout={layout} style={style} />
       <MemoizedStructureSceneObjects
-        atomRenderingMode={atomRenderingMode}
-        bondRenderingMode={bondRenderingMode}
         componentOpacity={componentOpacity}
         groupPosition={layout.groupPosition}
         materialFamily={materialFamily}

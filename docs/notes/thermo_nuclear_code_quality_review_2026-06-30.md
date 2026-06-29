@@ -67,6 +67,10 @@ Scope: whole-repo maintainability review of the current `pretty-lattice` codebas
 
 ### 3. `StructureSceneObjects.tsx` 只是换了名字的 scene catch-all
 
+2026-06-30 更新：独立 atom mesh / bond mesh 渲染后端已经删除，当前
+composition 固定走 `InstancedAtoms.tsx` 和 `BatchedBonds.tsx`。下面原始
+观察记录的是删除前的风险形态；后续不应再恢复 mesh/batched 双后端选择。
+
 这个文件表面上叫 “StructureSceneObjects”，但实际包含：
 
 - scene object composition: `StructureSceneObjects()`，`StructureSceneObjects.tsx:283` 到 `StructureSceneObjects.tsx:442`。
@@ -81,13 +85,14 @@ Scope: whole-repo maintainability review of the current `pretty-lattice` codebas
 建议把它拆成：
 
 - `StructureSceneObjects.tsx`: 只做 atoms/bonds/polyhedra/cell frame 的 composition。
-- `AtomMesh.tsx` 和 `AtomHighlightAnimator.tsx`: 原子和高亮动画。
+- `InstancedAtoms.tsx`: 原子实例渲染和高亮动画。
 - `BondRenderItems.ts`: 从 `SceneSpec` 生成单一 bond render model。
-- `BatchedBonds.tsx` 和 `BondMesh.tsx`: 两个 backend 消费同一份 render items。
+- `BatchedBonds.tsx`: 消费 `BondRenderItem[]` 的唯一 bond 渲染后端。
 - `PolyhedronMesh.tsx`。
 - `CellFrame.tsx`。
 
-关键不是“拆文件好看”，而是让 batched/mesh 两条 path 共享前置模型，删掉重复推导。
+关键不是“拆文件好看”，而是让 composition 留在 scene 边界，具体
+atoms/bonds/polyhedra/cell frame 逻辑留在各自模块。
 
 ### 4. `OrientationTab.tsx` 已经不是一个 tab，而是一个微型应用
 
@@ -238,12 +243,12 @@ Python 合同在 `src/pretty_lattice/structures/schema.py:7` 到 `schema.py:128`
 
 ### Slice 2: 拆 `StructureSceneObjects`
 
-优先共享 bond render model，删除 batched/non-batched 的重复推导。这个 slice 的收益很高，因为它会直接降低 preview/export parity 的未来成本。
+独立 bond mesh 后端已删除，`BondRenderItem[]` 已经是 batched bonds 的单一输入模型。这个 slice 后续应聚焦继续缩小 `StructureSceneObjects.tsx` 的 composition 边界，而不是恢复双后端。
 
 验收标准：
 
 - `StructureSceneObjects.tsx` 只保留 composition。
-- batched bonds 和 mesh bonds 消费同一份 `BondRenderItem[]`。
+- batched bonds 消费单一 `BondRenderItem[]`。
 - atom highlight 不再埋在 scene object catch-all 里。
 - 现有 lattice scene tests 继续覆盖 geometry 行为。
 
