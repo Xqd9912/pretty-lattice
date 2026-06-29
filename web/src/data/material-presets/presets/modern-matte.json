@@ -14,13 +14,13 @@
     {
       "type": "AmbientLight",
       "props": {
-        "intensity": 1.0
+        "intensity": 0.8
       }
     },
     {
       "type": "cameraDirectional",
       "props": {
-        "intensity": 2.0,
+        "intensity": 2.2,
         "offset": [0.3, 0.2, 0]
       }
     }

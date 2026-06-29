@@ -16,6 +16,7 @@ future manifest if exact upstream records need to be tracked.
 | `Al2O3.cif` | Al2O3 | 30 | Al, O | Corundum-like trigonal/rhombohedral case; useful for non-cubic lattice summaries. |
 | `Ba2Ca2Cu3HgO8.cif` | Ba2Ca2Cu3HgO8 | 16 | Ba, Ca, Cu, Hg, O | Multi-element oxide superconductor-style layered cell; useful for richer legends and boundary images. |
 | `Hg3Cl4O.cif` | Hg3Cl4O | 32 | Hg, Cl, O | Larger cubic/chiral case with heavier elements. |
+| `LiFePO4.cif` | LiFePO4 | 28 | Li, Fe, P, O | Orthorhombic olivine-style phosphate; useful for richer static preview scenes with multiple species and polyhedra. |
 | `MoS2.cif` | MoS2 | 6 | Mo, S | Layered hexagonal material; useful for future slab and bond-display checks. |
 | `NaCl.cif` | NaCl | 8 | Na, Cl | Rock-salt baseline with many boundary atoms in the conventional cell. |
 | `Si.cif` | Si | 8 | Si | Single-element diamond-cubic baseline. |

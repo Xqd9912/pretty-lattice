@@ -200,9 +200,7 @@ export function StyleTabContent({
   function handleResetFogClick() {
     onStyleChange((currentStyle) => ({
       ...currentStyle,
-      fogAffectsUnitCell: createDefaultStyle().fogAffectsUnitCell,
       fogAmount: createDefaultStyle().fogAmount,
-      fogEnabled: createDefaultStyle().fogEnabled,
       fogStart: createDefaultStyle().fogStart,
     }));
 

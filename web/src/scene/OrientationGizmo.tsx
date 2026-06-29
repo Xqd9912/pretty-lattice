@@ -75,13 +75,14 @@ export function OrientationGizmo({
 }) {
   const visualCanvasRef = useRef<HTMLDivElement | null>(null);
   const hoveredAxisRef = useRef<OrientationGizmoAxisLabel | null>(null);
+  const lastPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const suppressNextClickRef = useRef(false);
   const clickSuppressionTimeoutRef = useRef<number | null>(null);
   const axes = useMemo(() => computeOrientationGizmoAxes(cellVectors), [cellVectors]);
   const [hoveredAxis, setHoveredAxis] = useState<OrientationGizmoAxisLabel | null>(null);
 
   const pickAxisFromPointer = useCallback(
-    (event: PointerEvent) => {
+    (event: { clientX: number; clientY: number }) => {
       const rect = visualCanvasRef.current?.getBoundingClientRect();
       if (!rect) {
         return null;
@@ -136,15 +137,24 @@ export function OrientationGizmo({
 
   useEffect(() => {
     function handlePointerMove(event: PointerEvent) {
+      lastPointerRef.current = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+      };
       updateHoveredAxis(pickAxisFromPointer(event));
     }
 
     function handlePointerDown(event: PointerEvent) {
+      lastPointerRef.current = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+      };
       const axis = pickAxisFromPointer(event);
       if (!axis) {
         return;
       }
 
+      updateHoveredAxis(null);
       suppressNextClickRef.current = true;
       if (clickSuppressionTimeoutRef.current) {
         window.clearTimeout(clickSuppressionTimeoutRef.current);
@@ -190,6 +200,15 @@ export function OrientationGizmo({
       }
     };
   }, [onAxisClick, pickAxisFromPointer, updateHoveredAxis]);
+
+  useEffect(() => {
+    const lastPointer = lastPointerRef.current;
+    if (!lastPointer) {
+      return;
+    }
+
+    updateHoveredAxis(pickAxisFromPointer(lastPointer));
+  }, [orientationVersion, pickAxisFromPointer, updateHoveredAxis]);
 
   return (
     <div

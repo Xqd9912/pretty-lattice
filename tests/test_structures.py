@@ -44,6 +44,7 @@ CIF_FIXTURES = [
         "D4h",
     ),
     ("Hg3Cl4O.cif", 32, {"Hg", "Cl", "O"}, "Hg3Cl4O", 198, "cubic", "T"),
+    ("LiFePO4.cif", 28, {"Li", "Fe", "P", "O"}, "LiFePO4", 62, "orthorhombic", "D2h"),
     ("MoS2.cif", 6, {"Mo", "S"}, "MoS2", 194, "hexagonal", "D6h"),
     ("NaCl.cif", 8, {"Na", "Cl"}, "NaCl", 225, "cubic", "Oh"),
     ("Si.cif", 8, {"Si"}, "Si", 227, "cubic", "Oh"),

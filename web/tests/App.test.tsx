@@ -1024,15 +1024,15 @@ describe("App", () => {
     expect(bondStyleSelect.textContent).toContain("Bicolor");
     expect(within(commonControls).queryByRole("button", { name: "Bond color" })).toBeNull();
     expect(colorSchemeSelect.textContent).toContain("VESTA Soft");
-    expect(fogSwitch.getAttribute("aria-checked")).toBe("false");
+    expect(fogSwitch.getAttribute("aria-checked")).toBe("true");
     expect(fogStartSlider.value).toBe("50");
     expect(fogStartInput.value).toBe("50");
     expect(fogAmountSlider.value).toBe("50");
     expect(fogAmountInput.value).toBe("50");
-    expect(fogStartSlider.disabled).toBe(true);
-    expect(fogStartInput.disabled).toBe(true);
-    expect(fogAmountSlider.disabled).toBe(true);
-    expect(fogAmountInput.disabled).toBe(true);
+    expect(fogStartSlider.disabled).toBe(false);
+    expect(fogStartInput.disabled).toBe(false);
+    expect(fogAmountSlider.disabled).toBe(false);
+    expect(fogAmountInput.disabled).toBe(false);
 
     await user.click(atomRadiusModelButton);
     expect(await screen.findByRole("listbox", { name: "Atom radius model" })).toBeTruthy();
@@ -1087,13 +1087,6 @@ describe("App", () => {
 
     expect(colorSchemeSelect.textContent).toContain("Jmol");
     expect(fetchCalls).toHaveLength(1);
-
-    await user.click(fogSwitch);
-    expect(fogSwitch.getAttribute("aria-checked")).toBe("true");
-    expect(fogStartSlider.disabled).toBe(false);
-    expect(fogStartInput.disabled).toBe(false);
-    expect(fogAmountSlider.disabled).toBe(false);
-    expect(fogAmountInput.disabled).toBe(false);
 
     fireEvent.change(fogStartSlider, { target: { value: "18" } });
     fireEvent.change(fogAmountSlider, { target: { value: "72" } });
@@ -1159,15 +1152,15 @@ describe("App", () => {
     await user.click(resetFogButton);
 
     expect(resetFogButton.className).toContain("tool-icon-button-reset-feedback");
-    expect(fogSwitch.getAttribute("aria-checked")).toBe("false");
+    expect(fogSwitch.getAttribute("aria-checked")).toBe("true");
     expect(fogStartInput.value).toBe("50");
     expect(fogStartSlider.value).toBe("50");
     expect(fogAmountInput.value).toBe("50");
     expect(fogAmountSlider.value).toBe("50");
-    expect(fogStartSlider.disabled).toBe(true);
-    expect(fogStartInput.disabled).toBe(true);
-    expect(fogAmountSlider.disabled).toBe(true);
-    expect(fogAmountInput.disabled).toBe(true);
+    expect(fogStartSlider.disabled).toBe(false);
+    expect(fogStartInput.disabled).toBe(false);
+    expect(fogAmountSlider.disabled).toBe(false);
+    expect(fogAmountInput.disabled).toBe(false);
   });
 
   test("selects material presets without re-uploading or changing independent controls", async () => {

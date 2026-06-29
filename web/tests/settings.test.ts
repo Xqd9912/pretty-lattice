@@ -61,7 +61,7 @@ describe("settings", () => {
     expect(DEFAULT_UNIT_CELL_LINE_STYLE).toBe("solid");
   });
 
-  test("defaults style controls to 40 percent atoms, 100 percent bonds, and bicolor bonds", () => {
+  test("defaults style controls to 40 percent atoms, 100 percent bonds, bicolor bonds, and enabled depth cueing", () => {
     expect(createDefaultStyle()).toEqual({
       atomRadius: 40,
       atomRadiusModel: "uniform",
@@ -72,7 +72,7 @@ describe("settings", () => {
       distinguishSimilarColors: true,
       fogAffectsUnitCell: false,
       fogAmount: 50,
-      fogEnabled: false,
+      fogEnabled: true,
       fogStart: 50,
       materialPreset: "modern-matte",
     });
