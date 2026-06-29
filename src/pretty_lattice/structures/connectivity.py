@@ -18,6 +18,7 @@ from pretty_lattice.structures.periodic_images import (
     ensure_atom_record,
     normalize_image_offset,
     site_element_symbol,
+    subtract_image_offsets,
 )
 from pretty_lattice.structures.schema import (
     BondAlgorithm,
@@ -93,8 +94,14 @@ def build_connectivity(
             target_site_index = int(neighbor["site_index"])
             target_site = sites[target_site_index]
             target_image_offset = add_image_offsets(
-                source_image_offset,
-                normalize_image_offset(neighbor.get("image", CANONICAL_IMAGE_OFFSET)),
+                add_image_offsets(
+                    source_image_offset,
+                    normalize_image_offset(neighbor.get("image", CANONICAL_IMAGE_OFFSET)),
+                ),
+                subtract_image_offsets(
+                    target_site.canonical_image_offset,
+                    source_site.canonical_image_offset,
+                ),
             )
             target_atom_id = atom_instance_id(target_site.site_id, target_image_offset)
             if target_atom_id == source_atom_id:

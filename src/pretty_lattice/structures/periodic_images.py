@@ -27,6 +27,7 @@ class SceneSite:
     site_id: str
     element_symbol: str
     fractional_position: list[float]
+    canonical_image_offset: tuple[int, int, int]
 
 
 @dataclass
@@ -61,18 +62,22 @@ def build_atom_records(
         fractional_position = vector3(site.frac_coords)
         site_id = f"{symbol}-{index}"
         canonical_fractional_position = fractional_position
+        canonical_image_offset = CANONICAL_IMAGE_OFFSET
         boundary_axes: tuple[int, ...] = ()
 
         if can_generate_periodic_images:
-            canonical_fractional_position, boundary_axes = canonicalize_fractional_position(
-                fractional_position
-            )
+            (
+                canonical_fractional_position,
+                canonical_image_offset,
+                boundary_axes,
+            ) = canonicalize_fractional_position(fractional_position)
 
         site_data = SceneSite(
             index=index,
             site_id=site_id,
             element_symbol=symbol,
             fractional_position=canonical_fractional_position,
+            canonical_image_offset=canonical_image_offset,
         )
         sites.append(site_data)
 
@@ -217,8 +222,9 @@ def site_specie(site: PeriodicSite):
 
 def canonicalize_fractional_position(
     fractional_position: Sequence[float],
-) -> tuple[list[float], tuple[int, ...]]:
+) -> tuple[list[float], tuple[int, int, int], tuple[int, ...]]:
     canonical_position: list[float] = []
+    canonical_image_offset: list[int] = []
     boundary_axes: list[int] = []
 
     for axis, value in enumerate(fractional_position):
@@ -227,12 +233,22 @@ def canonicalize_fractional_position(
             wrapped_value, 1.0, abs_tol=BOUNDARY_TOLERANCE
         ):
             canonical_position.append(0.0)
+            canonical_image_offset.append(int(round(float(value))))
             boundary_axes.append(axis)
             continue
 
         canonical_position.append(wrapped_value)
+        canonical_image_offset.append(0)
 
-    return canonical_position, tuple(boundary_axes)
+    return (
+        canonical_position,
+        (
+            canonical_image_offset[0],
+            canonical_image_offset[1],
+            canonical_image_offset[2],
+        ),
+        tuple(boundary_axes),
+    )
 
 
 def periodic_image_offsets(boundary_axes: tuple[int, ...]) -> list[tuple[int, int, int]]:
@@ -271,3 +287,10 @@ def add_image_offsets(
     right: tuple[int, int, int],
 ) -> tuple[int, int, int]:
     return (left[0] + right[0], left[1] + right[1], left[2] + right[2])
+
+
+def subtract_image_offsets(
+    left: tuple[int, int, int],
+    right: tuple[int, int, int],
+) -> tuple[int, int, int]:
+    return (left[0] - right[0], left[1] - right[1], left[2] - right[2])

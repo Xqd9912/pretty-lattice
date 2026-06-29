@@ -1,5 +1,6 @@
 import ast
 import tomllib
+from math import dist
 from pathlib import Path
 
 import pytest
@@ -358,6 +359,24 @@ def test_vesta_bonding_uses_batched_neighbor_table(monkeypatch: pytest.MonkeyPat
 
     assert captured_atom_counts == [len(structure)]
     assert scene["bonds"]
+
+
+def test_vesta_bonding_keeps_boundary_bonds_local_after_canonicalizing_sites() -> None:
+    structure = read_structure(FIXTURE_DIR / "SrTiO3.cif") * (2, 2, 2)
+
+    scene = build_scene_response(structure, bond_algorithm="vesta")
+    atoms = scene["atoms"]
+    bond_lengths = [
+        dist(
+            atoms[bond["startAtomIndex"]]["position"],
+            atoms[bond["endAtomIndex"]]["position"],
+        )
+        for bond in scene["bonds"]
+    ]
+
+    assert bond_lengths
+    assert max(bond_lengths) == pytest.approx(2.76669762905849)
+    assert all(length < 3.0 for length in bond_lengths)
 
 
 def test_scene_response_generates_polyhedra_for_complete_coordination_environment() -> None:
