@@ -1,9 +1,22 @@
 import { type Ref } from "react";
-import { MeshBasicMaterial, MeshLambertMaterial, MeshStandardMaterial, type Side } from "three";
+import {
+  BackSide,
+  DoubleSide,
+  FrontSide,
+  MeshBasicMaterial,
+  MeshLambertMaterial,
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
+  type Side,
+} from "three";
 
 import type { ResolvedStructureMaterialFamily } from "./materialPresetResolver";
 
-export type StructureMeshMaterial = MeshBasicMaterial | MeshLambertMaterial | MeshStandardMaterial;
+export type StructureMeshMaterial =
+  | MeshBasicMaterial
+  | MeshLambertMaterial
+  | MeshPhysicalMaterial
+  | MeshStandardMaterial;
 
 export function StructureMaterial({
   color,
@@ -38,24 +51,38 @@ export function StructureMaterial({
     transparent,
     vertexColors,
   };
+  const presetProps = resolveThreeProps(materialFamily.material.props);
+  const resolvedCommonProps = omitUndefined(commonProps);
 
-  if (materialFamily.material.kind === "basic") {
+  if (materialFamily.material.type === "MeshBasicMaterial") {
     return (
       <meshBasicMaterial
         ref={materialRef as Ref<MeshBasicMaterial>}
         key={materialKey}
-        {...commonProps}
+        {...presetProps}
+        {...resolvedCommonProps}
       />
     );
   }
 
-  if (materialFamily.material.kind === "lambert") {
+  if (materialFamily.material.type === "MeshLambertMaterial") {
     return (
       <meshLambertMaterial
         ref={materialRef as Ref<MeshLambertMaterial>}
         key={materialKey}
-        flatShading={materialFamily.material.flatShading}
-        {...commonProps}
+        {...presetProps}
+        {...resolvedCommonProps}
+      />
+    );
+  }
+
+  if (materialFamily.material.type === "MeshPhysicalMaterial") {
+    return (
+      <meshPhysicalMaterial
+        ref={materialRef as Ref<MeshPhysicalMaterial>}
+        key={materialKey}
+        {...presetProps}
+        {...resolvedCommonProps}
       />
     );
   }
@@ -64,10 +91,40 @@ export function StructureMaterial({
     <meshStandardMaterial
       ref={materialRef as Ref<MeshStandardMaterial>}
       key={materialKey}
-      flatShading={materialFamily.material.flatShading}
-      metalness={materialFamily.material.metalness}
-      roughness={materialFamily.material.roughness}
-      {...commonProps}
+      {...presetProps}
+      {...resolvedCommonProps}
     />
   );
 }
+
+function omitUndefined(data: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined),
+  );
+}
+
+function resolveThreeProps(data: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(data).map(([key, value]) => [key, resolveThreePropValue(value)]),
+  );
+}
+
+function resolveThreePropValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    return THREE_PROP_CONSTANTS[value] ?? value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(resolveThreePropValue);
+  }
+  if (typeof value === "object" && value !== null) {
+    return resolveThreeProps(value as Record<string, unknown>);
+  }
+
+  return value;
+}
+
+const THREE_PROP_CONSTANTS: Record<string, unknown> = {
+  BackSide,
+  DoubleSide,
+  FrontSide,
+};

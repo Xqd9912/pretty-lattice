@@ -9,9 +9,11 @@ const DEFAULT_CAMERA_RELATIVE_LIGHT_OFFSET = [0.32, 0.22, 0] as const;
 const MIN_LIGHT_DISTANCE = 4;
 
 export function CameraHeadlight({
+  color,
   intensity = PREVIEW_HEADLIGHT_INTENSITY,
   offset = DEFAULT_CAMERA_RELATIVE_LIGHT_OFFSET,
 }: {
+  color?: string | number;
   intensity?: number;
   offset?: readonly [number, number, number];
 }) {
@@ -50,6 +52,7 @@ export function CameraHeadlight({
       <primitive object={targetObject} />
       <directionalLight
         ref={lightRef}
+        color={color}
         intensity={intensity}
         target={targetObject}
       />

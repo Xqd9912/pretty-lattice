@@ -7,13 +7,29 @@ import metallicPresetData from "../data/material-presets/presets/metallic.json";
 import modernMattePresetData from "../data/material-presets/presets/modern-matte.json";
 
 export type MaterialPresetId = string;
-export type MaterialPresetKind = "basic" | "lambert" | "standard";
+export type MaterialPresetMaterialType =
+  | "MeshBasicMaterial"
+  | "MeshLambertMaterial"
+  | "MeshPhysicalMaterial"
+  | "MeshStandardMaterial";
+export type MaterialPresetLightType =
+  | "AmbientLight"
+  | "HemisphereLight"
+  | "cameraDirectional";
+export type MaterialPresetJsonValue =
+  | boolean
+  | number
+  | string
+  | null
+  | MaterialPresetJsonValue[]
+  | { [key: string]: MaterialPresetJsonValue };
+export type MaterialPresetProps = Record<string, MaterialPresetJsonValue>;
 
 interface MaterialPresetBase {
   description?: string;
   id: MaterialPresetId;
   label: string;
-  lighting: MaterialPresetLighting;
+  lighting: MaterialPresetLight[];
   material: MaterialPresetMaterial;
 }
 
@@ -29,35 +45,14 @@ export interface MaterialPresetCatalogIndex {
   version: 1;
 }
 
-export interface MaterialPresetLighting {
-  ambientIntensity: number;
-  cameraLights: MaterialPresetCameraLight[];
+export interface MaterialPresetMaterial {
+  props: MaterialPresetProps;
+  type: MaterialPresetMaterialType;
 }
 
-export interface MaterialPresetCameraLight {
-  intensity: number;
-  offset: readonly [number, number, number];
-}
-
-export type MaterialPresetMaterial =
-  | BasicMaterialPresetMaterial
-  | LambertMaterialPresetMaterial
-  | StandardMaterialPresetMaterial;
-
-export interface BasicMaterialPresetMaterial {
-  kind: "basic";
-}
-
-export interface LambertMaterialPresetMaterial {
-  flatShading: boolean;
-  kind: "lambert";
-}
-
-export interface StandardMaterialPresetMaterial {
-  flatShading: boolean;
-  kind: "standard";
-  metalness: number;
-  roughness: number;
+export interface MaterialPresetLight {
+  props: MaterialPresetProps;
+  type: MaterialPresetLightType;
 }
 
 export type MaterialPreset = MaterialPresetBase;
@@ -67,24 +62,30 @@ export interface MaterialPresetOption {
   value: MaterialPresetId;
 }
 
-const BUNDLED_MATERIAL_PRESET_DATA = [
-  classicMattePresetData,
-  twoPointFiveDPresetData,
-  twoDPresetData,
-  glossyPresetData,
-  metallicPresetData,
-  modernMattePresetData,
-];
+const STATIC_MATERIAL_PRESET_MODULES: Record<string, unknown> = {
+  "../data/material-presets/presets/2-5d.json": twoPointFiveDPresetData,
+  "../data/material-presets/presets/2d.json": twoDPresetData,
+  "../data/material-presets/presets/classic-matte.json": classicMattePresetData,
+  "../data/material-presets/presets/glossy.json": glossyPresetData,
+  "../data/material-presets/presets/metallic.json": metallicPresetData,
+  "../data/material-presets/presets/modern-matte.json": modernMattePresetData,
+};
 const MATERIAL_PRESET_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const SUPPORTED_MATERIAL_KINDS = new Set<MaterialPresetKind>([
-  "basic",
-  "lambert",
-  "standard",
+const SUPPORTED_MATERIAL_TYPES = new Set<MaterialPresetMaterialType>([
+  "MeshBasicMaterial",
+  "MeshLambertMaterial",
+  "MeshPhysicalMaterial",
+  "MeshStandardMaterial",
+]);
+const SUPPORTED_LIGHT_TYPES = new Set<MaterialPresetLightType>([
+  "AmbientLight",
+  "HemisphereLight",
+  "cameraDirectional",
 ]);
 
 export const MATERIAL_PRESET_CATALOG = buildMaterialPresetCatalog(
   materialPresetCatalogData,
-  BUNDLED_MATERIAL_PRESET_DATA,
+  collectBundledMaterialPresetData(),
 );
 export const MATERIAL_PRESETS = MATERIAL_PRESET_CATALOG.presets;
 export const DEFAULT_MATERIAL_PRESET_ID =
@@ -107,11 +108,11 @@ export function materialPresetById(id: MaterialPresetId): MaterialPreset {
 
 export function buildMaterialPresetCatalog(
   catalogData: unknown,
-  presetData: unknown[],
+  presetDataByPath: Record<string, unknown>,
 ): MaterialPresetCatalog {
   const catalogIndex = validateMaterialPresetCatalogIndex(catalogData);
-  const parsedPresets = presetData.map((entry, index) =>
-    parseMaterialPreset(entry, `material preset files[${index}]`),
+  const parsedPresets = Object.entries(presetDataByPath).map(([path, data]) =>
+    parseMaterialPreset(data, path),
   );
   const presetsById = new Map<string, MaterialPreset>();
   for (const preset of parsedPresets) {
@@ -238,6 +239,17 @@ export function validateMaterialPresetData(data: unknown): MaterialPresetCatalog
   };
 }
 
+function collectBundledMaterialPresetData(): Record<string, unknown> {
+  if (typeof import.meta.glob === "function") {
+    return import.meta.glob("../data/material-presets/presets/*.json", {
+      eager: true,
+      import: "default",
+    });
+  }
+
+  return STATIC_MATERIAL_PRESET_MODULES;
+}
+
 function parseMaterialPreset(data: unknown, path: string): MaterialPreset {
   const rawPreset = expectRecord(data, path);
   assertKnownKeys(rawPreset, path, [
@@ -264,78 +276,34 @@ function parseMaterialPreset(data: unknown, path: string): MaterialPreset {
   };
 }
 
-function parseLighting(data: unknown, path: string): MaterialPresetLighting {
-  const lighting = expectRecord(data, path);
-  assertKnownKeys(lighting, path, ["ambientIntensity", "cameraLights"]);
-
-  return {
-    ambientIntensity: expectFiniteNumberInRange(
-      lighting.ambientIntensity,
-      `${path}.ambientIntensity`,
-      0,
-      5,
-    ),
-    cameraLights: parseCameraLights(lighting.cameraLights, `${path}.cameraLights`),
-  };
-}
-
-function parseCameraLights(data: unknown, path: string): MaterialPresetCameraLight[] {
+function parseLighting(data: unknown, path: string): MaterialPresetLight[] {
   if (!Array.isArray(data)) {
     throw new Error(`${path} must be an array.`);
   }
-  if (data.length > 4) {
-    throw new Error(`${path} must contain at most 4 lights.`);
+  if (data.length === 0) {
+    return [];
   }
 
-  return data.map((entry, index) => parseCameraLight(entry, `${path}[${index}]`));
+  return data.map((entry, index) => parseLight(entry, `${path}[${index}]`));
 }
 
-function parseCameraLight(data: unknown, path: string): MaterialPresetCameraLight {
+function parseLight(data: unknown, path: string): MaterialPresetLight {
   const light = expectRecord(data, path);
-  assertKnownKeys(light, path, ["intensity", "offset"]);
+  assertKnownKeys(light, path, ["props", "type"]);
 
   return {
-    intensity: expectFiniteNumberInRange(light.intensity, `${path}.intensity`, 0, 5),
-    offset: expectVectorTuple(light.offset, `${path}.offset`, -2, 2),
+    props: expectProps(light.props, `${path}.props`),
+    type: expectLightType(light.type, `${path}.type`),
   };
 }
 
 function parseMaterial(data: unknown, path: string): MaterialPresetMaterial {
   const material = expectRecord(data, path);
-  const kind = expectMaterialKind(material.kind, `${path}.kind`);
+  assertKnownKeys(material, path, ["props", "type"]);
 
-  if (kind === "basic") {
-    assertKnownKeys(material, path, ["kind"]);
-    return { kind };
-  }
-
-  if (kind === "lambert") {
-    assertKnownKeys(material, path, ["flatShading", "kind"]);
-    return {
-      flatShading: expectOptionalBoolean(
-        material.flatShading,
-        `${path}.flatShading`,
-        false,
-      ),
-      kind,
-    };
-  }
-
-  assertKnownKeys(material, path, [
-    "flatShading",
-    "kind",
-    "metalness",
-    "roughness",
-  ]);
   return {
-    flatShading: expectOptionalBoolean(
-      material.flatShading,
-      `${path}.flatShading`,
-      false,
-    ),
-    kind,
-    metalness: expectFiniteNumberInRange(material.metalness, `${path}.metalness`, 0, 1),
-    roughness: expectFiniteNumberInRange(material.roughness, `${path}.roughness`, 0, 1),
+    props: expectProps(material.props, `${path}.props`),
+    type: expectMaterialType(material.type, `${path}.type`),
   };
 }
 
@@ -379,60 +347,66 @@ function expectPresetId(data: unknown, path: string): string {
   return value;
 }
 
-function expectMaterialKind(data: unknown, path: string): MaterialPresetKind {
-  if (typeof data !== "string" || !SUPPORTED_MATERIAL_KINDS.has(data as MaterialPresetKind)) {
+function expectMaterialType(data: unknown, path: string): MaterialPresetMaterialType {
+  if (
+    typeof data !== "string" ||
+    !SUPPORTED_MATERIAL_TYPES.has(data as MaterialPresetMaterialType)
+  ) {
     throw new Error(
-      `${path} must be one of ${Array.from(SUPPORTED_MATERIAL_KINDS).join(", ")}.`,
+      `${path} must be one of ${Array.from(SUPPORTED_MATERIAL_TYPES).join(", ")}.`,
     );
   }
 
-  return data as MaterialPresetKind;
+  return data as MaterialPresetMaterialType;
 }
 
-function expectOptionalBoolean(
-  data: unknown,
-  path: string,
-  fallback: boolean,
-): boolean {
-  if (data === undefined) {
-    return fallback;
-  }
-  if (typeof data !== "boolean") {
-    throw new Error(`${path} must be a boolean.`);
+function expectLightType(data: unknown, path: string): MaterialPresetLightType {
+  if (
+    typeof data !== "string" ||
+    !SUPPORTED_LIGHT_TYPES.has(data as MaterialPresetLightType)
+  ) {
+    throw new Error(
+      `${path} must be one of ${Array.from(SUPPORTED_LIGHT_TYPES).join(", ")}.`,
+    );
   }
 
-  return data;
+  return data as MaterialPresetLightType;
 }
 
-function expectVectorTuple(
-  data: unknown,
-  path: string,
-  min: number,
-  max: number,
-): readonly [number, number, number] {
-  if (!Array.isArray(data) || data.length !== 3) {
-    throw new Error(`${path} must be a three-number array.`);
+function expectProps(data: unknown, path: string): MaterialPresetProps {
+  const props = expectRecord(data, path);
+  for (const [key, value] of Object.entries(props)) {
+    expectJsonValue(value, `${path}.${key}`);
   }
 
-  return [
-    expectFiniteNumberInRange(data[0], `${path}[0]`, min, max),
-    expectFiniteNumberInRange(data[1], `${path}[1]`, min, max),
-    expectFiniteNumberInRange(data[2], `${path}[2]`, min, max),
-  ];
+  return props as MaterialPresetProps;
 }
 
-function expectFiniteNumberInRange(
-  data: unknown,
-  path: string,
-  min: number,
-  max: number,
-): number {
-  if (typeof data !== "number" || !Number.isFinite(data)) {
-    throw new Error(`${path} must be a finite number.`);
-  }
-  if (data < min || data > max) {
-    throw new Error(`${path} must be between ${min} and ${max}.`);
+function expectJsonValue(data: unknown, path: string): MaterialPresetJsonValue {
+  if (
+    data === null ||
+    typeof data === "boolean" ||
+    typeof data === "number" ||
+    typeof data === "string"
+  ) {
+    if (typeof data === "number" && !Number.isFinite(data)) {
+      throw new Error(`${path} must be a finite number.`);
+    }
+    return data;
   }
 
-  return data;
+  if (Array.isArray(data)) {
+    return data.map((entry, index) => expectJsonValue(entry, `${path}[${index}]`));
+  }
+
+  if (typeof data === "object") {
+    const record = expectRecord(data, path);
+    const parsed: { [key: string]: MaterialPresetJsonValue } = {};
+    for (const [key, value] of Object.entries(record)) {
+      parsed[key] = expectJsonValue(value, `${path}.${key}`);
+    }
+    return parsed;
+  }
+
+  throw new Error(`${path} must be a JSON-compatible value.`);
 }

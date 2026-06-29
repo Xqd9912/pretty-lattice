@@ -16,12 +16,9 @@ import {
 } from "../model";
 import type { PreviewFpsStore } from "../model/previewFpsStore";
 import type { InteractionMode } from "../model/viewState";
-import { CameraHeadlight } from "./CameraHeadlight";
 import { computeCrystalCameraPose, type CrystalCameraState } from "./crystalCamera";
-import {
-  resolveStructureMaterialFamilyForStyle,
-  type ResolvedStructureMaterialFamily,
-} from "./materialPresetResolver";
+import { MaterialPresetLights } from "./MaterialPresetLights";
+import { resolveStructureMaterialFamilyForStyle } from "./materialPresetResolver";
 import { PreviewCameraController } from "./PreviewCameraController";
 import {
   EXPORT_SCENE_MESH_DETAIL_PRESETS,
@@ -193,8 +190,7 @@ export function LatticeScene({
       gl={DEFAULT_RENDERER_PARAMETERS}
       data-testid="lattice-canvas"
     >
-      <ambientLight intensity={materialFamily.lighting.ambientIntensity} />
-      <MaterialPresetCameraLights materialFamily={materialFamily} />
+      <MaterialPresetLights lighting={materialFamily.lighting} />
       <PreviewCameraController
         cameraAnimatedCommandVersion={cameraAnimatedCommandVersion}
         cameraCommandVersion={cameraCommandVersion}
@@ -239,24 +235,6 @@ export function LatticeScene({
         <PreviewFpsMeter previewFpsStore={previewFpsStore} />
       ) : null}
     </Canvas>
-  );
-}
-
-function MaterialPresetCameraLights({
-  materialFamily,
-}: {
-  materialFamily: ResolvedStructureMaterialFamily;
-}) {
-  return (
-    <>
-      {materialFamily.lighting.cameraLights.map((light, index) => (
-        <CameraHeadlight
-          key={`${index}:${light.intensity}:${light.offset.join(",")}`}
-          intensity={light.intensity}
-          offset={light.offset}
-        />
-      ))}
-    </>
   );
 }
 

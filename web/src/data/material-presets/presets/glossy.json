@@ -3,18 +3,26 @@
   "label": "Glossy",
   "description": "A low-roughness non-metal surface for crisp light response.",
   "material": {
-    "kind": "standard",
-    "metalness": 0.0,
-    "roughness": 0.2,
-    "flatShading": false
+    "type": "MeshStandardMaterial",
+    "props": {
+      "metalness": 0.0,
+      "roughness": 0.2,
+      "flatShading": false
+    }
   },
-  "lighting": {
-    "ambientIntensity": 0.8,
-    "cameraLights": [
-      {
+  "lighting": [
+    {
+      "type": "AmbientLight",
+      "props": {
+        "intensity": 0.8
+      }
+    },
+    {
+      "type": "cameraDirectional",
+      "props": {
         "intensity": 2.0,
         "offset": [0.32, 0.22, 0]
       }
-    ]
-  }
+    }
+  ]
 }

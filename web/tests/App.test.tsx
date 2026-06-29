@@ -83,6 +83,20 @@ mock.module("@react-three/fiber", () => {
       />
     ),
     useFrame: () => {},
+    createRoot: () => ({
+      configure: async () => {},
+      render: () => ({
+        getState: () => ({
+          advance: () => {},
+          gl: {
+            domElement: document.createElement("canvas"),
+            render: () => {},
+          },
+          scene: {},
+        }),
+      }),
+      unmount: () => {},
+    }),
     useThree: () => ({
       camera: new MockCamera(),
       gl: {
@@ -116,6 +130,11 @@ mock.module("../src/scene/OrientationGizmo", () => ({
       </button>
     </div>
   ),
+  ORIENTATION_GIZMO_CAMERA_POSITION: [0, 0, 5],
+  ORIENTATION_GIZMO_LABEL_DISTANCE: 1.3,
+  ORIENTATION_GIZMO_SCALE: 1.36,
+  ORIENTATION_GIZMO_ZOOM_PER_CANVAS_PIXEL: 53 / 588,
+  StaticOrientationGizmoScene: () => null,
 }));
 
 let exportRequests: CreateFigureExportOptions[] = [];

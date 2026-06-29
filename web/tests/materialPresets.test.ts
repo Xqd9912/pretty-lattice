@@ -29,42 +29,37 @@ describe("material presets", () => {
     ]);
   });
 
-  test("keeps bundled preset materials and lighting inside supported ranges", () => {
+  test("keeps bundled preset materials and lighting in the passthrough schema", () => {
     for (const preset of MATERIAL_PRESETS) {
-      expect(["basic", "lambert", "standard"]).toContain(preset.material.kind);
-      expect(preset.lighting.ambientIntensity).toBeGreaterThanOrEqual(0);
-      expect(preset.lighting.ambientIntensity).toBeLessThanOrEqual(5);
-      expect(preset.lighting.cameraLights.length).toBeLessThanOrEqual(4);
+      expect([
+        "MeshBasicMaterial",
+        "MeshLambertMaterial",
+        "MeshPhysicalMaterial",
+        "MeshStandardMaterial",
+      ]).toContain(preset.material.type);
+      expect(preset.material.props).toEqual(expect.any(Object));
+      expect(Array.isArray(preset.lighting)).toBe(true);
 
-      for (const light of preset.lighting.cameraLights) {
-        expect(light.intensity).toBeGreaterThanOrEqual(0);
-        expect(light.intensity).toBeLessThanOrEqual(5);
-        expect(light.offset).toHaveLength(3);
-        for (const component of light.offset) {
-          expect(component).toBeGreaterThanOrEqual(-2);
-          expect(component).toBeLessThanOrEqual(2);
-        }
-      }
-
-      if (preset.material.kind === "standard") {
-        expect(preset.material.metalness).toBeGreaterThanOrEqual(0);
-        expect(preset.material.metalness).toBeLessThanOrEqual(1);
-        expect(preset.material.roughness).toBeGreaterThanOrEqual(0);
-        expect(preset.material.roughness).toBeLessThanOrEqual(1);
+      for (const light of preset.lighting) {
+        expect(["AmbientLight", "HemisphereLight", "cameraDirectional"]).toContain(
+          light.type,
+        );
+        expect(light.props).toEqual(expect.any(Object));
       }
     }
   });
 
-  test("rejects unsupported material kinds", () => {
+  test("rejects unsupported material types", () => {
     expect(() =>
       validateMaterialPresetData(
         catalogWithPreset({
           material: {
-            kind: "toon",
+            props: {},
+            type: "MeshToonMaterial",
           },
         }),
       ),
-    ).toThrow("material presets.presets[0].material.kind must be one of");
+    ).toThrow("material presets.presets[0].material.type must be one of");
   });
 
   test("rejects duplicate preset IDs", () => {
@@ -95,38 +90,60 @@ describe("material presets", () => {
     );
   });
 
-  test("rejects out-of-range numeric values", () => {
+  test("accepts JSON-compatible material props without per-property whitelisting", () => {
+    const catalog = validateMaterialPresetData(
+      catalogWithPreset({
+        material: {
+          props: {
+            clearcoat: 0.8,
+            clearcoatRoughness: 0.2,
+            customFutureProp: [1, "two", false],
+          },
+          type: "MeshPhysicalMaterial",
+        },
+      }),
+    );
+
+    const [preset] = catalog.presets;
+    expect(preset).toBeDefined();
+    expect(preset!.material.props).toMatchObject({
+      clearcoat: 0.8,
+      clearcoatRoughness: 0.2,
+      customFutureProp: [1, "two", false],
+    });
+  });
+
+  test("rejects non-json prop values", () => {
     expect(() =>
       validateMaterialPresetData(
         catalogWithPreset({
           material: {
-            flatShading: false,
-            kind: "standard",
-            metalness: 0,
-            roughness: 1.2,
+            props: {
+              roughness: Number.NaN,
+            },
+            type: "MeshStandardMaterial",
           },
         }),
       ),
-    ).toThrow("material presets.presets[0].material.roughness must be between 0 and 1.");
+    ).toThrow("material presets.presets[0].material.props.roughness must be a finite number.");
   });
 
-  test("rejects invalid camera light offsets", () => {
+  test("rejects unsupported light types", () => {
     expect(() =>
       validateMaterialPresetData(
         catalogWithPreset({
-          lighting: {
-            ambientIntensity: 0.68,
-            cameraLights: [
-              {
+          lighting: [
+            {
+              props: {
                 intensity: 1.78,
-                offset: [0.32, 3, 0],
               },
-            ],
-          },
+              type: "PointLight",
+            },
+          ],
         }),
       ),
     ).toThrow(
-      "material presets.presets[0].lighting.cameraLights[0].offset[1] must be between -2 and 2.",
+      "material presets.presets[0].lighting[0].type must be one of",
     );
   });
 
@@ -137,19 +154,21 @@ describe("material presets", () => {
         presetOrder: ["modern-matte", "classic-matte"],
         version: 1,
       },
-      [
-        validPreset({ id: "classic-matte", label: "Classic Matte" }),
-        validPreset({
+      {
+        "classic-matte.json": validPreset({ id: "classic-matte", label: "Classic Matte" }),
+        "modern-matte.json": validPreset({
           id: "modern-matte",
           label: "Modern Matte",
           material: {
-            flatShading: false,
-            kind: "standard",
-            metalness: 0,
-            roughness: 0.58,
+            props: {
+              flatShading: false,
+              metalness: 0,
+              roughness: 0.58,
+            },
+            type: "MeshStandardMaterial",
           },
         }),
-      ],
+      },
     );
 
     expect(catalog.defaultPresetId).toBe("modern-matte");
@@ -167,10 +186,10 @@ describe("material presets", () => {
           presetOrder: ["classic-matte"],
           version: 1,
         },
-        [
-          validPreset({ id: "classic-matte" }),
-          validPreset({ id: "glossy", label: "Glossy" }),
-        ],
+        {
+          "classic-matte.json": validPreset({ id: "classic-matte" }),
+          "glossy.json": validPreset({ id: "glossy", label: "Glossy" }),
+        },
       ),
     ).toThrow('Bundled material preset "glossy" is not listed');
   });
@@ -189,18 +208,26 @@ function validPreset(patch: Record<string, unknown> = {}) {
   return {
     id: "classic-matte",
     label: "Classic Matte",
-    lighting: {
-      ambientIntensity: 0.68,
-      cameraLights: [
-        {
+    lighting: [
+      {
+        props: {
+          intensity: 0.68,
+        },
+        type: "AmbientLight",
+      },
+      {
+        props: {
           intensity: 1.78,
           offset: [0.32, 0.22, 0],
         },
-      ],
-    },
+        type: "cameraDirectional",
+      },
+    ],
     material: {
-      flatShading: false,
-      kind: "lambert",
+      props: {
+        flatShading: false,
+      },
+      type: "MeshLambertMaterial",
     },
     ...patch,
   };

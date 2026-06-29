@@ -230,13 +230,13 @@ describe("computeSceneLayout", () => {
 
     expect(STRUCTURE_MATERIAL_TARGETS).toEqual(["atom", "bond", "polyhedron"]);
     expect(atomFamily.id).toBe("glossy");
-    expect(atomFamily.material.kind).toBe("standard");
+    expect(atomFamily.material.type).toBe("MeshStandardMaterial");
     expect(bondFamily).toEqual(atomFamily);
     expect(polyhedronFamily).toEqual(atomFamily);
     expect(resolveStructureMaterialFamilyForStyle({
       ...style,
       materialPreset: "2d",
-    }).material.kind).toBe("basic");
+    }).material.type).toBe("MeshBasicMaterial");
   });
 
   test("keeps preview mesh detail aligned with the medium quality preset", () => {

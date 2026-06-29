@@ -1,7 +1,7 @@
 import {
   materialPresetById,
   type MaterialPreset,
-  type MaterialPresetLighting,
+  type MaterialPresetLight,
   type MaterialPresetMaterial,
 } from "../model/materialPresets";
 import type { StyleState } from "../model/appearance";
@@ -16,7 +16,7 @@ export type StructureMaterialTarget = (typeof STRUCTURE_MATERIAL_TARGETS)[number
 export interface ResolvedStructureMaterialFamily {
   id: string;
   label: string;
-  lighting: MaterialPresetLighting;
+  lighting: MaterialPresetLight[];
   material: MaterialPresetMaterial;
 }
 

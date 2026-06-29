@@ -8,7 +8,7 @@ import {
   type MaterialPreset,
   type MaterialPresetId,
 } from "../../../model/materialPresets";
-import { CameraHeadlight } from "../../../scene/CameraHeadlight";
+import { MaterialPresetLights } from "../../../scene/MaterialPresetLights";
 import type { ResolvedStructureMaterialFamily } from "../../../scene/materialPresetResolver";
 import { StructureMaterial } from "../../../scene/StructureMaterial";
 
@@ -114,14 +114,7 @@ function MaterialPresetTokenRenderer({
         className="pointer-events-none absolute inset-0 h-full w-full"
         style={{ pointerEvents: "none" }}
       >
-        <ambientLight intensity={materialFamily.lighting.ambientIntensity} />
-        {materialFamily.lighting.cameraLights.map((light, index) => (
-          <CameraHeadlight
-            key={`${index}:${light.intensity}:${light.offset.join(",")}`}
-            intensity={light.intensity}
-            offset={light.offset}
-          />
-        ))}
+        <MaterialPresetLights lighting={materialFamily.lighting} />
         <TokenImageCapture presetId={presetId} />
         <mesh>
           <sphereGeometry args={[0.26, 48, 32]} />

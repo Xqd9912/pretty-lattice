@@ -74,6 +74,8 @@ const EXPORT_LEGEND_LAYOUT_LABELS: Record<ExportLegendLayout, string> = {
   horizontal: "Horizontal",
   vertical: "Vertical",
 };
+const EXPORT_SEGMENTED_TRIGGER_CLASS =
+  "!h-5 rounded-[4px] px-0.5 py-0 text-[0.68rem] font-medium transition-[background-color,color,box-shadow] duration-75 ease-out motion-reduce:transition-none md:text-[0.68rem]";
 
 export function ExportTabContent({
   error,
@@ -551,7 +553,7 @@ function ExportLegendLayoutControl({
             value={option}
             aria-label={`${EXPORT_LEGEND_LAYOUT_LABELS[option]} legend layout`}
             disabled={disabled}
-            className="!h-5 rounded-[4px] px-0.5 py-0 text-[0.68rem] font-medium md:text-[0.68rem]"
+            className={EXPORT_SEGMENTED_TRIGGER_CLASS}
           >
             {EXPORT_LEGEND_LAYOUT_LABELS[option]}
           </TabsTrigger>
@@ -671,7 +673,7 @@ function ExportSupersamplingControl({
               key={option}
               value={String(option)}
               aria-label={`${option}x supersampling`}
-              className="!h-5 rounded-[4px] px-0.5 py-0 text-[0.68rem] font-medium md:text-[0.68rem]"
+              className={EXPORT_SEGMENTED_TRIGGER_CLASS}
             >
               {option}x
             </TabsTrigger>
@@ -708,7 +710,7 @@ function ExportMeshQualityControl({
               key={option}
               value={option}
               aria-label={`${MESH_QUALITY_LABELS[option]} mesh quality`}
-              className="!h-5 rounded-[4px] px-0.5 py-0 text-[0.68rem] font-medium md:text-[0.68rem]"
+              className={EXPORT_SEGMENTED_TRIGGER_CLASS}
             >
               {MESH_QUALITY_LABELS[option]}
             </TabsTrigger>

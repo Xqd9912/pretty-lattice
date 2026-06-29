@@ -3,16 +3,24 @@
   "label": "Classic Matte",
   "description": "Soft diffuse shading close to the original preview look.",
   "material": {
-    "kind": "lambert",
-    "flatShading": false
+    "type": "MeshLambertMaterial",
+    "props": {
+      "flatShading": false
+    }
   },
-  "lighting": {
-    "ambientIntensity": 1.0,
-    "cameraLights": [
-      {
+  "lighting": [
+    {
+      "type": "AmbientLight",
+      "props": {
+        "intensity": 1.0
+      }
+    },
+    {
+      "type": "cameraDirectional",
+      "props": {
         "intensity": 2.0,
         "offset": [0.32, 0.22, 0]
       }
-    ]
-  }
+    }
+  ]
 }

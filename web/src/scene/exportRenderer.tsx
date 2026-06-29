@@ -17,6 +17,7 @@ import {
 } from "./StructureSceneObjects";
 import { ExportSceneContent } from "./ExportSceneContent";
 import { CameraHeadlight } from "./CameraHeadlight";
+import { MaterialPresetLights } from "./MaterialPresetLights";
 import { computeSceneLayout } from "./sceneLayout";
 import { computeStructureExportFramePlan, type StructureExportFramePlan } from "./exportFrame";
 import { resolveStructureMaterialFamilyForStyle } from "./materialPresetResolver";
@@ -176,14 +177,7 @@ export async function renderStructureRasterImage({
 
     const store = root.render(
       <>
-        <ambientLight intensity={materialFamily.lighting.ambientIntensity} />
-        {materialFamily.lighting.cameraLights.map((light, index) => (
-          <CameraHeadlight
-            key={`${index}:${light.intensity}:${light.offset.join(",")}`}
-            intensity={light.intensity}
-            offset={light.offset}
-          />
-        ))}
+        <MaterialPresetLights lighting={materialFamily.lighting} />
         <ExportSceneContent
           atomRenderingMode={atomRenderingMode}
           bondRenderingMode={bondRenderingMode}

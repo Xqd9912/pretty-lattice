@@ -3,18 +3,26 @@
   "label": "Modern Matte",
   "description": "A smoother physically based matte surface with broader highlights.",
   "material": {
-    "kind": "standard",
-    "metalness": 0.15,
-    "roughness": 0.6,
-    "flatShading": false
+    "type": "MeshStandardMaterial",
+    "props": {
+      "metalness": 0.15,
+      "roughness": 0.6,
+      "flatShading": false
+    }
   },
-  "lighting": {
-    "ambientIntensity": 1.0,
-    "cameraLights": [
-      {
+  "lighting": [
+    {
+      "type": "AmbientLight",
+      "props": {
+        "intensity": 1.0
+      }
+    },
+    {
+      "type": "cameraDirectional",
+      "props": {
         "intensity": 2.0,
         "offset": [0.32, 0.22, 0]
       }
-    ]
-  }
+    }
+  ]
 }
