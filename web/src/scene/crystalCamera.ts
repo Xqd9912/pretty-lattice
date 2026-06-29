@@ -52,8 +52,8 @@ const DEFAULT_SECONDARY_DIRECTION: Record<
   CrystalCameraScreenDirection,
   CrystalCameraScreenDirection
 > = {
-  outward: "upward",
-  right: "outward",
+  outward: "right",
+  right: "upward",
   upward: "outward",
 };
 const SCREEN_DIRECTION_INDEX: Record<CrystalCameraScreenDirection, number> = {
@@ -197,12 +197,8 @@ export function computeCrystalCameraVectors(
     basis.direct,
     new Vector3(0, 0, 1),
   ).normalize();
-  const reciprocal = coefficientsToVector(
-    state.reciprocal,
-    basis.reciprocal,
-    new Vector3(0, 1, 0),
-  );
-  const fallbackSecondary = vestaLikeSecondaryForPrimary(basis, direct);
+  const reciprocal = vectorFromBasisCoefficients(state.reciprocal, basis.reciprocal);
+  const fallbackSecondary = cyclicSecondaryForPrimary(basis, direct);
   const secondary = projectPerpendicular(reciprocal, direct, fallbackSecondary);
   const screenFrame = completeScreenFrame(
     state.primary,
@@ -231,7 +227,7 @@ export function applyCrystalCameraRoll(
     basis.direct,
     new Vector3(0, 0, 1),
   ).normalize();
-  const anchor = vestaLikeSecondaryForPrimary(basis, primary);
+  const anchor = cyclicSecondaryForPrimary(basis, primary);
   const rollAnchorDirection = defaultSecondaryDirectionForPrimary(
     state.primary,
   );
@@ -300,7 +296,7 @@ export function stateFromViewVectors(
     safeSecondaryDirection,
   );
   const safePrimary = normalizeOrFallback(primaryVector, new Vector3(0, 0, 1));
-  const anchor = vestaLikeSecondaryForPrimary(basis, safePrimary);
+  const anchor = cyclicSecondaryForPrimary(basis, safePrimary);
   const rollAnchorDirection = defaultSecondaryDirectionForPrimary(primary);
   const rollVector = screenVectorForDirection(poseVectors, rollAnchorDirection);
   const safeRollVector = projectPerpendicular(rollVector, safePrimary, anchor);
@@ -336,6 +332,7 @@ export function stateWithDirectAxis(
   const nextState = {
     ...state,
     direct: crystalAxisDirectCoefficients(axis),
+    secondary: defaultSecondaryDirectionForPrimary(state.primary),
   };
 
   return applyCrystalCameraRoll(vectors, nextState, 0);
@@ -392,24 +389,25 @@ export function vectorsFromCameraQuaternion(quaternion: Quaternion): {
   };
 }
 
-function vestaLikeSecondaryForPrimary(
+function cyclicSecondaryForPrimary(
   basis: CrystalBasisVectors,
   primary: Vector3,
 ): Vector3 {
-  for (const candidate of [
-    basis.reciprocal[2],
-    basis.reciprocal[1],
-    basis.reciprocal[0],
-  ]) {
+  const safePrimary = normalizeOrFallback(primary, new Vector3(0, 0, 1));
+  const directCoefficients = vectorToDirectCoefficients(safePrimary, basis);
+  const [u, v, w] = directCoefficients;
+  const cyclicDirect = directVectorFromCoefficients([w, u, v], basis);
+
+  for (const candidate of [cyclicDirect, basis.direct[2], basis.direct[0]]) {
     const projected = candidate
       .clone()
-      .sub(primary.clone().multiplyScalar(candidate.dot(primary)));
+      .sub(safePrimary.clone().multiplyScalar(candidate.dot(safePrimary)));
     if (projected.lengthSq() >= EPSILON) {
       return projected.normalize();
     }
   }
 
-  return stablePerpendicular(primary);
+  return stablePerpendicular(safePrimary);
 }
 
 function cameraQuaternionFromOutwardUp(
@@ -519,11 +517,7 @@ function coefficientsToVector(
   basisVectors: [Vector3, Vector3, Vector3],
   fallback: Vector3,
 ): Vector3 {
-  const vector = basisVectors[0]
-    .clone()
-    .multiplyScalar(coefficients[0])
-    .add(basisVectors[1].clone().multiplyScalar(coefficients[1]))
-    .add(basisVectors[2].clone().multiplyScalar(coefficients[2]));
+  const vector = vectorFromBasisCoefficients(coefficients, basisVectors);
 
   return normalizeOrFallback(vector, fallback);
 }
@@ -548,6 +542,24 @@ function vectorToReciprocalCoefficients(
     vector.dot(basis.direct[1]),
     vector.dot(basis.direct[2]),
   ];
+}
+
+function directVectorFromCoefficients(
+  coefficients: VectorTuple,
+  basis: CrystalBasisVectors,
+): Vector3 {
+  return vectorFromBasisCoefficients(coefficients, basis.direct);
+}
+
+function vectorFromBasisCoefficients(
+  coefficients: VectorTuple,
+  basisVectors: [Vector3, Vector3, Vector3],
+): Vector3 {
+  return basisVectors[0]
+    .clone()
+    .multiplyScalar(coefficients[0])
+    .add(basisVectors[1].clone().multiplyScalar(coefficients[1]))
+    .add(basisVectors[2].clone().multiplyScalar(coefficients[2]));
 }
 
 function projectPerpendicular(

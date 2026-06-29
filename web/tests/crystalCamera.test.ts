@@ -35,7 +35,7 @@ describe("crystal camera math", () => {
     }
   });
 
-  test("uses VESTA-like c-star then b-star fallback for roll zero", () => {
+  test("uses cyclic direct-axis alignment for roll zero", () => {
     const aPrimary = computeCrystalCameraVectors(
       CUBIC_CELL,
       stateWithDirectAxis(CUBIC_CELL, createDefaultCrystalCameraState(), "a"),
@@ -50,11 +50,61 @@ describe("crystal camera math", () => {
     );
 
     expectVectorClose(aPrimary.outward, [1, 0, 0]);
+    expectVectorClose(aPrimary.right, [0, 1, 0]);
     expectVectorClose(aPrimary.up, [0, 0, 1]);
     expectVectorClose(bPrimary.outward, [0, 1, 0]);
-    expectVectorClose(bPrimary.up, [0, 0, 1]);
+    expectVectorClose(bPrimary.right, [0, 0, 1]);
+    expectVectorClose(bPrimary.up, [1, 0, 0]);
     expectVectorClose(cPrimary.outward, [0, 0, 1]);
+    expectVectorClose(cPrimary.right, [1, 0, 0]);
     expectVectorClose(cPrimary.up, [0, 1, 0]);
+  });
+
+  test("uses cyclic direct-axis alignment for non-outward primary screen axes", () => {
+    const aRight = computeCrystalCameraVectors(CUBIC_CELL, {
+      ...createDefaultCrystalCameraState(),
+      direct: [1, 0, 0],
+      primary: "right",
+      reciprocal: [0, 1, 0],
+      secondary: "upward",
+    });
+    const aUpward = computeCrystalCameraVectors(CUBIC_CELL, {
+      ...createDefaultCrystalCameraState(),
+      direct: [1, 0, 0],
+      primary: "upward",
+      reciprocal: [0, 1, 0],
+      secondary: "outward",
+    });
+
+    expectVectorClose(aRight.right, [1, 0, 0]);
+    expectVectorClose(aRight.up, [0, 1, 0]);
+    expectVectorClose(aRight.outward, [0, 0, 1]);
+    expectVectorClose(aUpward.up, [1, 0, 0]);
+    expectVectorClose(aUpward.outward, [0, 1, 0]);
+    expectVectorClose(aUpward.right, [0, 0, 1]);
+  });
+
+  test("falls back to direct c then direct a when cyclic transport degenerates", () => {
+    const symmetricDirection = computeCrystalCameraVectors(CUBIC_CELL, {
+      ...createDefaultCrystalCameraState(),
+      direct: [1, 1, 1],
+      primary: "outward",
+      reciprocal: [0, 0, 0],
+      secondary: "right",
+    });
+    const cOutward = computeCrystalCameraVectors(CUBIC_CELL, {
+      ...createDefaultCrystalCameraState(),
+      direct: [0, 0, 1],
+      primary: "outward",
+      reciprocal: [0, 0, 0],
+      secondary: "right",
+    });
+
+    expectVectorClose(
+      symmetricDirection.right,
+      new Vector3(-1, -1, 2).normalize().toArray() as VectorTuple,
+    );
+    expectVectorClose(cOutward.right, [1, 0, 0]);
   });
 
   test("default standard view matches the Naumann cubic orientation", () => {
@@ -140,7 +190,7 @@ describe("crystal camera math", () => {
 
     expect(state.primary).toBe("upward");
     expect(state.secondary).toBe("outward");
-    expect(state.rollDegrees).toBeCloseTo(90);
+    expect(Math.abs(state.rollDegrees)).toBeCloseTo(180);
     expect(state.direct).toEqual([0, 0, 1]);
     expect(state.reciprocal).toEqual([-1, 0, 0]);
   });

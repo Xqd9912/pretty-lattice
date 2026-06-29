@@ -84,30 +84,44 @@ and orthogonalize the secondary direction against it.
 
 If $\lVert\tilde{\mathbf s}\rVert$ is too small, the submitted secondary
 direction does not determine a roll angle around $\mathbf p$. In that case the
-camera uses a deterministic VESTA-like anchor. It tries the reciprocal axes in
-the order
+camera uses the cyclic direct-lattice roll anchor from
+[Use Cyclic Crystal Orientation for Camera Roll Zero](../decisions/cyclic-crystal-camera-orientation.md).
+Define
 
 $$
-\mathbf r_1=\mathbf c^*,\qquad
-\mathbf r_2=\mathbf b^*,\qquad
-\mathbf r_3=\mathbf a^*
+T(\mathbf a)=\mathbf b,\qquad
+T(\mathbf b)=\mathbf c,\qquad
+T(\mathbf c)=\mathbf a.
 $$
 
-and chooses the first projected candidate
+For
 
 $$
-\mathbf q_i=\mathbf r_i-(\mathbf r_i\cdot \mathbf p)\mathbf p
+\mathbf p_0=u\mathbf a+v\mathbf b+w\mathbf c,
 $$
 
-with nonzero length:
+the first roll-anchor candidate is
 
 $$
-\mathbf s=\frac{\mathbf q_i}{\lVert\mathbf q_i\rVert}.
+\mathbf q_0=T(\mathbf p_0)=w\mathbf a+u\mathbf b+v\mathbf c.
 $$
 
-Only if all reciprocal candidates are degenerate does the camera fall back to a
-fixed Cartesian axis, projected by the same formula. This final step is a
-last-resort convention, not a replacement for the crystal-coordinate rule.
+It is projected into the screen plane:
+
+$$
+\mathbf q=\mathbf q_0-(\mathbf q_0\cdot \mathbf p)\mathbf p.
+$$
+
+If this projected vector is nonzero, the fallback secondary direction is
+
+$$
+\mathbf s=\frac{\mathbf q}{\lVert\mathbf q\rVert}.
+$$
+
+If the cyclic candidate is degenerate, the camera tries the projected direct
+`c` axis, then the projected direct `a` axis. Only if those are also degenerate
+does it use a fixed Cartesian fallback. This final step is a last-resort
+convention, not a replacement for the crystal-coordinate rule.
 
 The two vectors then determine the whole screen frame. The missing axis is
 filled by the right-hand rule. For example, if
@@ -124,6 +138,6 @@ $$
 $$
 
 If instead the primary direction is $X$, the same rule applies with $X$ fixed
-and one of $Y$ or $Z$ chosen as the secondary direction. The same fallback anchor
-also defines zero angle: changing the angle rotates $\mathbf s$ about the fixed
-axis $\mathbf p$.
+and the cyclic next screen axis $Y$ used as the roll-zero anchor. The same
+anchor also defines zero angle: changing the angle rotates $\mathbf s$ about the
+fixed axis $\mathbf p$.
