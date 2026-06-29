@@ -76,15 +76,12 @@ export const POLYHEDRON_SURFACE_OPACITY = 0.5;
 export const POLYHEDRON_EDGE_COLOR = "#f2f5f9";
 export const POLYHEDRON_EDGE_LINE_WIDTH_PIXELS = 1;
 export const POLYHEDRON_EDGE_OPACITY = 0.8;
-const CELL_FRAME_DASH_SIZE = 0.14;
-const CELL_FRAME_GAP_SIZE = 0.05;
+const CELL_FRAME_DASH_SIZE = 0.08;
+const CELL_FRAME_GAP_SIZE = 0.03;
 const POLYHEDRON_EDGE_OPACITY_RATIO =
   POLYHEDRON_EDGE_OPACITY / POLYHEDRON_SURFACE_OPACITY;
 export const SCENE_FOG_COLOR = "#fafafa";
-const FOG_START_OFFSET_EARLY = -0.7;
-const FOG_START_OFFSET_LATE = 0.35;
-const FOG_FALLOFF_SPAN_STRONG = 0.35;
-const FOG_FALLOFF_SPAN_SOFT = 1.15;
+const FOG_FRONT_PADDING_RATIO = 0.4;
 
 export const PREVIEW_SCENE_MESH_DETAIL: SceneMeshDetail = {
   bondRadialSegments: 16,
@@ -193,36 +190,42 @@ export function SceneFog({
   layout: SceneLayout;
   style: StyleState;
 }) {
-  const { scene } = useThree();
+  const { invalidate, scene } = useThree();
   const fog = useMemo(
     () =>
       style.fogEnabled
         ? createSceneFog(
             layout.standardPose.distance,
             layout.span,
+            layout.depthCueingBackOffset,
+            layout.depthCueingFrontOffset,
+            style.fogAmount,
             style.fogStart,
-            style.fogStrength,
           )
         : null,
     [
       layout.span,
+      layout.depthCueingBackOffset,
+      layout.depthCueingFrontOffset,
       layout.standardPose.distance,
+      style.fogAmount,
       style.fogEnabled,
       style.fogStart,
-      style.fogStrength,
     ],
   );
 
   useLayoutEffect(() => {
     const previousFog = scene.fog;
     scene.fog = fog;
+    invalidate();
 
     return () => {
       if (scene.fog === fog) {
         scene.fog = previousFog;
+        invalidate();
       }
     };
-  }, [fog, scene]);
+  }, [fog, invalidate, scene]);
 
   return null;
 }
@@ -230,33 +233,43 @@ export function SceneFog({
 export function createSceneFog(
   cameraDistance: number,
   span: number,
+  backOffset: number,
+  frontOffset: number,
+  amount: number,
   start: number,
-  strength: number,
 ): Fog | null {
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
   const safeStart = Number.isFinite(start) ? start : 0;
-  const safeStrength = Number.isFinite(strength) ? strength : 0;
+  const normalizedAmount = Math.min(1, Math.max(0, safeAmount / 100));
   const normalizedStart = Math.min(1, Math.max(0, safeStart / 100));
-  const normalizedStrength = Math.min(1, Math.max(0, safeStrength / 100));
-  if (normalizedStrength <= 0) {
+  if (normalizedAmount <= 0) {
     return null;
   }
 
   const safeSpan = Number.isFinite(span) ? Math.max(1, span) : 1;
+  const safeBackOffset = Number.isFinite(backOffset)
+    ? Math.max(0.01 * safeSpan, backOffset)
+    : 0.01 * safeSpan;
+  const safeFrontOffset = Number.isFinite(frontOffset)
+    ? Math.min(safeBackOffset, frontOffset)
+    : 0;
   const safeCameraDistance = Number.isFinite(cameraDistance)
     ? Math.max(0.01, cameraDistance)
     : 0.01;
+  const frontPadding = safeSpan * FOG_FRONT_PADDING_RATIO;
+  const firstStartOffset = safeFrontOffset - frontPadding;
+  const lastStartOffset = Math.max(
+    firstStartOffset,
+    safeBackOffset - frontPadding,
+  );
   const startOffset = lerp(
-    FOG_START_OFFSET_EARLY,
-    FOG_START_OFFSET_LATE,
+    firstStartOffset,
+    lastStartOffset,
     normalizedStart,
   );
-  const falloffSpan = lerp(
-    FOG_FALLOFF_SPAN_SOFT,
-    FOG_FALLOFF_SPAN_STRONG,
-    normalizedStrength,
-  );
-  const near = safeCameraDistance + safeSpan * startOffset;
-  const far = near + safeSpan * falloffSpan;
+  const near = safeCameraDistance + startOffset;
+  const back = safeCameraDistance + safeBackOffset;
+  const far = near + (back - near) / normalizedAmount;
 
   return new Fog(SCENE_FOG_COLOR, near, far);
 }
@@ -326,6 +339,7 @@ export function StructureSceneObjects({
         {showUnitCell ? (
           <CellFrame
             color={unitCellLineColor}
+            fog={style.fogEnabled && style.fogAffectsUnitCell}
             lineWidthScale={unitCellLineWidthScale}
             opacity={componentOpacity.unitCell / 100}
             lineStyle={unitCellLineStyle}
@@ -1332,12 +1346,14 @@ function Polyhedron({
 
 function CellFrame({
   color = CELL_FRAME_COLOR,
+  fog,
   lineWidthScale,
   lineStyle,
   opacity,
   vectors,
 }: {
   color?: string;
+  fog: boolean;
   lineWidthScale: number;
   lineStyle: UnitCellLineStyle;
   opacity: number;
@@ -1353,7 +1369,7 @@ function CellFrame({
       dashed: lineStyle === "dashed",
       depthWrite: opacity >= 1,
       dashSize: CELL_FRAME_DASH_SIZE,
-      fog: false,
+      fog,
       gapSize: CELL_FRAME_GAP_SIZE,
       linewidth: lineWidth,
       opacity,
@@ -1367,7 +1383,7 @@ function CellFrame({
       line.computeLineDistances();
     }
     return line;
-  }, [color, lineStyle, lineWidthScale, opacity, vectors]);
+  }, [color, fog, lineStyle, lineWidthScale, opacity, vectors]);
 
   useEffect(() => {
     return () => {

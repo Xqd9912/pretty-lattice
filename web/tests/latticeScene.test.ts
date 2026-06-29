@@ -221,6 +221,24 @@ describe("computeSceneLayout", () => {
     );
   });
 
+  test("uses atom positions for the depth cueing front and back references", () => {
+    const scene = sceneWithOffCenterAtoms();
+    const layout = computeSceneLayout(scene);
+    const outward = new Vector3(...layout.standardPose.outward).normalize();
+    const offset = new Vector3(...layout.groupPosition);
+    const projections = scene.atoms.map((item) =>
+      new Vector3(...item.position).add(offset).dot(outward),
+    );
+    const expectedFrontOffset = -Math.max(0, ...projections);
+    const expectedBackOffset = Math.max(
+      0.01 * layout.span,
+      -Math.min(0, ...projections),
+    );
+
+    expect(layout.depthCueingFrontOffset).toBeCloseTo(expectedFrontOffset);
+    expect(layout.depthCueingBackOffset).toBeCloseTo(expectedBackOffset);
+  });
+
   test("tracks the standard-view projected fit size for slender unit cells", () => {
     const layout = computeSceneLayout(sceneWithLongCell());
 
@@ -385,24 +403,32 @@ describe("computeSceneLayout", () => {
     expect(camera.far).toBeGreaterThanOrEqual(1000);
   });
 
-  test("maps fog start and strength to a linear scene fog range", () => {
-    expect(createSceneFog(40, 10, 25, 0)).toBeNull();
+  test("maps depth cueing start and amount to a linear scene fog range", () => {
+    expect(createSceneFog(40, 10, 6, 1, 0, 25)).toBeNull();
 
-    const earlyFog = createSceneFog(40, 10, 0, 100);
-    const lateFog = createSceneFog(40, 10, 100, 100);
-    const softFog = createSceneFog(40, 10, 25, 25);
-    const strongFog = createSceneFog(40, 10, 25, 100);
+    const earlyFog = createSceneFog(40, 10, 6, 1, 50, 0);
+    const lateFog = createSceneFog(40, 10, 6, 1, 50, 100);
+    const subtleFog = createSceneFog(40, 10, 6, 1, 25, 25);
+    const strongFog = createSceneFog(40, 10, 6, 1, 100, 25);
 
     expect(earlyFog).not.toBeNull();
     expect(lateFog).not.toBeNull();
-    expect(softFog).not.toBeNull();
+    expect(subtleFog).not.toBeNull();
     expect(strongFog).not.toBeNull();
     expect(earlyFog?.color.getHexString()).toBe(SCENE_FOG_COLOR.slice(1));
-    expect(earlyFog!.near).toBeLessThan(35);
+    expect(earlyFog!.near).toBeCloseTo(37);
     expect(lateFog!.near).toBeGreaterThan(earlyFog!.near);
-    expect(lateFog!.far).toBeGreaterThan(earlyFog!.far);
-    expect(strongFog!.near).toBeCloseTo(softFog!.near);
-    expect(strongFog!.far).toBeLessThan(softFog!.far);
+    expect(lateFog!.near).toBeCloseTo(42);
+    expect(lateFog!.far).toBeLessThan(earlyFog!.far);
+    expect(strongFog!.near).toBeCloseTo(subtleFog!.near);
+    expect(strongFog!.far).toBeLessThan(subtleFog!.far);
+
+    const backDepth = 40 + 6;
+    const earlyBackFade = (backDepth - earlyFog!.near) / (earlyFog!.far - earlyFog!.near);
+    const lateBackFade = (backDepth - lateFog!.near) / (lateFog!.far - lateFog!.near);
+    expect(earlyBackFade).toBeCloseTo(0.5);
+    expect(lateBackFade).toBeCloseTo(0.5);
+    expect(strongFog!.far).toBeCloseTo(backDepth);
   });
 
   test("derives export aspect from the projected currently visible content", () => {

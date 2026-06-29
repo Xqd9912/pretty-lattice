@@ -103,6 +103,7 @@ export function InspectorSidebar({
   isOpen,
   isSceneLoading,
   previewMeshQuality,
+  fogAffectsUnitCell,
   showFpsOverlay,
   showCrystalAxisLabels,
   unitCellLineStyle,
@@ -112,6 +113,7 @@ export function InspectorSidebar({
   onDragSensitivityChange,
   onInteractionModeChange,
   onPreviewMeshQualityChange,
+  onFogAffectsUnitCellChange,
   onShowFpsOverlayChange,
   onShowCrystalAxisLabelsChange,
   onUnitCellLineStyleChange,
@@ -124,6 +126,7 @@ export function InspectorSidebar({
   isOpen: boolean;
   isSceneLoading: boolean;
   previewMeshQuality: MeshQuality;
+  fogAffectsUnitCell: boolean;
   showFpsOverlay: boolean;
   showCrystalAxisLabels: boolean;
   unitCellLineStyle: UnitCellLineStyle;
@@ -133,6 +136,7 @@ export function InspectorSidebar({
   onDragSensitivityChange: (dragSensitivity: number) => void;
   onInteractionModeChange: (interactionMode: InteractionMode) => void;
   onPreviewMeshQualityChange: (meshQuality: MeshQuality) => void;
+  onFogAffectsUnitCellChange: (fogAffectsUnitCell: boolean) => void;
   onShowFpsOverlayChange: (showFpsOverlay: boolean) => void;
   onShowCrystalAxisLabelsChange: (showCrystalAxisLabels: boolean) => void;
   onUnitCellLineStyleChange: (lineStyle: UnitCellLineStyle) => void;
@@ -180,6 +184,7 @@ export function InspectorSidebar({
               interactionMode={interactionMode}
               isSceneLoading={isSceneLoading}
               previewMeshQuality={previewMeshQuality}
+              fogAffectsUnitCell={fogAffectsUnitCell}
               showFpsOverlay={showFpsOverlay}
               showCrystalAxisLabels={showCrystalAxisLabels}
               unitCellLineStyle={unitCellLineStyle}
@@ -189,6 +194,7 @@ export function InspectorSidebar({
               onDragSensitivityChange={onDragSensitivityChange}
               onInteractionModeChange={onInteractionModeChange}
               onPreviewMeshQualityChange={onPreviewMeshQualityChange}
+              onFogAffectsUnitCellChange={onFogAffectsUnitCellChange}
               onShowFpsOverlayChange={onShowFpsOverlayChange}
               onShowCrystalAxisLabelsChange={onShowCrystalAxisLabelsChange}
               onUnitCellLineStyleChange={onUnitCellLineStyleChange}
@@ -208,6 +214,7 @@ function SettingsPanel({
   interactionMode,
   isSceneLoading,
   previewMeshQuality,
+  fogAffectsUnitCell,
   showFpsOverlay,
   showCrystalAxisLabels,
   unitCellLineStyle,
@@ -217,6 +224,7 @@ function SettingsPanel({
   onDragSensitivityChange,
   onInteractionModeChange,
   onPreviewMeshQualityChange,
+  onFogAffectsUnitCellChange,
   onShowFpsOverlayChange,
   onShowCrystalAxisLabelsChange,
   onUnitCellLineStyleChange,
@@ -228,6 +236,7 @@ function SettingsPanel({
   interactionMode: InteractionMode;
   isSceneLoading: boolean;
   previewMeshQuality: MeshQuality;
+  fogAffectsUnitCell: boolean;
   showFpsOverlay: boolean;
   showCrystalAxisLabels: boolean;
   unitCellLineStyle: UnitCellLineStyle;
@@ -237,6 +246,7 @@ function SettingsPanel({
   onDragSensitivityChange: (dragSensitivity: number) => void;
   onInteractionModeChange: (interactionMode: InteractionMode) => void;
   onPreviewMeshQualityChange: (meshQuality: MeshQuality) => void;
+  onFogAffectsUnitCellChange: (fogAffectsUnitCell: boolean) => void;
   onShowFpsOverlayChange: (showFpsOverlay: boolean) => void;
   onShowCrystalAxisLabelsChange: (showCrystalAxisLabels: boolean) => void;
   onUnitCellLineStyleChange: (lineStyle: UnitCellLineStyle) => void;
@@ -279,6 +289,12 @@ function SettingsPanel({
           </SelectContent>
         </Select>
       </InspectorSelectRow>
+
+      <InspectorSwitchRow
+        checked={fogAffectsUnitCell}
+        label="Apply depth cueing to unit cell"
+        onCheckedChange={onFogAffectsUnitCellChange}
+      />
 
       <InspectorSelectRow label="Atom Mesh">
         <Select

@@ -719,11 +719,15 @@ describe("App", () => {
     const showCrystalAxisLabelsSwitch = within(inspector).getByRole("switch", {
       name: "Show crystal axis labels",
     });
+    const depthCueingUnitCellSwitch = within(inspector).getByRole("switch", {
+      name: "Apply depth cueing to unit cell",
+    });
     const unitCellLineSelect = within(inspector).getByRole("combobox", {
       name: "Unit cell line style",
     });
 
     expect(showCrystalAxisLabelsSwitch.getAttribute("aria-checked")).toBe("true");
+    expect(depthCueingUnitCellSwitch.getAttribute("aria-checked")).toBe("false");
     expect(screen.getByTestId("mock-orientation-gizmo").getAttribute("data-show-labels")).toBe(
       "true",
     );
@@ -732,6 +736,8 @@ describe("App", () => {
     expect(screen.getByTestId("mock-orientation-gizmo").getAttribute("data-show-labels")).toBe(
       "false",
     );
+    await user.click(depthCueingUnitCellSwitch);
+    expect(depthCueingUnitCellSwitch.getAttribute("aria-checked")).toBe("true");
 
     expect(unitCellLineSelect.textContent).toContain("Solid");
     await user.click(unitCellLineSelect);
@@ -752,6 +758,7 @@ describe("App", () => {
     expect(exportZipDownloads).toHaveLength(0);
     expect(exportRequests[0]?.showCrystalAxisLabels).toBe(false);
     expect(exportRequests[0]?.unitCellLineStyle).toBe("dashed");
+    expect(exportRequests[0]?.style.fogAffectsUnitCell).toBe(true);
   });
 
   test("toggles polyhedra independently from atoms, bonds, and unit cell", async () => {
@@ -940,22 +947,22 @@ describe("App", () => {
       name: "Material",
     });
     const fogSwitch = within(commonControls).getByRole("switch", {
-      name: "Fog",
+      name: "Depth cueing",
     });
     const fogStartSlider = within(commonControls).getByRole("slider", {
-      name: "Fog start",
+      name: "Depth cueing start",
     }) as HTMLInputElement;
     const fogStartInput = within(commonControls).getByRole("textbox", {
-      name: "Fog start value",
+      name: "Depth cueing start value",
     }) as HTMLInputElement;
-    const fogStrengthSlider = within(commonControls).getByRole("slider", {
-      name: "Fog strength",
+    const fogAmountSlider = within(commonControls).getByRole("slider", {
+      name: "Depth cueing amount",
     }) as HTMLInputElement;
-    const fogStrengthInput = within(commonControls).getByRole("textbox", {
-      name: "Fog strength value",
+    const fogAmountInput = within(commonControls).getByRole("textbox", {
+      name: "Depth cueing amount value",
     }) as HTMLInputElement;
     const resetFogButton = within(commonControls).getByRole("button", {
-      name: "Reset fog",
+      name: "Reset depth cueing",
     }) as HTMLButtonElement;
 
     expect(atomRadiusSlider.min).toBe("0");
@@ -971,15 +978,15 @@ describe("App", () => {
     expect(materialSelect.textContent).toContain("Classic Matte");
     expect(bondStyleSelect.textContent).toContain("By atom");
     expect(colorSchemeSelect.textContent).toContain("VESTA Soft");
-    expect(fogSwitch.getAttribute("aria-checked")).toBe("false");
+    expect(fogSwitch.getAttribute("aria-checked")).toBe("true");
     expect(fogStartSlider.value).toBe("50");
     expect(fogStartInput.value).toBe("50");
-    expect(fogStrengthSlider.value).toBe("50");
-    expect(fogStrengthInput.value).toBe("50");
-    expect(fogStartSlider.disabled).toBe(true);
-    expect(fogStartInput.disabled).toBe(true);
-    expect(fogStrengthSlider.disabled).toBe(true);
-    expect(fogStrengthInput.disabled).toBe(true);
+    expect(fogAmountSlider.value).toBe("50");
+    expect(fogAmountInput.value).toBe("50");
+    expect(fogStartSlider.disabled).toBe(false);
+    expect(fogStartInput.disabled).toBe(false);
+    expect(fogAmountSlider.disabled).toBe(false);
+    expect(fogAmountInput.disabled).toBe(false);
 
     await user.click(atomRadiusModelSelect);
     expect(await screen.findByText("Atom radius model")).toBeTruthy();
@@ -1002,20 +1009,13 @@ describe("App", () => {
     expect(colorSchemeSelect.textContent).toContain("Jmol");
     expect(fetchCalls).toHaveLength(1);
 
-    await user.click(fogSwitch);
-    expect(fogSwitch.getAttribute("aria-checked")).toBe("true");
-    expect(fogStartSlider.disabled).toBe(false);
-    expect(fogStartInput.disabled).toBe(false);
-    expect(fogStrengthSlider.disabled).toBe(false);
-    expect(fogStrengthInput.disabled).toBe(false);
-
     fireEvent.change(fogStartSlider, { target: { value: "18" } });
-    fireEvent.change(fogStrengthSlider, { target: { value: "72" } });
+    fireEvent.change(fogAmountSlider, { target: { value: "72" } });
 
     expect(fogStartInput.value).toBe("18");
     expect(fogStartSlider.value).toBe("18");
-    expect(fogStrengthInput.value).toBe("72");
-    expect(fogStrengthSlider.value).toBe("72");
+    expect(fogAmountInput.value).toBe("72");
+    expect(fogAmountSlider.value).toBe("72");
 
     fireEvent.change(atomRadiusSlider, { target: { value: "100" } });
 
@@ -1066,7 +1066,7 @@ describe("App", () => {
     expect(colorSchemeSelect.textContent).toContain("Jmol");
     expect(fogSwitch.getAttribute("aria-checked")).toBe("true");
     expect(fogStartInput.value).toBe("18");
-    expect(fogStrengthInput.value).toBe("72");
+    expect(fogAmountInput.value).toBe("72");
 
     await user.click(resetFogButton);
 
@@ -1074,8 +1074,8 @@ describe("App", () => {
     expect(fogSwitch.getAttribute("aria-checked")).toBe("true");
     expect(fogStartInput.value).toBe("50");
     expect(fogStartSlider.value).toBe("50");
-    expect(fogStrengthInput.value).toBe("50");
-    expect(fogStrengthSlider.value).toBe("50");
+    expect(fogAmountInput.value).toBe("50");
+    expect(fogAmountSlider.value).toBe("50");
   });
 
   test("selects material presets without re-uploading or changing independent controls", async () => {

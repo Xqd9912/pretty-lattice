@@ -26,6 +26,8 @@ const NARROW_VIEWPORT_SAFE_AREA: PreviewSafeArea = {
 
 export interface SceneStructureLayout {
   cameraFitBounds: CameraFitBounds;
+  depthCueingBackOffset: number;
+  depthCueingFrontOffset: number;
   groupPosition: VectorTuple;
   span: number;
   standardPose: StandardCameraPose;
@@ -70,15 +72,53 @@ export function computeSceneStructureLayout(
     span,
   );
 
+  const depthCueingRange = computeDepthCueingRange(
+    scene,
+    groupPosition,
+    standardPose,
+    span,
+  );
+
   return {
     cameraFitBounds: computeProjectedCameraFitBounds(
       scene,
       groupPosition,
       defaultCameraPose,
     ),
+    depthCueingBackOffset: depthCueingRange.backOffset,
+    depthCueingFrontOffset: depthCueingRange.frontOffset,
     groupPosition,
     span,
     standardPose,
+  };
+}
+
+function computeDepthCueingRange(
+  scene: SceneSpec,
+  groupPosition: VectorTuple,
+  standardPose: Pick<StandardCameraPose, "outward">,
+  span: number,
+): { backOffset: number; frontOffset: number } {
+  const outward = new Vector3(...standardPose.outward).normalize();
+  const offset = new Vector3(...groupPosition);
+  const points =
+    scene.atoms.length > 0
+      ? scene.atoms.map((atom) => new Vector3(...atom.position))
+      : cellCorners(scene.cell.vectors);
+  let nearestFrontProjection = 0;
+  let nearestBackProjection = 0;
+
+  for (const point of points) {
+    const projected = point.clone().add(offset).dot(outward);
+    nearestFrontProjection = Math.max(nearestFrontProjection, projected);
+    nearestBackProjection = Math.min(nearestBackProjection, projected);
+  }
+
+  const minimumOffset = 0.01 * Math.max(1, span);
+
+  return {
+    backOffset: Math.max(minimumOffset, -nearestBackProjection),
+    frontOffset: -nearestFrontProjection,
   };
 }
 

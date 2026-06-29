@@ -34,10 +34,10 @@ import {
   type MaterialPresetId,
 } from "../../../model/materialPresets";
 import {
+  STYLE_FOG_AMOUNT_MAX,
+  STYLE_FOG_AMOUNT_MIN,
   STYLE_FOG_START_MAX,
   STYLE_FOG_START_MIN,
-  STYLE_FOG_STRENGTH_MAX,
-  STYLE_FOG_STRENGTH_MIN,
   STYLE_SCALE_MAX,
   STYLE_SCALE_MIN,
   createDefaultStyle,
@@ -134,13 +134,13 @@ export function StyleTabContent({
     }));
   }
 
-  function setFogStrength(fogStrength: number) {
+  function setFogAmount(fogAmount: number) {
     onStyleChange((currentStyle) => ({
       ...currentStyle,
-      fogStrength: clampPercentValue(
-        fogStrength,
-        STYLE_FOG_STRENGTH_MIN,
-        STYLE_FOG_STRENGTH_MAX,
+      fogAmount: clampPercentValue(
+        fogAmount,
+        STYLE_FOG_AMOUNT_MIN,
+        STYLE_FOG_AMOUNT_MAX,
       ),
     }));
   }
@@ -189,8 +189,9 @@ export function StyleTabContent({
   function handleResetFogClick() {
     onStyleChange((currentStyle) => ({
       ...currentStyle,
+      fogAffectsUnitCell: createDefaultStyle().fogAffectsUnitCell,
+      fogAmount: createDefaultStyle().fogAmount,
       fogStart: createDefaultStyle().fogStart,
-      fogStrength: createDefaultStyle().fogStrength,
     }));
 
     if (fogResetFeedbackTimeoutRef.current !== null) {
@@ -267,29 +268,28 @@ export function StyleTabContent({
 
       <section aria-labelledby="style-fog-label">
         <div className="grid grid-cols-[minmax(5.5rem,1fr)_6.75rem_2.35rem] items-center gap-2 px-1.5">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="col-span-2 flex min-w-0 items-center gap-2">
             <h2
               id="style-fog-label"
-              className={cn(COMMON_PANEL_SECTION_TITLE_TEXT_CLASS, "leading-tight text-muted-foreground")}
+              className={cn(COMMON_PANEL_SECTION_TITLE_TEXT_CLASS, "whitespace-nowrap leading-tight text-muted-foreground")}
             >
-              Fog
+              Depth cueing
             </h2>
             <Switch
               checked={style.fogEnabled}
-              aria-label="Fog"
+              aria-label="Depth cueing"
               className="h-4 w-7 p-0.5"
               thumbClassName="size-3 data-[state=checked]:translate-x-3"
               onCheckedChange={setFogEnabled}
             />
           </div>
-          <span aria-hidden="true" />
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="flex justify-end">
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label="Reset fog"
+                  aria-label="Reset depth cueing"
                   className={cn(
                     TOOL_ICON_BUTTON_CLASS,
                     fogResetFeedbackPhase === "a"
@@ -305,12 +305,12 @@ export function StyleTabContent({
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent side="top">Reset fog</TooltipContent>
+            <TooltipContent side="top">Reset depth cueing</TooltipContent>
           </Tooltip>
         </div>
         <div className={cn("mt-1", COMMON_PANEL_ROW_STACK_CLASS, style.fogEnabled ? null : "opacity-55")}>
           <PercentSliderRow
-            accessibleLabel="Fog"
+            accessibleLabel="Depth cueing"
             allowZero
             disabled={!style.fogEnabled}
             label="Start"
@@ -321,15 +321,15 @@ export function StyleTabContent({
             onValueChange={setFogStart}
           />
           <PercentSliderRow
-            accessibleLabel="Fog"
+            accessibleLabel="Depth cueing"
             allowZero
             disabled={!style.fogEnabled}
-            label="Strength"
-            max={STYLE_FOG_STRENGTH_MAX}
-            min={STYLE_FOG_STRENGTH_MIN}
-            value={style.fogStrength}
-            valueLabel="strength"
-            onValueChange={setFogStrength}
+            label="Amount"
+            max={STYLE_FOG_AMOUNT_MAX}
+            min={STYLE_FOG_AMOUNT_MIN}
+            value={style.fogAmount}
+            valueLabel="amount"
+            onValueChange={setFogAmount}
           />
         </div>
       </section>

@@ -16,9 +16,10 @@ export interface StyleState {
   bondColorMode: BondColorMode;
   bondThickness: number;
   colorScheme: ColorScheme;
+  fogAffectsUnitCell: boolean;
+  fogAmount: number;
   fogEnabled: boolean;
   fogStart: number;
-  fogStrength: number;
   materialPreset: MaterialPresetId;
 }
 
@@ -28,9 +29,10 @@ export const DEFAULT_STYLE: StyleState = {
   bondColorMode: "by-atom",
   bondThickness: 100,
   colorScheme: DEFAULT_COLOR_SCHEME_ID,
-  fogEnabled: false,
+  fogAffectsUnitCell: false,
+  fogAmount: 50,
+  fogEnabled: true,
   fogStart: 50,
-  fogStrength: 50,
   materialPreset: DEFAULT_MATERIAL_PRESET_ID,
 };
 
@@ -44,8 +46,8 @@ export const STYLE_SCALE_MAX: Pick<StyleState, "atomRadius" | "bondThickness"> =
   bondThickness: 200,
 };
 
-export const STYLE_FOG_STRENGTH_MIN = 0;
-export const STYLE_FOG_STRENGTH_MAX = 100;
+export const STYLE_FOG_AMOUNT_MIN = 0;
+export const STYLE_FOG_AMOUNT_MAX = 100;
 export const STYLE_FOG_START_MIN = 0;
 export const STYLE_FOG_START_MAX = 100;
 

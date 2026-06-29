@@ -425,6 +425,13 @@ export function App() {
     setPreviewMeshQuality(nextQuality);
   }, []);
 
+  const handleFogAffectsUnitCellChange = useCallback((fogAffectsUnitCell: boolean) => {
+    setStyle((currentStyle) => ({
+      ...currentStyle,
+      fogAffectsUnitCell,
+    }));
+  }, []);
+
   const handleAtomPulse = useCallback((atomId: string) => {
     if (atomId === inspectedAtomIdRef.current) {
       return;
@@ -1291,6 +1298,7 @@ export function App() {
             isOpen={isInspectorOpen}
             isSceneLoading={previewStatus === "loading"}
             previewMeshQuality={previewMeshQuality}
+            fogAffectsUnitCell={style.fogAffectsUnitCell}
             showFpsOverlay={viewState.showFpsOverlay}
             showCrystalAxisLabels={showCrystalAxisLabels}
             unitCellLineStyle={unitCellLineStyle}
@@ -1302,6 +1310,7 @@ export function App() {
             onDragSensitivityChange={handleDragSensitivityChange}
             onInteractionModeChange={handleInteractionModeChange}
             onPreviewMeshQualityChange={handlePreviewMeshQualityChange}
+            onFogAffectsUnitCellChange={handleFogAffectsUnitCellChange}
             onShowFpsOverlayChange={handleShowFpsOverlayChange}
             onShowCrystalAxisLabelsChange={setShowCrystalAxisLabels}
             onUnitCellLineStyleChange={setUnitCellLineStyle}
