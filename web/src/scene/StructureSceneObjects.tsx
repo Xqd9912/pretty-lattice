@@ -785,6 +785,7 @@ function BatchedBonds({
   thicknessScale: number;
 }) {
   const meshRef = useRef<BatchedMesh | null>(null);
+  const populatedBatchMeshRef = useRef<BatchedMesh | null>(null);
   const populatedBatchKeyRef = useRef<string | null>(null);
   const invalidate = useThree((state) => state.invalidate);
   const batch = useMemo(
@@ -810,15 +811,20 @@ function BatchedBonds({
   useLayoutEffect(() => {
     const mesh = meshRef.current;
     if (!mesh || !batch) {
+      populatedBatchMeshRef.current = null;
       populatedBatchKeyRef.current = null;
       return;
     }
 
-    if (populatedBatchKeyRef.current === batch.key) {
+    if (
+      populatedBatchMeshRef.current === mesh &&
+      populatedBatchKeyRef.current === batch.key
+    ) {
       return;
     }
 
     populateBatchedBondMesh(mesh, batch);
+    populatedBatchMeshRef.current = mesh;
     populatedBatchKeyRef.current = batch.key;
     mesh.computeBoundingBox();
     mesh.computeBoundingSphere();

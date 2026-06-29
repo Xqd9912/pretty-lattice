@@ -99,10 +99,10 @@ describe("computeSceneLayout", () => {
 
   test("fits the camera from the geometric mean of projected and available size", () => {
     const safeArea = {
-      bottom: 132,
+      bottom: 116,
       left: 420,
       right: 176,
-      top: 24,
+      top: 40,
     };
     const zoom = computeCameraFitZoom(
       {
@@ -119,10 +119,10 @@ describe("computeSceneLayout", () => {
 
   test("fits from projected area scale instead of a longest-side cap", () => {
     const safeArea = {
-      bottom: 132,
+      bottom: 116,
       left: 420,
       right: 176,
-      top: 24,
+      top: 40,
     };
     const zoom = computeCameraFitZoom(
       {
@@ -139,24 +139,24 @@ describe("computeSceneLayout", () => {
 
   test("offsets the orthographic frustum toward the safe-area center", () => {
     const frustum = computeOrthographicFrustum(1000, 800, 100, {
-      bottom: 132,
+      bottom: 116,
       left: 420,
       right: 176,
-      top: 24,
+      top: 40,
     });
 
     expect((frustum.left + frustum.right) / 2).toBeCloseTo(-1.22);
-    expect((frustum.bottom + frustum.top) / 2).toBeCloseTo(-0.54);
+    expect((frustum.bottom + frustum.top) / 2).toBeCloseTo(-0.38);
   });
 
   test("keeps the unit-cell center visually anchored while orthographic zoom changes", () => {
     const width = 1000;
     const height = 800;
     const safeArea = {
-      bottom: 132,
+      bottom: 116,
       left: 420,
       right: 176,
-      top: 24,
+      top: 40,
     };
     const expectedScreenX =
       safeArea.left + (width - safeArea.left - safeArea.right) / 2;
@@ -181,10 +181,10 @@ describe("computeSceneLayout", () => {
 
   test("folds the preview safe area for narrow viewports", () => {
     const desktopSafeArea = {
-      bottom: 132,
+      bottom: 116,
       left: 420,
       right: 176,
-      top: 24,
+      top: 40,
     };
 
     expect(previewSafeAreaForViewport(desktopSafeArea, 1280)).toBe(

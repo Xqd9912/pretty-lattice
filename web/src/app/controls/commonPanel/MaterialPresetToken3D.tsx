@@ -85,10 +85,15 @@ function MaterialPresetTokenRenderer({
 }: {
   presetId: MaterialPresetId;
 }) {
+  const tokenImage = useMaterialPresetTokenImage(presetId);
   const materialFamily = useMemo(
     () => materialPresetToFamily(materialPresetById(presetId)),
     [presetId],
   );
+
+  if (tokenImage) {
+    return null;
+  }
 
   return (
     <span

@@ -414,7 +414,8 @@ describe("settings", () => {
     expect(safeArea).toBe(INSPECTOR_PREVIEW_SAFE_AREA);
     expect(safeArea.right).toBe(176);
     expect(safeArea.left).toBe(420);
-    expect(safeArea.bottom).toBe(132);
+    expect(safeArea.bottom).toBe(116);
+    expect(safeArea.top).toBe(40);
     expect(sceneOffsetXForInspector(false, 1200)).toBe(0);
     expect(sceneOffsetXForInspector(true, 760)).toBe(0);
     expect(sceneOffsetXForInspector(true, 1200)).toBe(INSPECTOR_OPEN_SCENE_OFFSET_X_PX);
