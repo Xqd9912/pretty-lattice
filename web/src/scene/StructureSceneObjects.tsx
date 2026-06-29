@@ -20,12 +20,12 @@ import { InstancedAtoms } from "./InstancedAtoms";
 import { BatchedBonds } from "./BatchedBonds";
 import { createBondRenderItems } from "./BondRenderItems";
 import { CellFrame } from "./CellFrame";
-import { MemoizedPolyhedronMesh } from "./PolyhedronMesh";
+import { MemoizedBatchedPolyhedra } from "./BatchedPolyhedra";
 export {
   POLYHEDRON_EDGE_COLOR,
   POLYHEDRON_EDGE_OPACITY,
   POLYHEDRON_SURFACE_OPACITY,
-} from "./PolyhedronMesh";
+} from "./BatchedPolyhedra";
 
 export interface SceneMeshDetail {
   bondRadialSegments: number;
@@ -314,18 +314,15 @@ export function StructureSceneObjects({
             vectors={scene.cell.vectors}
           />
         ) : null}
-        {scene.polyhedra.map((polyhedron, polyhedronIndex) => (
-          <MemoizedPolyhedronMesh
-            key={polyhedronIndex}
-            atoms={scene.atoms}
-            colorScheme={style.colorScheme}
-            colorOverrides={colorOverrides}
-            materialFamily={materialFamily}
-            opacity={componentOpacity.polyhedra / 100}
-            polyhedron={polyhedron}
-            lineWidthScale={polyhedronEdgeLineWidthScale}
-          />
-        ))}
+        <MemoizedBatchedPolyhedra
+          atoms={scene.atoms}
+          colorScheme={style.colorScheme}
+          colorOverrides={colorOverrides}
+          materialFamily={materialFamily}
+          opacity={componentOpacity.polyhedra / 100}
+          polyhedra={scene.polyhedra}
+          lineWidthScale={polyhedronEdgeLineWidthScale}
+        />
         <BatchedBonds
           bondRenderItems={bondRenderItems}
           colorMode={style.bondColorMode}

@@ -30,6 +30,10 @@ import {
   createCameraPoseSnapshot,
 } from "../src/scene/cameraPose";
 import {
+  createPolyhedronSurfaceBatchBuild,
+  disposePolyhedronSurfaceBatchBuild,
+} from "../src/scene/BatchedPolyhedra";
+import {
   createDefaultCrystalCameraState,
   stateWithDirectAxis,
 } from "../src/scene/crystalCamera";
@@ -519,6 +523,41 @@ describe("computeSceneLayout", () => {
     ).toBeNull();
   });
 
+  test("builds one surface batch for valid polyhedra and skips invalid entries", () => {
+    const scene = sceneWithOffCenterAtoms();
+    const validPolyhedron = tetrahedronPolyhedron();
+    const secondValidPolyhedron = {
+      ...tetrahedronPolyhedron(),
+      centerAtomIndex: 1,
+    };
+    const invalidCenterPolyhedron = {
+      ...tetrahedronPolyhedron(),
+      centerAtomIndex: 999,
+    };
+    const invalidFacePolyhedron = {
+      ...tetrahedronPolyhedron(),
+      faces: [[0, 1, 4]],
+    } satisfies SceneSpec["polyhedra"][number];
+
+    const batch = createPolyhedronSurfaceBatchBuild({
+      atoms: scene.atoms,
+      colorScheme: createDefaultStyle().colorScheme,
+      polyhedra: [
+        validPolyhedron,
+        invalidCenterPolyhedron,
+        secondValidPolyhedron,
+        invalidFacePolyhedron,
+      ],
+    });
+
+    expect(batch?.itemCount).toBe(2);
+    expect(batch?.maxVertexCount).toBe(8);
+    expect(batch?.maxIndexCount).toBe(24);
+    expect(batch?.items.map((item) => item.polyhedronIndex)).toEqual([0, 2]);
+    expect(batch?.key.startsWith("polyhedra:2:")).toBe(true);
+    disposePolyhedronSurfaceBatchBuild(batch);
+  });
+
   test("normalizes orientation gizmo axes without orthogonalizing the cell", () => {
     const axes = computeOrientationGizmoAxes([
       [4, 0, 0],
@@ -558,6 +597,21 @@ function standardCubicUp(): [number, number, number] {
 
 function dot(left: [number, number, number], right: [number, number, number]) {
   return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
+}
+
+function tetrahedronPolyhedron(): SceneSpec["polyhedra"][number] {
+  return {
+    centerAtomIndex: 0,
+    hullAtomIndices: [0, 1, 2, 3],
+    faces: [
+      [0, 1, 2],
+      [0, 1, 3],
+      [0, 2, 3],
+      [1, 2, 3],
+    ],
+    visibilityDependencies: [],
+    visibilityDependencyGroups: [],
+  };
 }
 
 function firstTriangleNormalDotVertexNormal(
