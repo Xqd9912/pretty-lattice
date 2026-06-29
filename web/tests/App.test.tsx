@@ -393,7 +393,7 @@ describe("App", () => {
       name: "Bond rendering mode",
     });
     const previewMeshSelect = within(sidebar).getByRole("combobox", {
-      name: "Preview 3D mesh",
+      name: "Preview quality",
     });
 
     expect(atomRenderingSelect.textContent).toContain("Instanced");
@@ -414,7 +414,7 @@ describe("App", () => {
       within(sidebar).getByRole("combobox", { name: "Bond rendering mode" }).textContent,
     ).toContain("Independent");
     expect(
-      within(sidebar).getByRole("combobox", { name: "Preview 3D mesh" }).textContent,
+      within(sidebar).getByRole("combobox", { name: "Preview quality" }).textContent,
     ).toContain("XHigh");
   });
 
@@ -439,7 +439,7 @@ describe("App", () => {
       within(sidebar).getByRole("combobox", { name: "Bond rendering mode" }).textContent,
     ).toContain("Batched");
     expect(
-      within(sidebar).getByRole("combobox", { name: "Preview 3D mesh" }).textContent,
+      within(sidebar).getByRole("combobox", { name: "Preview quality" }).textContent,
     ).toContain("Low");
   });
 
@@ -716,8 +716,8 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Sidebar" }));
     const inspector = screen.getByRole("complementary", { name: "Sidebar" });
     expect(within(inspector).queryByRole("combobox", { name: "Renderer" })).toBeNull();
-    const showCrystalAxisLabelsSwitch = within(inspector).getByRole("switch", {
-      name: "Show crystal axis labels",
+    const hideCrystalAxisLabelsSwitch = within(inspector).getByRole("switch", {
+      name: "Hide crystal axis labels",
     });
     const depthCueingUnitCellSwitch = within(inspector).getByRole("switch", {
       name: "Apply depth cueing to unit cell",
@@ -726,13 +726,13 @@ describe("App", () => {
       name: "Unit cell line style",
     });
 
-    expect(showCrystalAxisLabelsSwitch.getAttribute("aria-checked")).toBe("true");
+    expect(hideCrystalAxisLabelsSwitch.getAttribute("aria-checked")).toBe("false");
     expect(depthCueingUnitCellSwitch.getAttribute("aria-checked")).toBe("false");
     expect(screen.getByTestId("mock-orientation-gizmo").getAttribute("data-show-labels")).toBe(
       "true",
     );
-    await user.click(showCrystalAxisLabelsSwitch);
-    expect(showCrystalAxisLabelsSwitch.getAttribute("aria-checked")).toBe("false");
+    await user.click(hideCrystalAxisLabelsSwitch);
+    expect(hideCrystalAxisLabelsSwitch.getAttribute("aria-checked")).toBe("true");
     expect(screen.getByTestId("mock-orientation-gizmo").getAttribute("data-show-labels")).toBe(
       "false",
     );
@@ -1152,13 +1152,13 @@ describe("App", () => {
       name: "1x supersampling",
     });
     const highMeshQuality = within(commonControls).getByRole("tab", {
-      name: "High mesh quality",
+      name: "High 3D Mesh Quality",
     });
     const xHighMeshQuality = within(commonControls).getByRole("tab", {
-      name: "XHigh mesh quality",
+      name: "XHigh 3D Mesh Quality",
     });
     const resetQualityButton = within(commonControls).getByRole("button", {
-      name: "Reset quality",
+      name: "Reset render settings",
     }) as HTMLButtonElement;
     const formatSelect = within(commonControls).getByRole("combobox", {
       name: "Format",

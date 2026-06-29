@@ -260,9 +260,9 @@ function SettingsPanel({
       />
 
       <InspectorSwitchRow
-        checked={showCrystalAxisLabels}
-        label="Show crystal axis labels"
-        onCheckedChange={onShowCrystalAxisLabelsChange}
+        checked={!showCrystalAxisLabels}
+        label="Hide crystal axis labels"
+        onCheckedChange={(checked) => onShowCrystalAxisLabelsChange(!checked)}
       />
 
       <InspectorSelectRow label="Unit cell line style">
@@ -296,7 +296,7 @@ function SettingsPanel({
         onCheckedChange={onFogAffectsUnitCellChange}
       />
 
-      <InspectorSelectRow label="Atom Mesh">
+      <InspectorSelectRow label="Atom mesh">
         <Select
           value={atomRenderingMode}
           onValueChange={(value) => onAtomRenderingModeChange(value as AtomRenderingMode)}
@@ -321,7 +321,7 @@ function SettingsPanel({
         </Select>
       </InspectorSelectRow>
 
-      <InspectorSelectRow label="Bond Mesh">
+      <InspectorSelectRow label="Bond mesh">
         <Select
           value={bondRenderingMode}
           onValueChange={(value) => onBondRenderingModeChange(value as BondRenderingMode)}
@@ -346,14 +346,14 @@ function SettingsPanel({
         </Select>
       </InspectorSelectRow>
 
-      <InspectorSelectRow label="Preview 3D mesh">
+      <InspectorSelectRow label="Preview quality">
         <Select
           value={previewMeshQuality}
           onValueChange={(value) => onPreviewMeshQualityChange(value as MeshQuality)}
         >
           <SelectTrigger
             size="sm"
-            aria-label="Preview 3D mesh"
+            aria-label="Preview quality"
             className={INSPECTOR_SELECT_TRIGGER_CLASS}
           >
             <SelectValue />

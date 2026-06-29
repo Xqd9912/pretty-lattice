@@ -113,7 +113,7 @@ export function ExportTabContent({
     [],
   );
 
-  function handleResetQualityClick() {
+  function handleResetRenderSettingsClick() {
     const defaultSettings = createDefaultExportSettings();
     onSettingsChange({
       ...settings,
@@ -198,14 +198,14 @@ export function ExportTabContent({
 
       <Separator className="my-0.5" />
 
-      <section aria-labelledby="export-quality-label" className="flex flex-col gap-2.5">
+      <section aria-labelledby="export-output-label" className="flex flex-col gap-2.5">
         <div className="grid grid-cols-[minmax(5.5rem,1fr)_6.75rem_2.35rem] items-center gap-2 px-1.5">
           <div className="flex min-w-0 items-center gap-1">
             <h2
-              id="export-quality-label"
+              id="export-output-label"
               className={cn(COMMON_PANEL_SECTION_TITLE_TEXT_CLASS, "leading-tight text-muted-foreground")}
             >
-              Quality
+              Output
             </h2>
             <ExportStatusIndicator message={statusMessage} />
           </div>
@@ -216,19 +216,19 @@ export function ExportTabContent({
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label="Reset quality"
+                  aria-label="Reset render settings"
                   className={cn(
                     TOOL_ICON_BUTTON_CLASS,
                     resetFeedbackPhase === "a" ? TOOL_ICON_BUTTON_RESET_FEEDBACK_A_CLASS : null,
                     resetFeedbackPhase === "b" ? TOOL_ICON_BUTTON_RESET_FEEDBACK_B_CLASS : null,
                   )}
-                  onClick={handleResetQualityClick}
+                  onClick={handleResetRenderSettingsClick}
                 >
                   <RotateCcw aria-hidden="true" />
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent side="top">Reset quality</TooltipContent>
+            <TooltipContent side="top">Reset render settings</TooltipContent>
           </Tooltip>
         </div>
 
@@ -694,7 +694,7 @@ function ExportMeshQualityControl({
   return (
     <label className="mt-0.5 grid min-w-0 gap-1 px-1.5">
       <span className={cn("truncate px-0.5 leading-none text-muted-foreground", COMMON_PANEL_FIELD_LABEL_TEXT_CLASS)}>
-        3D mesh
+        3D Mesh Quality
       </span>
       <Tabs
         value={value}
@@ -702,14 +702,14 @@ function ExportMeshQualityControl({
         onValueChange={(nextValue) => onCommit(nextValue as ExportMeshQuality)}
       >
         <TabsList
-          aria-label="Export mesh quality"
+          aria-label="Export 3D Mesh Quality"
           className="!h-6 w-full rounded-md p-0.5"
         >
           {MESH_QUALITY_OPTIONS.map((option) => (
             <TabsTrigger
               key={option}
               value={option}
-              aria-label={`${MESH_QUALITY_LABELS[option]} mesh quality`}
+              aria-label={`${MESH_QUALITY_LABELS[option]} 3D Mesh Quality`}
               className={EXPORT_SEGMENTED_TRIGGER_CLASS}
             >
               {MESH_QUALITY_LABELS[option]}
