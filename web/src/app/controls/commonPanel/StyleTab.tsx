@@ -1,4 +1,4 @@
-import { RotateCcw } from "lucide-react";
+import { Check, ChevronDown, RotateCcw } from "lucide-react";
 import {
   type CSSProperties,
   type Dispatch,
@@ -9,12 +9,12 @@ import {
 } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -64,13 +64,12 @@ const BOND_COLOR_OPTIONS: { label: string; value: BondColorMode }[] = [
 ];
 const ATOM_RADIUS_MODEL_OPTIONS: {
   menuLabel: string;
-  triggerLabel: string;
   value: AtomRadiusModel;
 }[] = [
-  { menuLabel: "Uniform", triggerLabel: "Uniform", value: "uniform" },
-  { menuLabel: "Atomic", triggerLabel: "Atomic", value: "atomic" },
-  { menuLabel: "Van der Waals", triggerLabel: "vdW", value: "vdw" },
-  { menuLabel: "Ionic", triggerLabel: "Ionic", value: "ionic" },
+  { menuLabel: "Uniform", value: "uniform" },
+  { menuLabel: "Atomic", value: "atomic" },
+  { menuLabel: "Van der Waals", value: "vdw" },
+  { menuLabel: "Ionic", value: "ionic" },
 ];
 const UNICOLOR_TOKEN_STYLE = { background: "#aeb5c0" } as const;
 const BY_ATOM_TOKEN_STYLE = { background: "linear-gradient(90deg, #f58c9a 0 50%, #78a7ff 50% 100%)" } as const;
@@ -214,7 +213,7 @@ export function StyleTabContent({
             id="style-size-label"
             className={cn(COMMON_PANEL_SECTION_TITLE_TEXT_CLASS, "leading-tight text-muted-foreground")}
           >
-            Radius
+            Size
           </h2>
           <span aria-hidden="true" />
           <Tooltip>
@@ -243,7 +242,7 @@ export function StyleTabContent({
           <PercentSliderRow
             accessibleLabel="Atom"
             label={(
-              <AtomRadiusModelSelect
+              <AtomRadiusModelPopover
                 value={style.atomRadiusModel}
                 onValueChange={setAtomRadiusModel}
               />
@@ -472,51 +471,81 @@ export function StyleTabContent({
   );
 }
 
-function AtomRadiusModelSelect({
+function AtomRadiusModelPopover({
   onValueChange,
   value,
 }: {
   onValueChange: (value: AtomRadiusModel) => void;
   value: AtomRadiusModel;
 }) {
+  const [open, setOpen] = useState(false);
   const selectedOption = ATOM_RADIUS_MODEL_OPTIONS.find((option) => option.value === value);
 
   return (
-    <Select
-      value={value}
-      onValueChange={(nextValue) => onValueChange(nextValue as AtomRadiusModel)}
-    >
-      <SelectTrigger
-        size="sm"
-        aria-label="Atom radius model"
-        className={cn(
-          "-ml-1.5 !h-6 w-20 gap-0.5 !py-0 !pr-0.5 !pl-1.5 [&_svg]:size-3.5",
-          COMMON_PANEL_BODY_TEXT_CLASS,
-        )}
+    <Popover open={open} onOpenChange={setOpen}>
+      <span className="inline-flex min-w-0 items-center gap-1">
+        <span className="min-w-0 truncate">Atom</span>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Atom radius model: ${selectedOption?.menuLabel ?? "Unknown"}`}
+            aria-haspopup="listbox"
+            className={cn(
+              TOOL_ICON_BUTTON_CLASS,
+              "size-5 rounded-[7px] border-input [&_svg]:size-3",
+            )}
+          >
+            <ChevronDown aria-hidden="true" />
+          </Button>
+        </PopoverTrigger>
+      </span>
+      <PopoverContent
+        align="start"
+        className="w-40"
+        onOpenAutoFocus={(event) => event.preventDefault()}
       >
-        <span data-slot="select-value" className="min-w-0 truncate">
-          {selectedOption?.triggerLabel}
-        </span>
-      </SelectTrigger>
-      <SelectContent
-        position="popper"
-        className="!bg-background !text-foreground"
-      >
-        <SelectGroup>
-          <SelectLabel className="py-1 text-xs font-medium">Atom radius model</SelectLabel>
+        <div
+          className={cn(
+            "px-2 pb-1 pt-1.5 leading-none text-muted-foreground",
+            COMMON_PANEL_BODY_TEXT_CLASS,
+          )}
+        >
+          Atom radius model
+        </div>
+        <div role="listbox" aria-label="Atom radius model" className="grid gap-0.5">
           {ATOM_RADIUS_MODEL_OPTIONS.map((option) => (
-            <SelectItem
+            <button
               key={option.value}
-              value={option.value}
-              textValue={option.menuLabel}
-              className={cn("min-h-6 py-0.5", COMMON_PANEL_BODY_TEXT_CLASS)}
+              type="button"
+              role="option"
+              aria-selected={option.value === value}
+              className={cn(
+                "flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground",
+                COMMON_PANEL_BODY_TEXT_CLASS,
+                option.value === value
+                  ? "bg-accent text-accent-foreground font-medium"
+                  : "text-foreground",
+              )}
+              onClick={() => {
+                onValueChange(option.value);
+                setOpen(false);
+              }}
             >
-              {option.menuLabel}
-            </SelectItem>
+              <Check
+                aria-hidden="true"
+                className={cn(
+                  "size-3 shrink-0",
+                  option.value === value ? "opacity-100" : "opacity-0",
+                )}
+              />
+              <span className="min-w-0 truncate">{option.menuLabel}</span>
+            </button>
           ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

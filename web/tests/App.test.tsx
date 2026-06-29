@@ -924,9 +924,9 @@ describe("App", () => {
     const commonControls = screen.getByRole("complementary", { name: "Common controls" });
     await user.click(within(commonControls).getByRole("tab", { name: "Style" }));
 
-    expect(within(commonControls).getByText("Radius").isConnected).toBe(true);
-    const atomRadiusModelSelect = within(commonControls).getByRole("combobox", {
-      name: "Atom radius model",
+    expect(within(commonControls).getByText("Size").isConnected).toBe(true);
+    const atomRadiusModelButton = within(commonControls).getByRole("button", {
+      name: "Atom radius model: Uniform",
     });
     const atomRadiusSlider = within(commonControls).getByRole("slider", {
       name: "Atom scale",
@@ -977,7 +977,7 @@ describe("App", () => {
     expect(bondThicknessSlider.value).toBe("100");
     expect(bondThicknessInput.value).toBe("100");
     expect(commonControls.querySelectorAll(".opacity-slider-snap-marker")).toHaveLength(0);
-    expect(atomRadiusModelSelect.textContent).toContain("Uniform");
+    expect(within(commonControls).getByText("Atom").isConnected).toBe(true);
     expect(materialSelect.textContent).toContain("Classic Matte");
     expect(bondStyleSelect.textContent).toContain("By atom");
     expect(colorSchemeSelect.textContent).toContain("VESTA Soft");
@@ -991,12 +991,14 @@ describe("App", () => {
     expect(fogAmountSlider.disabled).toBe(false);
     expect(fogAmountInput.disabled).toBe(false);
 
-    await user.click(atomRadiusModelSelect);
-    expect(await screen.findByText("Atom radius model")).toBeTruthy();
+    await user.click(atomRadiusModelButton);
+    expect(await screen.findByRole("listbox", { name: "Atom radius model" })).toBeTruthy();
     await user.click(await screen.findByRole("option", { name: "Van der Waals" }));
 
     expect(fetchCalls).toHaveLength(1);
-    expect(atomRadiusModelSelect.textContent).toContain("vdW");
+    expect(atomRadiusModelButton.getAttribute("aria-label")).toBe(
+      "Atom radius model: Van der Waals",
+    );
 
     await user.click(bondStyleSelect);
     expect(await screen.findByRole("option", { name: "By atom" })).toBeTruthy();
@@ -1064,7 +1066,9 @@ describe("App", () => {
     expect(atomRadiusSlider.value).toBe("40");
     expect(bondThicknessInput.value).toBe("100");
     expect(bondThicknessSlider.value).toBe("100");
-    expect(atomRadiusModelSelect.textContent).toContain("vdW");
+    expect(atomRadiusModelButton.getAttribute("aria-label")).toBe(
+      "Atom radius model: Van der Waals",
+    );
     expect(bondStyleSelect.textContent).toContain("Uniform");
     expect(colorSchemeSelect.textContent).toContain("Jmol");
     expect(fogSwitch.getAttribute("aria-checked")).toBe("true");
@@ -1799,10 +1803,10 @@ describe("App", () => {
     });
     await user.click(polyhedraCheckbox);
     await user.click(within(commonControls).getByRole("tab", { name: "Style" }));
-    const atomRadiusModelSelect = within(commonControls).getByRole("combobox", {
-      name: "Atom radius model",
+    const atomRadiusModelButton = within(commonControls).getByRole("button", {
+      name: "Atom radius model: Uniform",
     });
-    await user.click(atomRadiusModelSelect);
+    await user.click(atomRadiusModelButton);
     await user.click(await screen.findByRole("option", { name: "Van der Waals" }));
 
     expect(fetchCalls).toHaveLength(1);
