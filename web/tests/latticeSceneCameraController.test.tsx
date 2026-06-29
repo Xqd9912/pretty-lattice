@@ -1,10 +1,6 @@
 import { act, render } from "@testing-library/react";
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import {
-  Children,
-  isValidElement,
-  type ReactNode,
-} from "react";
+import { Children, isValidElement, type ReactNode } from "react";
 import { OrthographicCamera, Vector3 } from "three";
 
 import type { SceneSpec } from "../src/api/scene";
@@ -83,7 +79,7 @@ mock.module("@react-three/fiber", () => ({
   }: {
     children: ReactNode;
     frameloop?: unknown;
-  }) => (
+  }) =>
     (() => {
       latestCanvasFrameloop = frameloop;
       return (
@@ -96,8 +92,7 @@ mock.module("@react-three/fiber", () => ({
           )}
         </div>
       );
-    })()
-  ),
+    })(),
   useFrame: (callback: () => void) => {
     latestFrameCallback = callback;
   },
@@ -124,11 +119,14 @@ mock.module("three/examples/jsm/controls/TrackballControls.js", () => ({
   TrackballControls: MockTrackballControls,
 }));
 
-const { createDefaultComponentOpacity, createDefaultStyle } = await import("../src/app/settings");
-const { createCameraInteractionStore } = await import("../src/app/cameraInteractionStore");
+const { createDefaultComponentOpacity, createDefaultStyle } =
+  await import("../src/app/settings");
+const { createCameraInteractionStore } =
+  await import("../src/app/cameraInteractionStore");
 const { LatticeScene } = await import("../src/scene/LatticeScene");
 const {
   applyCrystalCameraRoll,
+  computeCrystalCameraVectors,
   createDefaultCrystalCameraState,
   stateWithDirectAxis,
 } = await import("../src/scene/crystalCamera");
@@ -150,7 +148,7 @@ describe("LatticeScene camera commands", () => {
       <LatticeScene
         cameraCommandVersion={0}
         cameraInteractionStore={createCameraInteractionStore()}
-        cameraState={createDefaultCrystalCameraState()}
+        cameraState={createDefaultCrystalCameraState(scene.cell.vectors)}
         componentOpacity={createDefaultComponentOpacity()}
         interactionLocked={false}
         interactionMode="trackball"
@@ -170,7 +168,7 @@ describe("LatticeScene camera commands", () => {
       <LatticeScene
         cameraCommandVersion={0}
         cameraInteractionStore={createCameraInteractionStore()}
-        cameraState={createDefaultCrystalCameraState()}
+        cameraState={createDefaultCrystalCameraState(scene.cell.vectors)}
         componentOpacity={createDefaultComponentOpacity()}
         dragSensitivity={2}
         interactionLocked={false}
@@ -188,7 +186,7 @@ describe("LatticeScene camera commands", () => {
       <LatticeScene
         cameraCommandVersion={0}
         cameraInteractionStore={createCameraInteractionStore()}
-        cameraState={createDefaultCrystalCameraState()}
+        cameraState={createDefaultCrystalCameraState(scene.cell.vectors)}
         componentOpacity={createDefaultComponentOpacity()}
         dragSensitivity={0.75}
         interactionLocked={false}
@@ -210,7 +208,7 @@ describe("LatticeScene camera commands", () => {
       <LatticeScene
         cameraCommandVersion={0}
         cameraInteractionStore={createCameraInteractionStore()}
-        cameraState={createDefaultCrystalCameraState()}
+        cameraState={createDefaultCrystalCameraState(scene.cell.vectors)}
         componentOpacity={createDefaultComponentOpacity()}
         interactionLocked={false}
         interactionMode="trackball"
@@ -233,7 +231,7 @@ describe("LatticeScene camera commands", () => {
       <LatticeScene
         cameraCommandVersion={0}
         cameraInteractionStore={createCameraInteractionStore()}
-        cameraState={createDefaultCrystalCameraState()}
+        cameraState={createDefaultCrystalCameraState(scene.cell.vectors)}
         componentOpacity={createDefaultComponentOpacity()}
         interactionLocked={false}
         interactionMode="trackball"
@@ -251,7 +249,7 @@ describe("LatticeScene camera commands", () => {
 
   test("applies each command pose in the same render instead of lagging one command behind", () => {
     const scene = orthogonalScene();
-    const defaultCamera = createDefaultCrystalCameraState();
+    const defaultCamera = createDefaultCrystalCameraState(scene.cell.vectors);
     const aCamera = stateWithDirectAxis(scene.cell.vectors, defaultCamera, "a");
     const bCamera = stateWithDirectAxis(scene.cell.vectors, defaultCamera, "b");
     const props = {
@@ -295,7 +293,7 @@ describe("LatticeScene camera commands", () => {
     let now = 0;
     const nowSpy = spyOn(performance, "now").mockImplementation(() => now);
     const scene = orthogonalScene();
-    const defaultCamera = createDefaultCrystalCameraState();
+    const defaultCamera = createDefaultCrystalCameraState(scene.cell.vectors);
     const aCamera = stateWithDirectAxis(scene.cell.vectors, defaultCamera, "a");
     const props = {
       cameraAnimatedCommandVersion: 0,
@@ -313,8 +311,7 @@ describe("LatticeScene camera commands", () => {
 
     try {
       const { rerender } = render(<LatticeScene {...props} />);
-      expect(Math.abs(mockCamera.position.x)).toBeLessThan(1e-8);
-      expect(mockCamera.position.z).toBeGreaterThan(0);
+      expectVectorClose(mockCamera.position, standardCameraPosition());
 
       rerender(
         <LatticeScene
@@ -327,8 +324,7 @@ describe("LatticeScene camera commands", () => {
           }}
         />,
       );
-      expect(Math.abs(mockCamera.position.x)).toBeLessThan(1e-8);
-      expect(mockCamera.position.z).toBeGreaterThan(0);
+      expectVectorClose(mockCamera.position, standardCameraPosition());
       expect(animationActiveChanges).toEqual([true]);
 
       now = 130;
@@ -349,7 +345,7 @@ describe("LatticeScene camera commands", () => {
 
   test("applies external zoom without advancing control damping", () => {
     const scene = orthogonalScene();
-    const defaultCamera = createDefaultCrystalCameraState();
+    const defaultCamera = createDefaultCrystalCameraState(scene.cell.vectors);
     const cameraInteractionStore = createCameraInteractionStore();
     const props = {
       cameraCommandVersion: 0,
@@ -380,7 +376,7 @@ describe("LatticeScene camera commands", () => {
 
   test("applies external zoom without rerendering the preview tree", () => {
     const scene = orthogonalScene();
-    const defaultCamera = createDefaultCrystalCameraState();
+    const defaultCamera = createDefaultCrystalCameraState(scene.cell.vectors);
     const cameraInteractionStore = createCameraInteractionStore();
 
     render(
@@ -405,7 +401,7 @@ describe("LatticeScene camera commands", () => {
 
   test("syncs control zoom to the interaction store without emitting commands", () => {
     const scene = orthogonalScene();
-    const defaultCamera = createDefaultCrystalCameraState();
+    const defaultCamera = createDefaultCrystalCameraState(scene.cell.vectors);
     const cameraInteractionStore = createCameraInteractionStore();
     const viewScaleSnapshots: number[] = [];
     cameraInteractionStore.subscribeViewScale(() => {
@@ -440,7 +436,7 @@ describe("LatticeScene camera commands", () => {
 
   test("keeps the view scale snapshot aligned if a controls change event is missed", () => {
     const scene = orthogonalScene();
-    const defaultCamera = createDefaultCrystalCameraState();
+    const defaultCamera = createDefaultCrystalCameraState(scene.cell.vectors);
     const cameraInteractionStore = createCameraInteractionStore();
     const viewScaleSnapshots: number[] = [];
     cameraInteractionStore.subscribeViewScale(() => {
@@ -476,7 +472,7 @@ describe("LatticeScene camera commands", () => {
 
   test("keeps missed control zoom snapshots out of preview tree renders", () => {
     const scene = orthogonalScene();
-    const defaultCamera = createDefaultCrystalCameraState();
+    const defaultCamera = createDefaultCrystalCameraState(scene.cell.vectors);
     const cameraInteractionStore = createCameraInteractionStore();
 
     render(
@@ -503,9 +499,13 @@ describe("LatticeScene camera commands", () => {
 
   test("applies camera state commands from the interaction store without rerendering", () => {
     const scene = orthogonalScene();
-    const defaultCamera = createDefaultCrystalCameraState();
+    const defaultCamera = createDefaultCrystalCameraState(scene.cell.vectors);
     const cameraInteractionStore = createCameraInteractionStore();
-    const rolledCamera = applyCrystalCameraRoll(scene.cell.vectors, defaultCamera, 90);
+    const rolledCamera = applyCrystalCameraRoll(
+      scene.cell.vectors,
+      defaultCamera,
+      90,
+    );
 
     render(
       <LatticeScene
@@ -521,18 +521,22 @@ describe("LatticeScene camera commands", () => {
       />,
     );
 
-    expect(Math.abs(mockCamera.up.x)).toBeLessThan(1e-8);
-    expect(mockCamera.up.y).toBeGreaterThan(0);
+    expectVectorClose(
+      mockCamera.up,
+      computeCrystalCameraVectors(scene.cell.vectors, defaultCamera).up,
+    );
 
     act(() => cameraInteractionStore.requestCameraState(rolledCamera));
 
-    expect(mockCamera.up.x).toBeLessThan(0);
-    expect(Math.abs(mockCamera.up.y)).toBeLessThan(1e-8);
+    expectVectorClose(
+      mockCamera.up,
+      computeCrystalCameraVectors(scene.cell.vectors, rolledCamera).up,
+    );
   });
 
   test("keeps user camera interaction active until inertia settles", () => {
     const scene = orthogonalScene();
-    const defaultCamera = createDefaultCrystalCameraState();
+    const defaultCamera = createDefaultCrystalCameraState(scene.cell.vectors);
     const interactionChanges: {
       isActive: boolean;
       quaternionW: number | null;
@@ -546,7 +550,10 @@ describe("LatticeScene camera commands", () => {
         componentOpacity={createDefaultComponentOpacity()}
         interactionLocked={false}
         interactionMode="trackball"
-        onCameraControlsInteractionActiveChange={(isActive, quaternionSnapshot) => {
+        onCameraControlsInteractionActiveChange={(
+          isActive,
+          quaternionSnapshot,
+        ) => {
           interactionChanges.push({
             isActive,
             quaternionW: quaternionSnapshot?.w ?? null,
@@ -583,7 +590,7 @@ describe("LatticeScene camera commands", () => {
 
   test("does not report pure zoom controls as camera direction interaction", () => {
     const scene = orthogonalScene();
-    const defaultCamera = createDefaultCrystalCameraState();
+    const defaultCamera = createDefaultCrystalCameraState(scene.cell.vectors);
     const interactionChanges: boolean[] = [];
 
     render(
@@ -663,4 +670,19 @@ function orthogonalScene(): SceneSpec {
       },
     },
   };
+}
+
+function standardCameraPosition() {
+  const distance = 16;
+  return new Vector3(
+    (distance * 6) / Math.sqrt(41),
+    (distance * 2) / Math.sqrt(41),
+    distance / Math.sqrt(41),
+  );
+}
+
+function expectVectorClose(actual: Vector3, expected: Vector3) {
+  expect(actual.x).toBeCloseTo(expected.x);
+  expect(actual.y).toBeCloseTo(expected.y);
+  expect(actual.z).toBeCloseTo(expected.z);
 }

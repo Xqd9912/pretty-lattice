@@ -149,8 +149,8 @@ export function LatticeScene({
 }) {
   const layoutSourceScene = layoutScene ?? scene;
   const structureLayout = useMemo(
-    () => computeSceneStructureLayout(layoutSourceScene, style.atomRadiusModel),
-    [layoutSourceScene, style.atomRadiusModel],
+    () => computeSceneStructureLayout(layoutSourceScene),
+    [layoutSourceScene],
   );
   const cameraPose = useMemo(
     () =>

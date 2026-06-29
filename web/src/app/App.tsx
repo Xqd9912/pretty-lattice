@@ -317,7 +317,7 @@ export function App() {
       cameraInteractionStore.requestViewScale(DEFAULT_VIEW_SCALE);
       setCameraCommandVersion((version) => version + 1);
       setCameraOrientationVersion((version) => version + 1);
-      setViewState(createPreviewViewState());
+      setViewState(createPreviewViewState(nextScene?.cell.vectors));
     },
     [cameraInteractionStore, clearCameraDerivedUiFreezeState],
   );
@@ -366,9 +366,11 @@ export function App() {
   const handleResetView = useCallback(() => {
     clearCameraDerivedUiFreezeState();
     cameraInteractionStore.requestViewScale(DEFAULT_VIEW_SCALE);
-    setViewState(resetPreviewViewState);
+    setViewState((currentViewState) =>
+      resetPreviewViewState(currentViewState, scene?.cell.vectors),
+    );
     setCameraCommandVersion((version) => version + 1);
-  }, [cameraInteractionStore, clearCameraDerivedUiFreezeState]);
+  }, [cameraInteractionStore, clearCameraDerivedUiFreezeState, scene?.cell.vectors]);
 
   const handleCameraOrientationChange = useCallback(() => {
     if (

@@ -8,7 +8,7 @@ import {
   type CrystalCameraPose,
   type CrystalCameraState,
 } from "./crystalCamera";
-import { atomRadiusForModel, cellCenter, cellCorners } from "./sceneGeometry";
+import { cellCenter, cellCorners } from "./sceneGeometry";
 import {
   type CameraFitBounds,
   computeStandardCameraPose,
@@ -37,13 +37,13 @@ export interface SceneLayout extends SceneStructureLayout {
 
 export function computeSceneLayout(
   scene: SceneSpec,
-  atomRadiusModel: AtomRadiusModel = "uniform",
+  _atomRadiusModel: AtomRadiusModel = "uniform",
   cameraState?: CrystalCameraState,
 ): SceneLayout {
-  const structureLayout = computeSceneStructureLayout(scene, atomRadiusModel);
+  const structureLayout = computeSceneStructureLayout(scene);
   const cameraPose = computeCrystalCameraPose(
     scene.cell.vectors,
-    cameraState ?? createDefaultCrystalCameraState(),
+    cameraState ?? createDefaultCrystalCameraState(scene.cell.vectors),
     structureLayout.span,
   );
 
@@ -55,18 +55,10 @@ export function computeSceneLayout(
 
 export function computeSceneStructureLayout(
   scene: SceneSpec,
-  atomRadiusModel: AtomRadiusModel = "uniform",
+  _atomRadiusModel: AtomRadiusModel = "uniform",
 ): SceneStructureLayout {
-  const points = [
-    ...cellCorners(scene.cell.vectors),
-    ...scene.atoms.map((atom) => new Vector3(...atom.position)),
-  ];
+  const points = cellCorners(scene.cell.vectors);
   const box = new Box3().setFromPoints(points);
-  const maxRadius = Math.max(
-    0,
-    ...scene.atoms.map((atom) => atomRadiusForModel(atom, atomRadiusModel)),
-  );
-  box.expandByScalar(maxRadius);
   const center = cellCenter(scene.cell.vectors);
   const size = box.getSize(new Vector3());
   const span = Math.max(1, size.x, size.y, size.z);
@@ -74,14 +66,13 @@ export function computeSceneStructureLayout(
   const groupPosition: VectorTuple = [-center.x, -center.y, -center.z];
   const defaultCameraPose = computeCrystalCameraPose(
     scene.cell.vectors,
-    createDefaultCrystalCameraState(),
+    createDefaultCrystalCameraState(scene.cell.vectors),
     span,
   );
 
   return {
     cameraFitBounds: computeProjectedCameraFitBounds(
       scene,
-      atomRadiusModel,
       groupPosition,
       defaultCameraPose,
     ),
@@ -93,7 +84,6 @@ export function computeSceneStructureLayout(
 
 function computeProjectedCameraFitBounds(
   scene: SceneSpec,
-  atomRadiusModel: AtomRadiusModel,
   groupPosition: VectorTuple,
   cameraPose: Pick<CrystalCameraPose, "cameraUp" | "outward">,
 ): CameraFitBounds {
@@ -107,27 +97,22 @@ function computeProjectedCameraFitBounds(
   let maxX = -Infinity;
   let maxY = -Infinity;
 
-  function includePoint(point: Vector3 | VectorTuple, radius = 0) {
+  function includePoint(point: Vector3 | VectorTuple) {
     const localPoint = Array.isArray(point)
       ? new Vector3(...point)
       : point.clone();
     localPoint.add(offset);
-    const safeRadius = Math.max(0, radius);
     const x = localPoint.dot(right);
     const y = localPoint.dot(screenUp);
 
-    minX = Math.min(minX, x - safeRadius);
-    maxX = Math.max(maxX, x + safeRadius);
-    minY = Math.min(minY, y - safeRadius);
-    maxY = Math.max(maxY, y + safeRadius);
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
   }
 
   for (const corner of cellCorners(scene.cell.vectors)) {
     includePoint(corner);
-  }
-
-  for (const atom of scene.atoms) {
-    includePoint(atom.position, atomRadiusForModel(atom, atomRadiusModel));
   }
 
   return {

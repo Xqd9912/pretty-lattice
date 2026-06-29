@@ -6,7 +6,12 @@ import type {
   CrystalCameraScreenDirection,
   CrystalCameraState,
 } from "../model/crystalCameraState";
-import { withDefaultCellVectors, type StandardCameraPose, type VectorTuple } from "./viewMath";
+import {
+  computeStandardViewVectors,
+  withDefaultCellVectors,
+  type StandardCameraPose,
+  type VectorTuple,
+} from "./viewMath";
 
 export type {
   CrystalAxisLabel,
@@ -43,8 +48,6 @@ const CAMERA_TARGET = new Vector3(0, 0, 0);
 const CAMERA_LOCAL_FORWARD = new Vector3(0, 0, 1);
 const CAMERA_LOCAL_RIGHT = new Vector3(1, 0, 0);
 const CAMERA_LOCAL_UP = new Vector3(0, 1, 0);
-const DEFAULT_DIRECT: VectorTuple = [0, 0, 1];
-const DEFAULT_RECIPROCAL: VectorTuple = [0, 1, 0];
 const DEFAULT_SECONDARY_DIRECTION: Record<
   CrystalCameraScreenDirection,
   CrystalCameraScreenDirection
@@ -64,11 +67,20 @@ const FALLBACK_DIRECT_AXES: Record<CrystalAxisLabel, VectorTuple> = {
   c: [0, 0, 1],
 };
 
-export function createDefaultCrystalCameraState(): CrystalCameraState {
+export function createDefaultCrystalCameraState(
+  vectors: VectorTuple[] = [],
+): CrystalCameraState {
+  const basis = computeCrystalBasisVectors(vectors);
+  const standardView = computeStandardViewVectors(vectors);
+
   return {
-    direct: DEFAULT_DIRECT,
+    direct: normalizeCoefficients(
+      vectorToDirectCoefficients(standardView.outward, basis),
+    ),
     primary: "outward",
-    reciprocal: DEFAULT_RECIPROCAL,
+    reciprocal: normalizeCoefficients(
+      vectorToReciprocalCoefficients(standardView.vertical, basis),
+    ),
     secondary: "upward",
     rollDegrees: 0,
   };
@@ -96,11 +108,15 @@ export function secondaryDirectionForPrimaryChange(
   return defaultSecondaryDirectionForPrimary(nextPrimary);
 }
 
-export function crystalAxisDirectCoefficients(axis: CrystalAxisLabel): VectorTuple {
+export function crystalAxisDirectCoefficients(
+  axis: CrystalAxisLabel,
+): VectorTuple {
   return FALLBACK_DIRECT_AXES[axis];
 }
 
-export function computeCrystalBasisVectors(vectors: VectorTuple[]): CrystalBasisVectors {
+export function computeCrystalBasisVectors(
+  vectors: VectorTuple[],
+): CrystalBasisVectors {
   const [vectorA, vectorB, vectorC] = withDefaultCellVectors(vectors);
   const a = vectorFromTuple(vectorA, new Vector3(1, 0, 0));
   const b = vectorFromTuple(vectorB, new Vector3(0, 1, 0));
@@ -136,7 +152,10 @@ export function computeCrystalCameraPose(
   const cameraVectors = computeCrystalCameraVectors(vectors, state);
   const distance = Math.max(4, span * 4);
   const cameraPosition = cameraVectors.outward.clone().multiplyScalar(distance);
-  const quaternion = cameraQuaternionFromOutwardUp(cameraVectors.outward, cameraVectors.up);
+  const quaternion = cameraQuaternionFromOutwardUp(
+    cameraVectors.outward,
+    cameraVectors.up,
+  );
 
   return {
     cameraPosition: vectorTuple(cameraPosition),
@@ -153,7 +172,11 @@ export function computeDefaultCrystalCameraPose(
   vectors: VectorTuple[],
   span: number,
 ): StandardCameraPose {
-  const pose = computeCrystalCameraPose(vectors, createDefaultCrystalCameraState(), span);
+  const pose = computeCrystalCameraPose(
+    vectors,
+    createDefaultCrystalCameraState(vectors),
+    span,
+  );
 
   return {
     cameraPosition: pose.cameraPosition,
@@ -169,7 +192,11 @@ export function computeCrystalCameraVectors(
   state: CrystalCameraState,
 ): CrystalCameraVectors {
   const basis = computeCrystalBasisVectors(vectors);
-  const direct = coefficientsToVector(state.direct, basis.direct, new Vector3(0, 0, 1)).normalize();
+  const direct = coefficientsToVector(
+    state.direct,
+    basis.direct,
+    new Vector3(0, 0, 1),
+  ).normalize();
   const reciprocal = coefficientsToVector(
     state.reciprocal,
     basis.reciprocal,
@@ -177,7 +204,12 @@ export function computeCrystalCameraVectors(
   );
   const fallbackSecondary = vestaLikeSecondaryForPrimary(basis, direct);
   const secondary = projectPerpendicular(reciprocal, direct, fallbackSecondary);
-  const screenFrame = completeScreenFrame(state.primary, direct, state.secondary, secondary);
+  const screenFrame = completeScreenFrame(
+    state.primary,
+    direct,
+    state.secondary,
+    secondary,
+  );
 
   return {
     outward: screenFrame.outward,
@@ -194,20 +226,39 @@ export function applyCrystalCameraRoll(
   rollDegrees: number,
 ): CrystalCameraState {
   const basis = computeCrystalBasisVectors(vectors);
-  const primary = coefficientsToVector(state.direct, basis.direct, new Vector3(0, 0, 1)).normalize();
+  const primary = coefficientsToVector(
+    state.direct,
+    basis.direct,
+    new Vector3(0, 0, 1),
+  ).normalize();
   const anchor = vestaLikeSecondaryForPrimary(basis, primary);
-  const rollAnchorDirection = defaultSecondaryDirectionForPrimary(state.primary);
+  const rollAnchorDirection = defaultSecondaryDirectionForPrimary(
+    state.primary,
+  );
   const rolledAnchor = anchor
     .clone()
     .applyAxisAngle(primary, degreesToRadians(rollDegrees))
     .normalize();
-  const screenFrame = completeScreenFrame(state.primary, primary, rollAnchorDirection, rolledAnchor);
-  const safeSecondaryDirection = normalizeSecondaryDirection(state.primary, state.secondary);
-  const secondary = screenVectorForDirection(screenFrame, safeSecondaryDirection);
+  const screenFrame = completeScreenFrame(
+    state.primary,
+    primary,
+    rollAnchorDirection,
+    rolledAnchor,
+  );
+  const safeSecondaryDirection = normalizeSecondaryDirection(
+    state.primary,
+    state.secondary,
+  );
+  const secondary = screenVectorForDirection(
+    screenFrame,
+    safeSecondaryDirection,
+  );
 
   return {
     ...state,
-    reciprocal: normalizeCoefficients(vectorToReciprocalCoefficients(secondary, basis)),
+    reciprocal: normalizeCoefficients(
+      vectorToReciprocalCoefficients(secondary, basis),
+    ),
     secondary: safeSecondaryDirection,
     rollDegrees: normalizeRollDegrees(rollDegrees),
   };
@@ -221,7 +272,13 @@ export function stateWithPrimaryDirection(
 ): CrystalCameraState {
   const poseVectors = vectorsFromCameraQuaternion(quaternion);
 
-  return stateFromViewVectors(vectors, primary, secondary, poseVectors.up, poseVectors.outward);
+  return stateFromViewVectors(
+    vectors,
+    primary,
+    secondary,
+    poseVectors.up,
+    poseVectors.outward,
+  );
 }
 
 export function stateFromViewVectors(
@@ -232,22 +289,40 @@ export function stateFromViewVectors(
   outward: Vector3,
 ): CrystalCameraState {
   const basis = computeCrystalBasisVectors(vectors);
-  const safeSecondaryDirection = normalizeSecondaryDirection(primary, secondary);
+  const safeSecondaryDirection = normalizeSecondaryDirection(
+    primary,
+    secondary,
+  );
   const poseVectors = screenFrameFromOutwardUp(outward, up);
   const primaryVector = screenVectorForDirection(poseVectors, primary);
-  const secondaryVector = screenVectorForDirection(poseVectors, safeSecondaryDirection);
+  const secondaryVector = screenVectorForDirection(
+    poseVectors,
+    safeSecondaryDirection,
+  );
   const safePrimary = normalizeOrFallback(primaryVector, new Vector3(0, 0, 1));
   const anchor = vestaLikeSecondaryForPrimary(basis, safePrimary);
   const rollAnchorDirection = defaultSecondaryDirectionForPrimary(primary);
   const rollVector = screenVectorForDirection(poseVectors, rollAnchorDirection);
   const safeRollVector = projectPerpendicular(rollVector, safePrimary, anchor);
-  const safeSecondary = projectPerpendicular(secondaryVector, safePrimary, anchor);
-  const rollDegrees = signedAngleAroundAxis(anchor, safeRollVector, safePrimary);
+  const safeSecondary = projectPerpendicular(
+    secondaryVector,
+    safePrimary,
+    anchor,
+  );
+  const rollDegrees = signedAngleAroundAxis(
+    anchor,
+    safeRollVector,
+    safePrimary,
+  );
 
   return {
-    direct: normalizeCoefficients(vectorToDirectCoefficients(safePrimary, basis)),
+    direct: normalizeCoefficients(
+      vectorToDirectCoefficients(safePrimary, basis),
+    ),
     primary,
-    reciprocal: normalizeCoefficients(vectorToReciprocalCoefficients(safeSecondary, basis)),
+    reciprocal: normalizeCoefficients(
+      vectorToReciprocalCoefficients(safeSecondary, basis),
+    ),
     secondary: safeSecondaryDirection,
     rollDegrees: normalizeRollDegrees(rollDegrees),
   };
@@ -267,7 +342,9 @@ export function stateWithDirectAxis(
 }
 
 export function normalizeCoefficients(coefficients: VectorTuple): VectorTuple {
-  const finite = coefficients.map((value) => (Number.isFinite(value) ? value : 0)) as VectorTuple;
+  const finite = coefficients.map((value) =>
+    Number.isFinite(value) ? value : 0,
+  ) as VectorTuple;
   const maxAbs = Math.max(...finite.map((value) => Math.abs(value)));
 
   if (maxAbs < EPSILON) {
@@ -277,7 +354,9 @@ export function normalizeCoefficients(coefficients: VectorTuple): VectorTuple {
   return finite.map((value) => snapCoefficient(value / maxAbs)) as VectorTuple;
 }
 
-export function parseVectorCoefficients(values: readonly string[]): VectorTuple | null {
+export function parseVectorCoefficients(
+  values: readonly string[],
+): VectorTuple | null {
   if (values.length !== 3) {
     return null;
   }
@@ -305,7 +384,9 @@ export function vectorsFromCameraQuaternion(quaternion: Quaternion): {
   up: Vector3;
 } {
   return {
-    outward: CAMERA_LOCAL_FORWARD.clone().applyQuaternion(quaternion).normalize(),
+    outward: CAMERA_LOCAL_FORWARD.clone()
+      .applyQuaternion(quaternion)
+      .normalize(),
     right: CAMERA_LOCAL_RIGHT.clone().applyQuaternion(quaternion).normalize(),
     up: CAMERA_LOCAL_UP.clone().applyQuaternion(quaternion).normalize(),
   };
@@ -315,8 +396,14 @@ function vestaLikeSecondaryForPrimary(
   basis: CrystalBasisVectors,
   primary: Vector3,
 ): Vector3 {
-  for (const candidate of [basis.reciprocal[2], basis.reciprocal[1], basis.reciprocal[0]]) {
-    const projected = candidate.clone().sub(primary.clone().multiplyScalar(candidate.dot(primary)));
+  for (const candidate of [
+    basis.reciprocal[2],
+    basis.reciprocal[1],
+    basis.reciprocal[0],
+  ]) {
+    const projected = candidate
+      .clone()
+      .sub(primary.clone().multiplyScalar(candidate.dot(primary)));
     if (projected.lengthSq() >= EPSILON) {
       return projected.normalize();
     }
@@ -325,8 +412,15 @@ function vestaLikeSecondaryForPrimary(
   return stablePerpendicular(primary);
 }
 
-function cameraQuaternionFromOutwardUp(outward: Vector3, up: Vector3): Quaternion {
-  const { outward: z, right: x, upward: y } = screenFrameFromOutwardUp(outward, up);
+function cameraQuaternionFromOutwardUp(
+  outward: Vector3,
+  up: Vector3,
+): Quaternion {
+  const {
+    outward: z,
+    right: x,
+    upward: y,
+  } = screenFrameFromOutwardUp(outward, up);
   const matrix = new Matrix4().makeBasis(x, y, z);
 
   return new Quaternion().setFromRotationMatrix(matrix).normalize();
@@ -338,7 +432,10 @@ function completeScreenFrame(
   secondaryDirection: CrystalCameraScreenDirection,
   secondaryVector: Vector3,
 ): Record<CrystalCameraScreenDirection, Vector3> {
-  const safeSecondaryDirection = normalizeSecondaryDirection(primaryDirection, secondaryDirection);
+  const safeSecondaryDirection = normalizeSecondaryDirection(
+    primaryDirection,
+    secondaryDirection,
+  );
   const axes: Partial<Record<CrystalCameraScreenDirection, Vector3>> = {
     [primaryDirection]: primaryVector.clone().normalize(),
     [safeSecondaryDirection]: secondaryVector.clone().normalize(),
@@ -346,9 +443,12 @@ function completeScreenFrame(
   const missingDirection = (["right", "upward", "outward"] as const).find(
     (direction) => axes[direction] === undefined,
   )!;
-  const crossSign = screenCrossSign(primaryDirection, safeSecondaryDirection, missingDirection);
-  axes[missingDirection] = axes[primaryDirection]!
-    .clone()
+  const crossSign = screenCrossSign(
+    primaryDirection,
+    safeSecondaryDirection,
+    missingDirection,
+  );
+  axes[missingDirection] = axes[primaryDirection]!.clone()
     .cross(axes[safeSecondaryDirection]!)
     .multiplyScalar(crossSign)
     .normalize();
@@ -387,7 +487,9 @@ function normalizeSecondaryDirection(
   primary: CrystalCameraScreenDirection,
   secondary: CrystalCameraScreenDirection,
 ): CrystalCameraScreenDirection {
-  return primary === secondary ? defaultSecondaryDirectionForPrimary(primary) : secondary;
+  return primary === secondary
+    ? defaultSecondaryDirectionForPrimary(primary)
+    : secondary;
 }
 
 function screenCrossSign(
@@ -426,7 +528,10 @@ function coefficientsToVector(
   return normalizeOrFallback(vector, fallback);
 }
 
-function vectorToDirectCoefficients(vector: Vector3, basis: CrystalBasisVectors): VectorTuple {
+function vectorToDirectCoefficients(
+  vector: Vector3,
+  basis: CrystalBasisVectors,
+): VectorTuple {
   return [
     vector.dot(basis.reciprocal[0]),
     vector.dot(basis.reciprocal[1]),
@@ -434,7 +539,10 @@ function vectorToDirectCoefficients(vector: Vector3, basis: CrystalBasisVectors)
   ];
 }
 
-function vectorToReciprocalCoefficients(vector: Vector3, basis: CrystalBasisVectors): VectorTuple {
+function vectorToReciprocalCoefficients(
+  vector: Vector3,
+  basis: CrystalBasisVectors,
+): VectorTuple {
   return [
     vector.dot(basis.direct[0]),
     vector.dot(basis.direct[1]),
@@ -442,9 +550,15 @@ function vectorToReciprocalCoefficients(vector: Vector3, basis: CrystalBasisVect
   ];
 }
 
-function projectPerpendicular(vector: Vector3, axis: Vector3, fallback: Vector3): Vector3 {
+function projectPerpendicular(
+  vector: Vector3,
+  axis: Vector3,
+  fallback: Vector3,
+): Vector3 {
   const safeAxis = normalizeOrFallback(axis, new Vector3(0, 0, 1));
-  const projected = vector.clone().sub(safeAxis.clone().multiplyScalar(vector.dot(safeAxis)));
+  const projected = vector
+    .clone()
+    .sub(safeAxis.clone().multiplyScalar(vector.dot(safeAxis)));
 
   if (projected.lengthSq() >= EPSILON) {
     return projected.normalize();
@@ -461,7 +575,9 @@ function stablePerpendicular(axis: Vector3): Vector3 {
   ];
 
   for (const candidate of candidates) {
-    const projected = candidate.clone().sub(axis.clone().multiplyScalar(candidate.dot(axis)));
+    const projected = candidate
+      .clone()
+      .sub(axis.clone().multiplyScalar(candidate.dot(axis)));
     if (projected.lengthSq() >= EPSILON) {
       return projected.normalize();
     }
@@ -470,7 +586,11 @@ function stablePerpendicular(axis: Vector3): Vector3 {
   return new Vector3(0, 1, 0);
 }
 
-function signedAngleAroundAxis(from: Vector3, to: Vector3, axis: Vector3): number {
+function signedAngleAroundAxis(
+  from: Vector3,
+  to: Vector3,
+  axis: Vector3,
+): number {
   const safeFrom = projectPerpendicular(from, axis, stablePerpendicular(axis));
   const safeTo = projectPerpendicular(to, axis, safeFrom);
   const sin = axis.dot(safeFrom.clone().cross(safeTo));

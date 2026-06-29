@@ -57,12 +57,57 @@ describe("crystal camera math", () => {
     expectVectorClose(cPrimary.up, [0, 1, 0]);
   });
 
-  test("roll rotates around the primary direct direction", () => {
-    const rolledState = applyCrystalCameraRoll(
+  test("default standard view matches the Naumann cubic orientation", () => {
+    const vectors = computeCrystalCameraVectors(
       CUBIC_CELL,
       createDefaultCrystalCameraState(),
-      90,
     );
+
+    expectVectorClose(vectors.outward, standardCubicOutward());
+    expectVectorClose(vectors.up, standardCubicUp());
+    expect(Math.abs(vectors.up.dot(vectors.outward))).toBeLessThan(0.000001);
+  });
+
+  test("default standard view keeps the same orientation for rectangular orthogonal cells", () => {
+    const vectors = computeCrystalCameraVectors(
+      [
+        [2, 0, 0],
+        [0, 3, 0],
+        [0, 0, 4],
+      ],
+      createDefaultCrystalCameraState([
+        [2, 0, 0],
+        [0, 3, 0],
+        [0, 0, 4],
+      ]),
+    );
+
+    expectVectorClose(vectors.outward, standardCubicOutward());
+    expectVectorClose(vectors.up, standardCubicUp());
+  });
+
+  test("default standard view uses an orthonormal basal frame for hexagonal cells", () => {
+    const hexagonalCell: VectorTuple[] = [
+      [1, 0, 0],
+      [-0.5, Math.sqrt(3) / 2, 0],
+      [0, 0, 1],
+    ];
+    const vectors = computeCrystalCameraVectors(
+      hexagonalCell,
+      createDefaultCrystalCameraState(hexagonalCell),
+    );
+
+    expectVectorClose(vectors.outward, standardCubicOutward());
+    expectVectorClose(vectors.up, standardCubicUp());
+  });
+
+  test("roll rotates around the primary direct direction", () => {
+    const cOutwardState = stateWithDirectAxis(
+      CUBIC_CELL,
+      createDefaultCrystalCameraState(),
+      "c",
+    );
+    const rolledState = applyCrystalCameraRoll(CUBIC_CELL, cOutwardState, 90);
     const rolledVectors = computeCrystalCameraVectors(CUBIC_CELL, rolledState);
 
     expectVectorClose(rolledVectors.outward, [0, 0, 1]);
@@ -143,4 +188,14 @@ function expectVectorClose(actual: Vector3, expected: VectorTuple) {
   expect(actual.x).toBeCloseTo(expected[0]);
   expect(actual.y).toBeCloseTo(expected[1]);
   expect(actual.z).toBeCloseTo(expected[2]);
+}
+
+function standardCubicOutward(): VectorTuple {
+  const length = Math.sqrt(41);
+  return [6 / length, 2 / length, 1 / length];
+}
+
+function standardCubicUp(): VectorTuple {
+  const length = Math.sqrt(1640);
+  return [-6 / length, -2 / length, 40 / length];
 }

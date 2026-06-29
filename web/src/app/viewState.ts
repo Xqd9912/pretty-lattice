@@ -51,9 +51,9 @@ export interface PreviewViewState {
   showFpsOverlay: boolean;
 }
 
-export function createPreviewViewState(): PreviewViewState {
+export function createPreviewViewState(cellVectors: VectorTuple[] = []): PreviewViewState {
   return {
-    camera: createDefaultCrystalCameraState(),
+    camera: createDefaultCrystalCameraState(cellVectors),
     dragSensitivity: DEFAULT_DRAG_SENSITIVITY,
     interactionLocked: false,
     interactionMode: "trackball",
@@ -62,10 +62,13 @@ export function createPreviewViewState(): PreviewViewState {
   };
 }
 
-export function resetPreviewViewState(state: PreviewViewState): PreviewViewState {
+export function resetPreviewViewState(
+  state: PreviewViewState,
+  cellVectors: VectorTuple[] = [],
+): PreviewViewState {
   return {
     ...state,
-    camera: createDefaultCrystalCameraState(),
+    camera: createDefaultCrystalCameraState(cellVectors),
     resetCounter: state.resetCounter + 1,
   };
 }

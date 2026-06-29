@@ -53,7 +53,7 @@ describe("computeSceneLayout", () => {
     expect(computeSceneLayout(scene).groupPosition).toEqual([-2.5, -1.5, -1]);
   });
 
-  test("uses the VESTA-like c-outward b-star-up camera pose", () => {
+  test("uses the Naumann standard view with direct c projected upward", () => {
     const pose = computeStandardCameraPose(
       [
         [1, 0, 0],
@@ -63,13 +63,41 @@ describe("computeSceneLayout", () => {
       3,
     );
 
-    expectVectorClose(pose.outward, [0, 0, 1]);
-    expectVectorClose(pose.cameraUp, [0, 1, 0]);
+    expectVectorClose(pose.outward, standardCubicOutward());
+    expectVectorClose(pose.cameraUp, standardCubicUp());
     expect(dot(pose.outward, pose.cameraUp)).toBeCloseTo(0);
-    expect(dot([0, 1, 0], pose.cameraUp)).toBeGreaterThan(0);
+    expect(dot([0, 0, 1], pose.cameraUp)).toBeGreaterThan(0);
   });
 
-  test("fits the camera to stable preview safe areas", () => {
+  test("keeps the same Naumann standard view for rectangular orthogonal cells", () => {
+    const pose = computeStandardCameraPose(
+      [
+        [2, 0, 0],
+        [0, 3, 0],
+        [0, 0, 4],
+      ],
+      4,
+    );
+
+    expectVectorClose(pose.outward, standardCubicOutward());
+    expectVectorClose(pose.cameraUp, standardCubicUp());
+  });
+
+  test("uses the same basal viewing angle for hexagonal cells", () => {
+    const pose = computeStandardCameraPose(
+      [
+        [1, 0, 0],
+        [-0.5, Math.sqrt(3) / 2, 0],
+        [0, 0, 1],
+      ],
+      3,
+    );
+
+    expectVectorClose(pose.outward, standardCubicOutward());
+    expectVectorClose(pose.cameraUp, standardCubicUp());
+  });
+
+  test("fits the camera from the geometric mean of projected and available size", () => {
     const safeArea = {
       bottom: 132,
       left: 420,
@@ -86,10 +114,10 @@ describe("computeSceneLayout", () => {
       safeArea,
     );
 
-    expect(zoom).toBeCloseTo(404 / (17 * 1.15));
+    expect(zoom).toBeCloseTo(Math.sqrt(404 * 644) / (17 * 2));
   });
 
-  test("fits directly from the projected size instead of a 3D span cap", () => {
+  test("fits from projected area scale instead of a longest-side cap", () => {
     const safeArea = {
       bottom: 132,
       left: 420,
@@ -106,7 +134,7 @@ describe("computeSceneLayout", () => {
       safeArea,
     );
 
-    expect(zoom).toBeCloseTo(404 / (4 * 1.15));
+    expect(zoom).toBeCloseTo(Math.sqrt(404 * 644) / (Math.sqrt(2 * 4) * 2));
   });
 
   test("offsets the orthographic frustum toward the safe-area center", () => {
@@ -130,8 +158,10 @@ describe("computeSceneLayout", () => {
       right: 176,
       top: 24,
     };
-    const expectedScreenX = safeArea.left + (width - safeArea.left - safeArea.right) / 2;
-    const expectedScreenY = safeArea.top + (height - safeArea.top - safeArea.bottom) / 2;
+    const expectedScreenX =
+      safeArea.left + (width - safeArea.left - safeArea.right) / 2;
+    const expectedScreenY =
+      safeArea.top + (height - safeArea.top - safeArea.bottom) / 2;
 
     for (const zoom of [10, 25, 50, 100, 200]) {
       const camera = new OrthographicCamera();
@@ -157,7 +187,9 @@ describe("computeSceneLayout", () => {
       top: 24,
     };
 
-    expect(previewSafeAreaForViewport(desktopSafeArea, 1280)).toBe(desktopSafeArea);
+    expect(previewSafeAreaForViewport(desktopSafeArea, 1280)).toBe(
+      desktopSafeArea,
+    );
     expect(previewSafeAreaForViewport(desktopSafeArea, 390)).toEqual({
       bottom: 132,
       left: 16,
@@ -179,31 +211,35 @@ describe("computeSceneLayout", () => {
     expect(positions.slice(-6)).toEqual([1, 3, 2, 5, 3, 2]);
   });
 
-  test("fits the preview layout from frontend element radii", () => {
+  test("fits the preview layout from unit-cell bounds only", () => {
     const scene = sceneWithOffCenterAtoms();
 
-    expect(computeSceneLayout(scene).span).toBeCloseTo(6);
-    expect(computeSceneLayout(scene, "vdw").span).toBeCloseTo(9.2);
+    expect(computeSceneLayout(scene).span).toBeCloseTo(5);
+    expect(computeSceneLayout(scene, "vdw").span).toBeCloseTo(5);
+    expect(computeSceneLayout(scene, "vdw").cameraFitBounds).toEqual(
+      computeSceneLayout(scene).cameraFitBounds,
+    );
   });
 
-  test("tracks the VESTA-like projected fit size for slender structures", () => {
+  test("tracks the standard-view projected fit size for slender unit cells", () => {
     const layout = computeSceneLayout(sceneWithLongCell());
 
-    expect(layout.cameraFitBounds.projectedWidth).toBeCloseTo(layout.span);
+    expect(layout.cameraFitBounds.projectedWidth).toBeGreaterThan(0);
+    expect(layout.cameraFitBounds.projectedWidth).toBeLessThan(layout.span);
     expect(layout.cameraFitBounds.projectedHeight).toBeLessThan(layout.span);
   });
 
-  test("uses the default c-outward projected footprint for 100 percent fit", () => {
+  test("uses the default standard-view projected footprint for 100 percent fit", () => {
     const layout = computeSceneLayout(sceneWithLongC());
 
-    expect(layout.span).toBeGreaterThan(10);
-    expect(layout.cameraFitBounds.projectedWidth).toBeLessThan(3);
-    expect(layout.cameraFitBounds.projectedHeight).toBeLessThan(3);
+    expect(layout.span).toBeCloseTo(10);
+    expect(layout.cameraFitBounds.projectedWidth).toBeGreaterThan(0);
+    expect(layout.cameraFitBounds.projectedHeight).toBeGreaterThan(0);
   });
 
   test("keeps the projected fit size fixed after the initial default view", () => {
     const scene = sceneWithLongC();
-    const cOutwardLayout = computeSceneLayout(scene);
+    const standardLayout = computeSceneLayout(scene);
     const aOutwardLayout = computeSceneLayout(
       scene,
       "uniform",
@@ -215,8 +251,10 @@ describe("computeSceneLayout", () => {
     );
 
     expectVectorClose(aOutwardLayout.cameraPose.outward, [1, 0, 0]);
-    expect(cOutwardLayout.cameraFitBounds.projectedHeight).toBeLessThan(3);
-    expect(aOutwardLayout.cameraFitBounds).toEqual(cOutwardLayout.cameraFitBounds);
+    expect(standardLayout.cameraFitBounds.projectedHeight).toBeGreaterThan(0);
+    expect(aOutwardLayout.cameraFitBounds).toEqual(
+      standardLayout.cameraFitBounds,
+    );
   });
 
   test("resolves one selected material family across structure objects", () => {
@@ -226,17 +264,22 @@ describe("computeSceneLayout", () => {
     };
     const atomFamily = resolveStructureMaterialFamilyForTarget(style, "atom");
     const bondFamily = resolveStructureMaterialFamilyForTarget(style, "bond");
-    const polyhedronFamily = resolveStructureMaterialFamilyForTarget(style, "polyhedron");
+    const polyhedronFamily = resolveStructureMaterialFamilyForTarget(
+      style,
+      "polyhedron",
+    );
 
     expect(STRUCTURE_MATERIAL_TARGETS).toEqual(["atom", "bond", "polyhedron"]);
     expect(atomFamily.id).toBe("glossy");
     expect(atomFamily.material.type).toBe("MeshStandardMaterial");
     expect(bondFamily).toEqual(atomFamily);
     expect(polyhedronFamily).toEqual(atomFamily);
-    expect(resolveStructureMaterialFamilyForStyle({
-      ...style,
-      materialPreset: "2d",
-    }).material.type).toBe("MeshBasicMaterial");
+    expect(
+      resolveStructureMaterialFamilyForStyle({
+        ...style,
+        materialPreset: "2d",
+      }).material.type,
+    ).toBe("MeshBasicMaterial");
   });
 
   test("keeps preview mesh detail aligned with the medium quality preset", () => {
@@ -250,7 +293,9 @@ describe("computeSceneLayout", () => {
       sphereHeightSegments: 16,
       sphereWidthSegments: 24,
     });
-    expect(EXPORT_SCENE_MESH_DETAIL_PRESETS.medium).toBe(PREVIEW_SCENE_MESH_DETAIL);
+    expect(EXPORT_SCENE_MESH_DETAIL_PRESETS.medium).toBe(
+      PREVIEW_SCENE_MESH_DETAIL,
+    );
     expect(EXPORT_SCENE_MESH_DETAIL_PRESETS.high).toEqual({
       bondRadialSegments: 24,
       sphereHeightSegments: 32,
@@ -261,10 +306,18 @@ describe("computeSceneLayout", () => {
   });
 
   test("scales exported structure line width from the tight content bounds", () => {
-    expect(structureLineWidthScale(exportFramePlanWithBounds(2000, 2000), 1)).toBeCloseTo(2);
-    expect(structureLineWidthScale(exportFramePlanWithBounds(2000, 2000, 4), 4)).toBeCloseTo(8);
-    expect(structureLineWidthScale(exportFramePlanWithBounds(600, 600, 2), 2)).toBeCloseTo(2);
-    expect(structureLineWidthScale(exportFramePlanWithBounds(5000, 5000), 1)).toBeCloseTo(5);
+    expect(
+      structureLineWidthScale(exportFramePlanWithBounds(2000, 2000), 1),
+    ).toBeCloseTo(2);
+    expect(
+      structureLineWidthScale(exportFramePlanWithBounds(2000, 2000, 4), 4),
+    ).toBeCloseTo(8);
+    expect(
+      structureLineWidthScale(exportFramePlanWithBounds(600, 600, 2), 2),
+    ).toBeCloseTo(2);
+    expect(
+      structureLineWidthScale(exportFramePlanWithBounds(5000, 5000), 1),
+    ).toBeCloseTo(5);
   });
 
   test("builds by-atom bonds as one open cylinder side with a hard color boundary", () => {
@@ -285,8 +338,11 @@ describe("computeSceneLayout", () => {
     expect(position.getY(rowVertexCount)).toBeCloseTo(0);
     expect(position.getY(rowVertexCount * 2)).toBeCloseTo(0);
     expect(position.getY(rowVertexCount * 3)).toBeCloseTo(2);
-    expect([color.getX(rowVertexCount), color.getY(rowVertexCount), color.getZ(rowVertexCount)])
-      .toEqual([1, 0, 0]);
+    expect([
+      color.getX(rowVertexCount),
+      color.getY(rowVertexCount),
+      color.getZ(rowVertexCount),
+    ]).toEqual([1, 0, 0]);
     expect([
       color.getX(rowVertexCount * 2),
       color.getY(rowVertexCount * 2),
@@ -451,22 +507,41 @@ describe("computeSceneLayout", () => {
 
     expect(axes.map((axis) => axis.label)).toEqual(["a", "b", "c"]);
     expectVectorClose(axes[0]!.direction, [1, 0, 0]);
-    expectVectorClose(axes[1]!.direction, [1 / Math.sqrt(10), 3 / Math.sqrt(10), 0]);
+    expectVectorClose(axes[1]!.direction, [
+      1 / Math.sqrt(10),
+      3 / Math.sqrt(10),
+      0,
+    ]);
     expectVectorClose(axes[2]!.direction, [0, 0, 1]);
   });
 });
 
-function expectVectorClose(actual: [number, number, number], expected: [number, number, number]) {
+function expectVectorClose(
+  actual: [number, number, number],
+  expected: [number, number, number],
+) {
   expect(actual[0]).toBeCloseTo(expected[0]);
   expect(actual[1]).toBeCloseTo(expected[1]);
   expect(actual[2]).toBeCloseTo(expected[2]);
+}
+
+function standardCubicOutward(): [number, number, number] {
+  const length = Math.sqrt(41);
+  return [6 / length, 2 / length, 1 / length];
+}
+
+function standardCubicUp(): [number, number, number] {
+  const length = Math.sqrt(1640);
+  return [-6 / length, -2 / length, 40 / length];
 }
 
 function dot(left: [number, number, number], right: [number, number, number]) {
   return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
 }
 
-function firstTriangleNormalDotVertexNormal(geometry: ReturnType<typeof twoToneBondCylinderGeometry>) {
+function firstTriangleNormalDotVertexNormal(
+  geometry: ReturnType<typeof twoToneBondCylinderGeometry>,
+) {
   const position = geometry.getAttribute("position");
   const normal = geometry.getAttribute("normal");
   const index = geometry.index;
@@ -476,11 +551,27 @@ function firstTriangleNormalDotVertexNormal(geometry: ReturnType<typeof twoToneB
   const a = index!.getX(0);
   const b = index!.getX(1);
   const c = index!.getX(2);
-  const pointA = new Vector3(position.getX(a), position.getY(a), position.getZ(a));
-  const pointB = new Vector3(position.getX(b), position.getY(b), position.getZ(b));
-  const pointC = new Vector3(position.getX(c), position.getY(c), position.getZ(c));
+  const pointA = new Vector3(
+    position.getX(a),
+    position.getY(a),
+    position.getZ(a),
+  );
+  const pointB = new Vector3(
+    position.getX(b),
+    position.getY(b),
+    position.getZ(b),
+  );
+  const pointC = new Vector3(
+    position.getX(c),
+    position.getY(c),
+    position.getZ(c),
+  );
   const faceNormal = pointB.sub(pointA).cross(pointC.sub(pointA)).normalize();
-  const vertexNormal = new Vector3(normal.getX(a), normal.getY(a), normal.getZ(a));
+  const vertexNormal = new Vector3(
+    normal.getX(a),
+    normal.getY(a),
+    normal.getZ(a),
+  );
 
   return faceNormal.dot(vertexNormal);
 }
@@ -583,10 +674,7 @@ function sceneWithExportVisibilityAtoms(): SceneSpec {
 function sceneWithLongCell(): SceneSpec {
   return {
     ...sceneWithOffCenterAtoms(),
-    atoms: [
-      atom("Si-0", [0, 0, 0]),
-      atom("Si-1", [10, 0, 0]),
-    ],
+    atoms: [atom("Si-0", [0, 0, 0]), atom("Si-1", [10, 0, 0])],
     cell: {
       vectors: [
         [10, 0, 0],
@@ -604,10 +692,7 @@ function sceneWithLongCell(): SceneSpec {
 function sceneWithLongC(): SceneSpec {
   return {
     ...sceneWithOffCenterAtoms(),
-    atoms: [
-      atom("Si-0", [0, 0, 0]),
-      atom("Si-1", [0, 0, 10]),
-    ],
+    atoms: [atom("Si-0", [0, 0, 0]), atom("Si-1", [0, 0, 10])],
     cell: {
       vectors: [
         [1, 0, 0],

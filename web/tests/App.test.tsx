@@ -1431,12 +1431,18 @@ describe("App", () => {
     ]);
     expect(
       within(commonControls).getByRole("textbox", { name: "z a" }),
-    ).toHaveProperty("value", "0.00");
-    expect(
-      within(commonControls).getByRole("textbox", { name: "z c" }),
     ).toHaveProperty("value", "1.00");
     expect(
+      within(commonControls).getByRole("textbox", { name: "z b" }),
+    ).toHaveProperty("value", "0.33");
+    expect(
+      within(commonControls).getByRole("textbox", { name: "z c" }),
+    ).toHaveProperty("value", "0.17");
+    expect(
       within(commonControls).getByRole("textbox", { name: "y b*" }),
+    ).toHaveProperty("value", "0.00");
+    expect(
+      within(commonControls).getByRole("textbox", { name: "y c*" }),
     ).toHaveProperty("value", "1.00");
     expect(
       within(commonControls).getByRole("button", { name: "y secondary axis" }).textContent,
@@ -1523,21 +1529,21 @@ describe("App", () => {
     expect(outwardA.value).toBe("");
 
     await user.tab();
-    expect(outwardA.value).toBe("0.00");
+    expect(outwardA.value).toBe("1.00");
 
     await user.clear(outwardA);
     await user.type(outwardA, "1");
 
     expect(outwardA.value).toBe("1");
-    expect(outwardC.value).toBe("1.00");
+    expect(outwardC.value).toBe("0.17");
 
     const resetDraftButton = within(commonControls).getByRole("button", {
       name: "Reset vectors draft",
     });
     await user.click(resetDraftButton);
 
-    expect(outwardA.value).toBe("0.00");
-    expect(outwardC.value).toBe("1.00");
+    expect(outwardA.value).toBe("1.00");
+    expect(outwardC.value).toBe("0.17");
     expect(resetDraftButton.className).toContain("tool-icon-button-reset-feedback");
 
     await user.clear(outwardA);
@@ -1548,7 +1554,7 @@ describe("App", () => {
     await user.click(applyVectorsButton);
 
     expect(outwardA.value).toBe("1.00");
-    expect(outwardC.value).toBe("1.00");
+    expect(outwardC.value).toBe("0.17");
     expect(applyVectorsButton.className).toContain("tool-icon-button-reset-feedback");
 
     await user.clear(outwardA);
