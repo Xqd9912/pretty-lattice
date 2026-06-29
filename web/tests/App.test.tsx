@@ -1020,7 +1020,7 @@ describe("App", () => {
     expect(bondThicknessInput.value).toBe("100");
     expect(commonControls.querySelectorAll(".opacity-slider-snap-marker")).toHaveLength(0);
     expect(within(commonControls).getByText("Atom").isConnected).toBe(true);
-    expect(materialSelect.textContent).toContain("Classic Matte");
+    expect(materialSelect.textContent).toContain("Modern Matte");
     expect(bondStyleSelect.textContent).toContain("Bicolor");
     expect(within(commonControls).queryByRole("button", { name: "Bond color" })).toBeNull();
     expect(colorSchemeSelect.textContent).toContain("VESTA Soft");

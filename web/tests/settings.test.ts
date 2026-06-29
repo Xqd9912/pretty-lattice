@@ -74,7 +74,7 @@ describe("settings", () => {
       fogAmount: 50,
       fogEnabled: false,
       fogStart: 50,
-      materialPreset: "classic-matte",
+      materialPreset: "modern-matte",
     });
     expect(STYLE_FOG_START_MIN).toBe(0);
     expect(STYLE_FOG_START_MAX).toBe(100);
