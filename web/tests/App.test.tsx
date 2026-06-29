@@ -389,6 +389,10 @@ describe("App", () => {
 
     await user.click(screen.getByRole("button", { name: "Sidebar" }));
     const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
+    expect(within(sidebar).getByRole("heading", { name: "Appearance" })).toBeTruthy();
+    expect(within(sidebar).getByRole("heading", { name: "Rendering" })).toBeTruthy();
+    expect(within(sidebar).getByRole("heading", { name: "Interaction" })).toBeTruthy();
+    expect(within(sidebar).getByRole("heading", { name: "Analysis" })).toBeTruthy();
     const atomRenderingSelect = within(sidebar).getByRole("combobox", {
       name: "Atom rendering mode",
     });
@@ -635,7 +639,6 @@ describe("App", () => {
     expect(within(inspector).queryByRole("heading", { name: "Inspector" })).toBeNull();
     const settingsTab = within(inspector).getByRole("tab", { name: "Settings" });
     expect(settingsTab.isConnected).toBe(true);
-    expect(inspector.querySelector("[data-slot='separator']")).toBeNull();
     expect(within(inspector).queryByText("Renderer")).toBeNull();
     expect(within(inspector).queryByRole("combobox", { name: "Renderer" })).toBeNull();
     expect(
@@ -747,8 +750,8 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Sidebar" }));
     const inspector = screen.getByRole("complementary", { name: "Sidebar" });
     expect(within(inspector).queryByRole("combobox", { name: "Renderer" })).toBeNull();
-    const hideCrystalAxisLabelsSwitch = within(inspector).getByRole("switch", {
-      name: "Hide crystal axis labels",
+    const showCrystalAxisLabelsSwitch = within(inspector).getByRole("switch", {
+      name: "Show crystal axis labels",
     });
     const depthCueingUnitCellSwitch = within(inspector).getByRole("switch", {
       name: "Apply depth cueing to unit cell",
@@ -760,7 +763,7 @@ describe("App", () => {
       name: "Unit cell line style",
     });
 
-    expect(hideCrystalAxisLabelsSwitch.getAttribute("aria-checked")).toBe("false");
+    expect(showCrystalAxisLabelsSwitch.getAttribute("aria-checked")).toBe("true");
     expect(depthCueingUnitCellSwitch.getAttribute("aria-checked")).toBe("false");
     expect(distinguishSimilarColorsSwitch.getAttribute("aria-checked")).toBe("true");
     await user.click(within(inspector).getByText("Distinguish similar colors"));
@@ -768,8 +771,8 @@ describe("App", () => {
     expect(screen.getByTestId("mock-orientation-gizmo").getAttribute("data-show-labels")).toBe(
       "true",
     );
-    await user.click(hideCrystalAxisLabelsSwitch);
-    expect(hideCrystalAxisLabelsSwitch.getAttribute("aria-checked")).toBe("true");
+    await user.click(showCrystalAxisLabelsSwitch);
+    expect(showCrystalAxisLabelsSwitch.getAttribute("aria-checked")).toBe("false");
     expect(screen.getByTestId("mock-orientation-gizmo").getAttribute("data-show-labels")).toBe(
       "false",
     );

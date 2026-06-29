@@ -9,6 +9,7 @@ import {
 import { PanelRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -61,6 +62,8 @@ import {
 } from "../../model";
 
 const INSPECTOR_BODY_TEXT_CLASS = "text-sm";
+const INSPECTOR_SECTION_TITLE_CLASS =
+  "text-[13px] font-bold leading-tight text-muted-foreground";
 const INSPECTOR_SELECT_TRIGGER_CLASS =
   "!h-[26px] w-full !px-2 !py-0 bg-background text-sm";
 const INSPECTOR_SELECT_ITEM_CLASS = "min-h-[26px] py-1 text-sm";
@@ -280,219 +283,252 @@ function SettingsPanel({
   onUnitCellLineStyleChange: (lineStyle: UnitCellLineStyle) => void;
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <InspectorSwitchRow
-        checked={showFpsOverlay}
-        label="Show FPS"
-        onCheckedChange={onShowFpsOverlayChange}
-      />
+    <div className="flex flex-col gap-3">
+      <InspectorSettingsSection id="inspector-appearance-settings" title="Appearance">
+        <InspectorSwitchRow
+          checked={showCrystalAxisLabels}
+          label="Show crystal axis labels"
+          onCheckedChange={onShowCrystalAxisLabelsChange}
+        />
 
-      <InspectorSwitchRow
-        checked={!showCrystalAxisLabels}
-        label="Hide crystal axis labels"
-        onCheckedChange={(checked) => onShowCrystalAxisLabelsChange(!checked)}
-      />
-
-      <InspectorSelectRow label="Unit cell line style">
-        <Select
-          value={unitCellLineStyle}
-          onValueChange={(value) => onUnitCellLineStyleChange(value as UnitCellLineStyle)}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label="Unit cell line style"
-            className={INSPECTOR_SELECT_TRIGGER_CLASS}
+        <InspectorSelectRow label="Unit cell line style">
+          <Select
+            value={unitCellLineStyle}
+            onValueChange={(value) => onUnitCellLineStyleChange(value as UnitCellLineStyle)}
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper" className="!bg-background !text-foreground">
-            <SelectGroup>
-              <SelectItem value="solid" className={INSPECTOR_SELECT_ITEM_CLASS}>
-                Solid
-              </SelectItem>
-              <SelectItem value="dashed" className={INSPECTOR_SELECT_ITEM_CLASS}>
-                Dashed
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </InspectorSelectRow>
-
-      <InspectorSwitchRow
-        checked={fogAffectsUnitCell}
-        label="Apply depth cueing to unit cell"
-        onCheckedChange={onFogAffectsUnitCellChange}
-      />
-
-      <InspectorSwitchRow
-        checked={distinguishSimilarColors}
-        label="Distinguish similar colors"
-        onCheckedChange={onDistinguishSimilarColorsChange}
-      />
-
-      <InspectorSelectRow label="Atom mesh">
-        <Select
-          value={atomRenderingMode}
-          onValueChange={(value) => onAtomRenderingModeChange(value as AtomRenderingMode)}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label="Atom rendering mode"
-            className={INSPECTOR_SELECT_TRIGGER_CLASS}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper" className="!bg-background !text-foreground">
-            <SelectGroup>
-              <SelectItem value="mesh" className={INSPECTOR_SELECT_ITEM_CLASS}>
-                Independent
-              </SelectItem>
-              <SelectItem value="instanced" className={INSPECTOR_SELECT_ITEM_CLASS}>
-                Instanced
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </InspectorSelectRow>
-
-      <InspectorSelectRow label="Bond mesh">
-        <Select
-          value={bondRenderingMode}
-          onValueChange={(value) => onBondRenderingModeChange(value as BondRenderingMode)}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label="Bond rendering mode"
-            className={INSPECTOR_SELECT_TRIGGER_CLASS}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper" className="!bg-background !text-foreground">
-            <SelectGroup>
-              <SelectItem value="mesh" className={INSPECTOR_SELECT_ITEM_CLASS}>
-                Independent
-              </SelectItem>
-              <SelectItem value="batched" className={INSPECTOR_SELECT_ITEM_CLASS}>
-                Batched
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </InspectorSelectRow>
-
-      <InspectorSelectRow label="Preview quality">
-        <Select
-          value={previewMeshQuality}
-          onValueChange={(value) => onPreviewMeshQualityChange(value as MeshQuality)}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label="Preview quality"
-            className={INSPECTOR_SELECT_TRIGGER_CLASS}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper" className="!bg-background !text-foreground">
-            <SelectGroup>
-              {MESH_QUALITY_OPTIONS.map((option) => (
-                <SelectItem
-                  key={option}
-                  value={option}
-                  className={INSPECTOR_SELECT_ITEM_CLASS}
-                >
-                  {MESH_QUALITY_LABELS[option]}
+            <SelectTrigger
+              size="sm"
+              aria-label="Unit cell line style"
+              className={INSPECTOR_SELECT_TRIGGER_CLASS}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" className="!bg-background !text-foreground">
+              <SelectGroup>
+                <SelectItem value="solid" className={INSPECTOR_SELECT_ITEM_CLASS}>
+                  Solid
                 </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </InspectorSelectRow>
-
-      <InspectorSelectRow label="Mouse control">
-        <Select
-          value={interactionMode}
-          onValueChange={(value) => onInteractionModeChange(value as InteractionMode)}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label="Mouse control"
-            className={INSPECTOR_SELECT_TRIGGER_CLASS}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper" className="!bg-background !text-foreground">
-            <SelectGroup>
-              {INTERACTION_MODE_OPTIONS.map((option) => (
-                <SelectItem
-                  key={option.value}
-                  value={option.value}
-                  className={INSPECTOR_SELECT_ITEM_CLASS}
-                >
-                  {option.label}
+                <SelectItem value="dashed" className={INSPECTOR_SELECT_ITEM_CLASS}>
+                  Dashed
                 </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </InspectorSelectRow>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </InspectorSelectRow>
 
-      <InspectorRangeRow
-        label="Drag sensitivity"
-        value={dragSensitivity}
-        min={MIN_DRAG_SENSITIVITY}
-        max={MAX_DRAG_SENSITIVITY}
-        clampValue={clampDragSensitivity}
-        formatPercent={formatDragSensitivityPercent}
-        onValueChange={onDragSensitivityChange}
-        parsePercentInput={parseDragSensitivityPercentInput}
-        sliderPositionToValue={sliderPositionToDragSensitivity}
-        snapSliderPosition={snapDragSensitivitySliderPosition}
-        valueToSliderPosition={dragSensitivityToSliderPosition}
-      />
+        <InspectorSwitchRow
+          checked={fogAffectsUnitCell}
+          label="Apply depth cueing to unit cell"
+          onCheckedChange={onFogAffectsUnitCellChange}
+        />
 
-      <InspectorRangeRow
-        label="Light strength"
-        value={lightStrength}
-        min={MIN_LIGHT_STRENGTH}
-        max={MAX_LIGHT_STRENGTH}
-        clampValue={clampLightStrength}
-        formatPercent={formatLightStrengthPercent}
-        onValueChange={onLightStrengthChange}
-        parsePercentInput={parseLightStrengthPercentInput}
-        sliderPositionToValue={sliderPositionToLightStrength}
-        snapSliderPosition={snapLightStrengthSliderPosition}
-        valueToSliderPosition={lightStrengthToSliderPosition}
-      />
+        <InspectorSwitchRow
+          checked={distinguishSimilarColors}
+          label="Distinguish similar colors"
+          onCheckedChange={onDistinguishSimilarColorsChange}
+        />
 
-      <InspectorSelectRow label="Bonding algorithm">
-        <Select
-          value={bondAlgorithm}
-          disabled={isSceneLoading}
-          onValueChange={(value) => onBondAlgorithmChange(value as BondAlgorithm)}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label="Bonding algorithm"
-            className={INSPECTOR_SELECT_TRIGGER_CLASS}
+        <InspectorRangeRow
+          label="Light strength"
+          value={lightStrength}
+          min={MIN_LIGHT_STRENGTH}
+          max={MAX_LIGHT_STRENGTH}
+          clampValue={clampLightStrength}
+          formatPercent={formatLightStrengthPercent}
+          onValueChange={onLightStrengthChange}
+          parsePercentInput={parseLightStrengthPercentInput}
+          sliderPositionToValue={sliderPositionToLightStrength}
+          snapSliderPosition={snapLightStrengthSliderPosition}
+          valueToSliderPosition={lightStrengthToSliderPosition}
+        />
+      </InspectorSettingsSection>
+
+      <Separator />
+
+      <InspectorSettingsSection id="inspector-rendering-settings" title="Rendering">
+        <InspectorSelectRow label="Atom mesh">
+          <Select
+            value={atomRenderingMode}
+            onValueChange={(value) => onAtomRenderingModeChange(value as AtomRenderingMode)}
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper" className="!bg-background !text-foreground">
-            <SelectGroup>
-              {BOND_ALGORITHM_OPTIONS.map((option) => (
-                <SelectItem
-                  key={option.value}
-                  value={option.value}
-                  className={INSPECTOR_SELECT_ITEM_CLASS}
-                >
-                  {option.label}
+            <SelectTrigger
+              size="sm"
+              aria-label="Atom rendering mode"
+              className={INSPECTOR_SELECT_TRIGGER_CLASS}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" className="!bg-background !text-foreground">
+              <SelectGroup>
+                <SelectItem value="mesh" className={INSPECTOR_SELECT_ITEM_CLASS}>
+                  Independent
                 </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </InspectorSelectRow>
+                <SelectItem value="instanced" className={INSPECTOR_SELECT_ITEM_CLASS}>
+                  Instanced
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </InspectorSelectRow>
+
+        <InspectorSelectRow label="Bond mesh">
+          <Select
+            value={bondRenderingMode}
+            onValueChange={(value) => onBondRenderingModeChange(value as BondRenderingMode)}
+          >
+            <SelectTrigger
+              size="sm"
+              aria-label="Bond rendering mode"
+              className={INSPECTOR_SELECT_TRIGGER_CLASS}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" className="!bg-background !text-foreground">
+              <SelectGroup>
+                <SelectItem value="mesh" className={INSPECTOR_SELECT_ITEM_CLASS}>
+                  Independent
+                </SelectItem>
+                <SelectItem value="batched" className={INSPECTOR_SELECT_ITEM_CLASS}>
+                  Batched
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </InspectorSelectRow>
+
+        <InspectorSelectRow label="Preview quality">
+          <Select
+            value={previewMeshQuality}
+            onValueChange={(value) => onPreviewMeshQualityChange(value as MeshQuality)}
+          >
+            <SelectTrigger
+              size="sm"
+              aria-label="Preview quality"
+              className={INSPECTOR_SELECT_TRIGGER_CLASS}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" className="!bg-background !text-foreground">
+              <SelectGroup>
+                {MESH_QUALITY_OPTIONS.map((option) => (
+                  <SelectItem
+                    key={option}
+                    value={option}
+                    className={INSPECTOR_SELECT_ITEM_CLASS}
+                  >
+                    {MESH_QUALITY_LABELS[option]}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </InspectorSelectRow>
+
+        <InspectorSwitchRow
+          checked={showFpsOverlay}
+          label="Show FPS"
+          onCheckedChange={onShowFpsOverlayChange}
+        />
+      </InspectorSettingsSection>
+
+      <Separator />
+
+      <InspectorSettingsSection id="inspector-interaction-settings" title="Interaction">
+        <InspectorSelectRow label="Mouse control">
+          <Select
+            value={interactionMode}
+            onValueChange={(value) => onInteractionModeChange(value as InteractionMode)}
+          >
+            <SelectTrigger
+              size="sm"
+              aria-label="Mouse control"
+              className={INSPECTOR_SELECT_TRIGGER_CLASS}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" className="!bg-background !text-foreground">
+              <SelectGroup>
+                {INTERACTION_MODE_OPTIONS.map((option) => (
+                  <SelectItem
+                    key={option.value}
+                    value={option.value}
+                    className={INSPECTOR_SELECT_ITEM_CLASS}
+                  >
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </InspectorSelectRow>
+
+        <InspectorRangeRow
+          label="Drag sensitivity"
+          value={dragSensitivity}
+          min={MIN_DRAG_SENSITIVITY}
+          max={MAX_DRAG_SENSITIVITY}
+          clampValue={clampDragSensitivity}
+          formatPercent={formatDragSensitivityPercent}
+          onValueChange={onDragSensitivityChange}
+          parsePercentInput={parseDragSensitivityPercentInput}
+          sliderPositionToValue={sliderPositionToDragSensitivity}
+          snapSliderPosition={snapDragSensitivitySliderPosition}
+          valueToSliderPosition={dragSensitivityToSliderPosition}
+        />
+      </InspectorSettingsSection>
+
+      <Separator />
+
+      <InspectorSettingsSection id="inspector-analysis-settings" title="Analysis">
+        <InspectorSelectRow label="Bonding algorithm">
+          <Select
+            value={bondAlgorithm}
+            disabled={isSceneLoading}
+            onValueChange={(value) => onBondAlgorithmChange(value as BondAlgorithm)}
+          >
+            <SelectTrigger
+              size="sm"
+              aria-label="Bonding algorithm"
+              className={INSPECTOR_SELECT_TRIGGER_CLASS}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" className="!bg-background !text-foreground">
+              <SelectGroup>
+                {BOND_ALGORITHM_OPTIONS.map((option) => (
+                  <SelectItem
+                    key={option.value}
+                    value={option.value}
+                    className={INSPECTOR_SELECT_ITEM_CLASS}
+                  >
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </InspectorSelectRow>
+      </InspectorSettingsSection>
     </div>
+  );
+}
+
+function InspectorSettingsSection({
+  children,
+  id,
+  title,
+}: {
+  children: ReactNode;
+  id: string;
+  title: string;
+}) {
+  return (
+    <section aria-labelledby={id} className="flex flex-col gap-3">
+      <h2 id={id} className={INSPECTOR_SECTION_TITLE_CLASS}>
+        {title}
+      </h2>
+      <div className="flex flex-col gap-2">{children}</div>
+    </section>
   );
 }
 
