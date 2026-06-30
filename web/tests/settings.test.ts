@@ -60,9 +60,9 @@ describe("settings", () => {
       colorScheme: "vesta-soft",
       distinguishSimilarColors: true,
       fogAffectsUnitCell: false,
-      fogAmount: 50,
+      fogAmount: 40,
       fogEnabled: true,
-      fogStart: 50,
+      fogStart: 40,
       materialPreset: "modern-matte",
     });
     expect(STYLE_FOG_START_MIN).toBe(0);

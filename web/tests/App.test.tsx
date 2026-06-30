@@ -1016,10 +1016,10 @@ describe("App", () => {
     expect(within(commonControls).queryByRole("button", { name: "Bond color" })).toBeNull();
     expect(colorSchemeSelect.textContent).toContain("VESTA Soft");
     expect(fogSwitch.getAttribute("aria-checked")).toBe("true");
-    expect(fogStartSlider.value).toBe("50");
-    expect(fogStartInput.value).toBe("50");
-    expect(fogAmountSlider.value).toBe("50");
-    expect(fogAmountInput.value).toBe("50");
+    expect(fogStartSlider.value).toBe("40");
+    expect(fogStartInput.value).toBe("40");
+    expect(fogAmountSlider.value).toBe("40");
+    expect(fogAmountInput.value).toBe("40");
     expect(fogStartSlider.disabled).toBe(false);
     expect(fogStartInput.disabled).toBe(false);
     expect(fogAmountSlider.disabled).toBe(false);
@@ -1144,10 +1144,10 @@ describe("App", () => {
 
     expect(resetFogButton.className).toContain("tool-icon-button-reset-feedback");
     expect(fogSwitch.getAttribute("aria-checked")).toBe("true");
-    expect(fogStartInput.value).toBe("50");
-    expect(fogStartSlider.value).toBe("50");
-    expect(fogAmountInput.value).toBe("50");
-    expect(fogAmountSlider.value).toBe("50");
+    expect(fogStartInput.value).toBe("40");
+    expect(fogStartSlider.value).toBe("40");
+    expect(fogAmountInput.value).toBe("40");
+    expect(fogAmountSlider.value).toBe("40");
     expect(fogStartSlider.disabled).toBe(false);
     expect(fogStartInput.disabled).toBe(false);
     expect(fogAmountSlider.disabled).toBe(false);
