@@ -525,10 +525,18 @@ describe("computeSceneLayout", () => {
 
   test("builds one surface batch for valid polyhedra and skips invalid entries", () => {
     const scene = sceneWithOffCenterAtoms();
+    const atoms = [
+      ...scene.atoms,
+      atom("Si-4", [1.1, 0.1, 0.1]),
+      atom("Si-5", [1.3, 0.1, 0.1]),
+      atom("Si-6", [1.1, 0.3, 0.1]),
+      atom("Si-7", [1.1, 0.1, 0.3]),
+    ];
     const validPolyhedron = tetrahedronPolyhedron();
     const secondValidPolyhedron = {
       ...tetrahedronPolyhedron(),
-      centerAtomIndex: 1,
+      centerAtomIndex: 4,
+      hullAtomIndices: [4, 5, 6, 7],
     };
     const invalidCenterPolyhedron = {
       ...tetrahedronPolyhedron(),
@@ -540,7 +548,7 @@ describe("computeSceneLayout", () => {
     } satisfies SceneSpec["polyhedra"][number];
 
     const batch = createPolyhedronSurfaceBatchBuild({
-      atoms: scene.atoms,
+      atoms,
       colorScheme: createDefaultStyle().colorScheme,
       polyhedra: [
         validPolyhedron,
@@ -550,11 +558,77 @@ describe("computeSceneLayout", () => {
       ],
     });
 
-    expect(batch?.itemCount).toBe(2);
-    expect(batch?.maxVertexCount).toBe(8);
-    expect(batch?.maxIndexCount).toBe(24);
-    expect(batch?.items.map((item) => item.polyhedronIndex)).toEqual([0, 2]);
-    expect(batch?.key.startsWith("polyhedra:2:")).toBe(true);
+    expect(batch).not.toBeNull();
+    if (!batch) {
+      throw new Error("Expected valid polyhedra to produce a surface batch.");
+    }
+
+    expect(batch.itemCount).toBe(2);
+    expect(batch.maxVertexCount).toBe(8);
+    expect(batch.maxIndexCount).toBe(24);
+    expect(batch.items.map((item) => item.polyhedronIndex)).toEqual([0, 2]);
+    expect(batch.edgeItems.map((item) => item.polyhedronIndex)).toEqual([0, 2]);
+    expect(batch.key.startsWith("polyhedra:2:")).toBe(true);
+    disposePolyhedronSurfaceBatchBuild(batch);
+  });
+
+  test("deduplicates coincident polyhedron surface faces across the batch", () => {
+    const scene = sceneWithOffCenterAtoms();
+    const batch = createPolyhedronSurfaceBatchBuild({
+      atoms: scene.atoms,
+      colorScheme: createDefaultStyle().colorScheme,
+      polyhedra: [
+        tetrahedronPolyhedron(),
+        {
+          ...tetrahedronPolyhedron(),
+          centerAtomIndex: 1,
+        },
+      ],
+    });
+
+    expect(batch).not.toBeNull();
+    if (!batch) {
+      throw new Error("Expected valid polyhedra to produce a surface batch.");
+    }
+
+    expect(batch.itemCount).toBe(1);
+    expect(batch.maxVertexCount).toBe(4);
+    expect(batch.maxIndexCount).toBe(12);
+    expect(batch.items.map((item) => item.polyhedronIndex)).toEqual([0]);
+    expect(batch.edgeItems.map((item) => item.polyhedronIndex)).toEqual([0, 1]);
+    disposePolyhedronSurfaceBatchBuild(batch);
+  });
+
+  test("keeps nearly coincident but distinct polyhedron surface faces", () => {
+    const scene = sceneWithOffCenterAtoms();
+    const atoms = [
+      ...scene.atoms,
+      atom("Si-4", [0.10000001, 0.1, 0.1]),
+      atom("Si-5", [0.3, 0.1, 0.1]),
+      atom("Si-6", [0.1, 0.3, 0.1]),
+      atom("Si-7", [0.1, 0.1, 0.3]),
+    ];
+    const batch = createPolyhedronSurfaceBatchBuild({
+      atoms,
+      colorScheme: createDefaultStyle().colorScheme,
+      polyhedra: [
+        tetrahedronPolyhedron(),
+        {
+          ...tetrahedronPolyhedron(),
+          centerAtomIndex: 4,
+          hullAtomIndices: [4, 5, 6, 7],
+        },
+      ],
+    });
+
+    expect(batch).not.toBeNull();
+    if (!batch) {
+      throw new Error("Expected valid polyhedra to produce a surface batch.");
+    }
+
+    expect(batch.itemCount).toBe(2);
+    expect(batch.items.map((item) => item.polyhedronIndex)).toEqual([0, 1]);
+    expect(batch.edgeItems.map((item) => item.polyhedronIndex)).toEqual([0, 1]);
     disposePolyhedronSurfaceBatchBuild(batch);
   });
 

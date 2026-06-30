@@ -413,6 +413,48 @@ def test_scene_response_generates_polyhedra_for_complete_coordination_environmen
     )
 
 
+def test_polyhedron_faces_have_stable_coplanar_triangulation() -> None:
+    cube_positions = [
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [1.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [1.0, 0.0, 1.0],
+        [0.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+    ]
+    shuffled_positions = [cube_positions[index] for index in [7, 2, 5, 0, 6, 1, 4, 3]]
+
+    cube_faces = polyhedra_module._polyhedron_faces_from_positions(cube_positions)
+    shuffled_faces = polyhedra_module._polyhedron_faces_from_positions(shuffled_positions)
+
+    assert len(cube_faces) == 12
+    assert _face_coordinate_keys(cube_positions, cube_faces) == _face_coordinate_keys(
+        shuffled_positions,
+        shuffled_faces,
+    )
+
+
+def test_polyhedron_faces_ignore_interior_coplanar_hull_points() -> None:
+    cube_positions_with_face_center = [
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [1.0, 1.0, 0.0],
+        [0.5, 0.5, 0.0],
+        [0.0, 0.0, 1.0],
+        [1.0, 0.0, 1.0],
+        [0.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+    ]
+
+    faces = polyhedra_module._polyhedron_faces_from_positions(cube_positions_with_face_center)
+
+    assert len(faces) == 12
+    assert all(4 not in face for face in faces)
+
+
 def test_scene_response_suppresses_reverse_and_same_species_polyhedron_centers() -> None:
     sr_tio3_scene = build_scene_response(read_structure(FIXTURE_DIR / "SrTiO3.cif"))
     si_scene = build_scene_response(read_structure(FIXTURE_DIR / "Si.cif"))
@@ -630,6 +672,25 @@ def _structure_from_fractional_positions(
         coords_are_cartesian=False,
         to_unit_cell=False,
     )
+
+
+def _face_coordinate_keys(
+    positions: list[list[float]],
+    faces: list[list[int]],
+) -> set[tuple[tuple[float, float, float], ...]]:
+    return {
+        tuple(
+            sorted(
+                (
+                    round(positions[index][0], 8),
+                    round(positions[index][1], 8),
+                    round(positions[index][2], 8),
+                )
+                for index in face
+            )
+        )
+        for face in faces
+    }
 
 
 def _dependency_name(dependency: str) -> str:

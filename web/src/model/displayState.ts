@@ -35,7 +35,7 @@ export const DEFAULT_COMPONENT_OPACITY: ComponentOpacityState = {
   atoms: 100,
   unitCell: 100,
   bonds: 100,
-  polyhedra: 50,
+  polyhedra: 75,
 };
 
 export const COMPONENT_OPACITY_MAX: ComponentOpacityState = {

@@ -883,7 +883,7 @@ describe("App", () => {
     expect(atomsOpacityInput.value).toBe("100");
     expect(atomsOpacityInput.parentElement?.textContent).toContain("%");
     expect(bondsOpacityInput.value).toBe("100");
-    expect(polyhedraOpacityInput.value).toBe("50");
+    expect(polyhedraOpacityInput.value).toBe("75");
     expect(polyhedraOpacitySlider.max).toBe("100");
 
     await user.clear(atomsOpacityInput);
@@ -900,7 +900,7 @@ describe("App", () => {
     await user.click(resetOpacityButton);
 
     expect(resetOpacityButton.className).toContain("tool-icon-button-reset-feedback");
-    expect(polyhedraOpacityInput.value).toBe("50");
+    expect(polyhedraOpacityInput.value).toBe("75");
 
     const polyhedraCheckbox = within(commonControls).getByRole("checkbox", {
       name: "Polyhedra",
@@ -941,7 +941,7 @@ describe("App", () => {
     expect(atomsCheckbox.getAttribute("aria-checked")).toBe("false");
     expect(unitCellOpacityInput.value).toBe("100");
     expect(bondsOpacityInput.value).toBe("100");
-    expect(polyhedraOpacityInput.value).toBe("50");
+    expect(polyhedraOpacityInput.value).toBe("75");
     expect(resetOpacityButton.className).toContain("tool-icon-button-reset-feedback");
     await waitFor(() =>
       expect(resetOpacityButton.className).not.toContain("tool-icon-button-reset-feedback"),

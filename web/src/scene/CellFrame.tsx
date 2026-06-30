@@ -37,7 +37,7 @@ export function CellFrame({
       alphaToCoverage: true,
       color,
       dashed: lineStyle === "dashed",
-      depthWrite: opacity >= 1,
+      depthWrite: false,
       dashSize: CELL_FRAME_DASH_SIZE,
       fog,
       gapSize: CELL_FRAME_GAP_SIZE,

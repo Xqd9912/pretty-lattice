@@ -24,6 +24,9 @@ export function StructureMaterial({
   materialFamily,
   materialRef,
   opacity,
+  polygonOffset,
+  polygonOffsetFactor,
+  polygonOffsetUnits,
   side,
   transparent,
   vertexColors,
@@ -33,6 +36,9 @@ export function StructureMaterial({
   materialFamily: ResolvedStructureMaterialFamily;
   materialRef?: Ref<StructureMeshMaterial>;
   opacity: number;
+  polygonOffset?: boolean;
+  polygonOffsetFactor?: number;
+  polygonOffsetUnits?: number;
   side?: Side;
   transparent: boolean;
   vertexColors?: boolean;
@@ -47,6 +53,9 @@ export function StructureMaterial({
     color,
     depthWrite,
     opacity,
+    polygonOffset,
+    polygonOffsetFactor,
+    polygonOffsetUnits,
     side,
     transparent,
     vertexColors,
