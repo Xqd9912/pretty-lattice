@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useRef, type CSSProperties } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -10,10 +10,12 @@ import { GLASS_SURFACE_CLASS } from "../surface";
 export function ElementLegend({
   entries,
   offsetX = 0,
+  onElementColorChange,
   safeArea,
 }: {
   entries: ElementLegendEntry[];
   offsetX?: number;
+  onElementColorChange?: (element: string, color: string) => void;
   safeArea: PreviewSafeArea;
 }) {
   return (
@@ -28,11 +30,10 @@ export function ElementLegend({
       <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
         {entries.map((entry) => (
           <li key={entry.element} className="flex min-w-0 items-center gap-2">
-            <span
-              aria-hidden="true"
-              data-slot="element-legend-swatch"
-              className="size-[18px] shrink-0 rounded-full border border-foreground/10 shadow-sm"
-              style={legendSphereStyle(entry.color)}
+            <ElementLegendColorControl
+              color={entry.color}
+              element={entry.element}
+              onElementColorChange={onElementColorChange}
             />
             <span className="font-sans text-[0.95rem] font-normal leading-none text-foreground">
               {entry.element}
@@ -41,6 +42,84 @@ export function ElementLegend({
         ))}
       </ul>
     </nav>
+  );
+}
+
+function ElementLegendColorControl({
+  color,
+  element,
+  onElementColorChange,
+}: {
+  color: string;
+  element: string;
+  onElementColorChange?: (element: string, color: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const nativeColor = nativeColorValue(color);
+
+  function handleOpenPicker() {
+    if (!onElementColorChange) {
+      return;
+    }
+
+    const input = inputRef.current;
+    if (!input) {
+      return;
+    }
+
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+        return;
+      }
+    } catch {
+      // Fall through to the click fallback for browsers that expose but reject showPicker.
+    }
+
+    input.click();
+  }
+
+  if (!onElementColorChange) {
+    return (
+      <span
+        aria-hidden="true"
+        data-slot="element-legend-swatch"
+        className="size-[18px] shrink-0 rounded-full border border-foreground/10 shadow-sm"
+        style={legendSphereStyle(color)}
+      />
+    );
+  }
+
+  return (
+    <span className="relative inline-flex size-[18px] shrink-0">
+      <button
+        type="button"
+        aria-label={`Set ${element} color`}
+        className="pointer-events-auto inline-flex size-[18px] shrink-0 items-center justify-center rounded-full bg-transparent p-0 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        onClick={handleOpenPicker}
+      >
+        <span
+          aria-hidden="true"
+          data-slot="element-legend-swatch"
+          className="size-[18px] shrink-0 rounded-full border border-foreground/10 shadow-sm"
+          style={legendSphereStyle(color)}
+        />
+      </button>
+      <input
+        ref={inputRef}
+        type="color"
+        aria-label={`${element} color value`}
+        tabIndex={-1}
+        value={nativeColor}
+        className="pointer-events-none absolute size-px opacity-0"
+        onChange={(event) => {
+          const nextColor = event.target.value.toLowerCase();
+          if (nextColor !== nativeColor) {
+            onElementColorChange(element, nextColor);
+          }
+        }}
+      />
+    </span>
   );
 }
 
@@ -55,4 +134,11 @@ function legendSphereStyle(color: string): CSSProperties {
   return {
     background: lambertLegendSwatchBackground(color),
   };
+}
+
+function nativeColorValue(color: string) {
+  if (/^#[\da-fA-F]{6}$/.test(color)) {
+    return color.toLowerCase();
+  }
+  return "#808080";
 }

@@ -1030,6 +1030,18 @@ describe("App", () => {
     expect(bondStyleSelect.textContent).toContain("Bicolor");
     expect(within(commonControls).queryByRole("button", { name: "Bond color" })).toBeNull();
     expect(colorSchemeSelect.textContent).toContain("VESTA Soft");
+    await user.click(colorSchemeSelect);
+    expect(await screen.findByRole("option", { name: "Custom" })).toBeTruthy();
+    await user.click(await screen.findByRole("option", { name: "Custom" }));
+    expect(colorSchemeSelect.textContent).toContain("Custom");
+    expect((screen.getByLabelText("Na color value") as HTMLInputElement).value).toBe("#e7d15f");
+    await user.click(colorSchemeSelect);
+    await user.click(await screen.findByRole("option", { name: "Jmol" }));
+    await user.click(colorSchemeSelect);
+    await user.click(await screen.findByRole("option", { name: "Custom" }));
+    expect((screen.getByLabelText("Na color value") as HTMLInputElement).value).toBe("#ab5cf2");
+    await user.click(colorSchemeSelect);
+    await user.click(await screen.findByRole("option", { name: "VESTA Soft" }));
     expect(fogSwitch.getAttribute("aria-checked")).toBe("true");
     expect(fogStartSlider.value).toBe("40");
     expect(fogStartInput.value).toBe("40");
@@ -1087,6 +1099,21 @@ describe("App", () => {
       ).value,
     ).toBe("#d2d2d2");
     expect(fetchCalls).toHaveLength(1);
+
+    expect(screen.getByRole("button", { name: "Set Na color" }).isConnected).toBe(true);
+    const sodiumColorInput = screen.getByLabelText("Na color value") as HTMLInputElement;
+    expect(sodiumColorInput.value).toBe("#e7d15f");
+    fireEvent.change(sodiumColorInput, { target: { value: "#112233" } });
+    expect(colorSchemeSelect.textContent).toContain("Custom");
+
+    await user.click(colorSchemeSelect);
+    await user.click(await screen.findByRole("option", { name: "Jmol" }));
+    expect(colorSchemeSelect.textContent).toContain("Jmol");
+
+    await user.click(colorSchemeSelect);
+    await user.click(await screen.findByRole("option", { name: "Custom" }));
+    expect(colorSchemeSelect.textContent).toContain("Custom");
+    expect(sodiumColorInput.value).toBe("#112233");
 
     await user.click(colorSchemeSelect);
     await user.click(await screen.findByRole("option", { name: "Jmol" }));

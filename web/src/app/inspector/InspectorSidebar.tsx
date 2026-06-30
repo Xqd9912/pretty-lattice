@@ -107,6 +107,7 @@ export function InspectorSidebar({
   bondAlgorithm,
   distinguishSimilarColors,
   dragSensitivity,
+  isCustomColorScheme,
   interactionMode,
   lightStrength,
   isOpen,
@@ -130,6 +131,7 @@ export function InspectorSidebar({
   bondAlgorithm: BondAlgorithm;
   distinguishSimilarColors: boolean;
   dragSensitivity: number;
+  isCustomColorScheme: boolean;
   interactionMode: InteractionMode;
   lightStrength: number;
   isOpen: boolean;
@@ -189,6 +191,7 @@ export function InspectorSidebar({
               bondAlgorithm={bondAlgorithm}
               distinguishSimilarColors={distinguishSimilarColors}
               dragSensitivity={dragSensitivity}
+              isCustomColorScheme={isCustomColorScheme}
               interactionMode={interactionMode}
               lightStrength={lightStrength}
               isSceneLoading={isSceneLoading}
@@ -219,6 +222,7 @@ function SettingsPanel({
   bondAlgorithm,
   distinguishSimilarColors,
   dragSensitivity,
+  isCustomColorScheme,
   interactionMode,
   lightStrength,
   isSceneLoading,
@@ -241,6 +245,7 @@ function SettingsPanel({
   bondAlgorithm: BondAlgorithm;
   distinguishSimilarColors: boolean;
   dragSensitivity: number;
+  isCustomColorScheme: boolean;
   interactionMode: InteractionMode;
   lightStrength: number;
   isSceneLoading: boolean;
@@ -301,7 +306,8 @@ function SettingsPanel({
         />
 
         <InspectorSwitchRow
-          checked={distinguishSimilarColors}
+          checked={isCustomColorScheme ? false : distinguishSimilarColors}
+          disabled={isCustomColorScheme}
           label="Distinguish similar colors"
           onCheckedChange={onDistinguishSimilarColorsChange}
         />
@@ -591,10 +597,12 @@ function InspectorRangeRow({
 
 function InspectorSwitchRow({
   checked,
+  disabled = false,
   label,
   onCheckedChange,
 }: {
   checked: boolean;
+  disabled?: boolean;
   label: string;
   onCheckedChange: (checked: boolean) => void;
 }) {
@@ -603,11 +611,13 @@ function InspectorSwitchRow({
       className={cn(
         "flex min-h-8 items-center justify-between gap-2",
         INSPECTOR_BODY_TEXT_CLASS,
+        disabled ? "opacity-55" : null,
       )}
     >
       <span className="leading-tight text-foreground">{label}</span>
       <Switch
         checked={checked}
+        disabled={disabled}
         aria-label={label}
         className="h-4 w-7 p-0.5"
         thumbClassName="size-3 data-[state=checked]:translate-x-3"

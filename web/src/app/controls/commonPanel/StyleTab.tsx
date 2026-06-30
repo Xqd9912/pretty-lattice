@@ -41,7 +41,9 @@ import {
   STYLE_SCALE_MAX,
   STYLE_SCALE_MIN,
   createDefaultStyle,
+  createCustomColormapFromScheme,
   DEFAULT_BOND_COLOR,
+  hasCustomColormapChanges,
   type BondColorMode,
   type StyleState,
 } from "../../../model";
@@ -63,6 +65,7 @@ const BOND_COLOR_OPTIONS: { label: string; value: BondColorMode }[] = [
   { label: "Unicolor", value: "unicolor" },
   { label: "Bicolor", value: "bicolor" },
 ];
+const CUSTOM_COLOR_SCHEME_VALUE = "__custom";
 const NATIVE_COLOR_VALUE_PATTERN = /^#[\da-fA-F]{6}$/;
 const ATOM_RADIUS_MODEL_OPTIONS: {
   menuLabel: string;
@@ -74,6 +77,12 @@ const ATOM_RADIUS_MODEL_OPTIONS: {
   { menuLabel: "Ionic", value: "ionic" },
 ];
 const BY_ATOM_TOKEN_STYLE = { background: "linear-gradient(90deg, #f58c9a 0 50%, #78a7ff 50% 100%)" } as const;
+const CUSTOM_COLOR_SCHEME_TOKEN_STYLE = {
+  background:
+    "linear-gradient(90deg, oklch(78% 0.17 24) 0%, oklch(80% 0.18 92) 28%, oklch(78% 0.17 168) 60%, oklch(76% 0.18 268) 100%)",
+  boxShadow:
+    "inset 0 0 0 1px oklch(100% 0 0 / 0.35), inset 0 1px 0 oklch(100% 0 0 / 0.28)",
+} satisfies CSSProperties;
 
 export function StyleTabContent({
   onAtomRadiusModelChange,
@@ -113,11 +122,32 @@ export function StyleTabContent({
     }));
   }
 
-  function setColorScheme(colorScheme: ColorScheme) {
-    onStyleChange((currentStyle) => ({
-      ...currentStyle,
-      colorScheme,
-    }));
+  function setColorScheme(value: string) {
+    onStyleChange((currentStyle) => {
+      if (value === CUSTOM_COLOR_SCHEME_VALUE) {
+        const customColormap =
+          currentStyle.customColormap ??
+          createCustomColormapFromScheme(currentStyle.colorScheme);
+
+        return {
+          ...currentStyle,
+          colorScheme: customColormap.baseColorScheme,
+          colorSchemeMode: "custom",
+          customColormap,
+        };
+      }
+
+      return {
+        ...currentStyle,
+        colorScheme: value,
+        colorSchemeMode: "preset",
+        customColormap:
+          currentStyle.customColormap &&
+          hasCustomColormapChanges(currentStyle.customColormap)
+            ? currentStyle.customColormap
+            : null,
+      };
+    });
   }
 
   function setMaterialPreset(materialPreset: MaterialPresetId) {
@@ -165,6 +195,10 @@ export function StyleTabContent({
   const selectedMaterialPresetOption =
     MATERIAL_PRESET_OPTIONS.find((option) => option.value === style.materialPreset) ??
     MATERIAL_PRESET_OPTIONS[0];
+  const selectedColorSchemeValue =
+    style.colorSchemeMode === "custom" && style.customColormap
+      ? CUSTOM_COLOR_SCHEME_VALUE
+      : style.colorScheme;
 
   useEffect(
     () => () => {
@@ -454,8 +488,8 @@ export function StyleTabContent({
         >
           <span className="min-w-0 truncate leading-tight">Color scheme</span>
           <Select
-            value={style.colorScheme}
-            onValueChange={(value) => setColorScheme(value as ColorScheme)}
+            value={selectedColorSchemeValue}
+            onValueChange={setColorScheme}
           >
             <SelectTrigger
               size="sm"
@@ -482,6 +516,13 @@ export function StyleTabContent({
                     />
                   </SelectItem>
                 ))}
+                <SelectItem
+                  value={CUSTOM_COLOR_SCHEME_VALUE}
+                  textValue="Custom"
+                  className={cn("min-h-6 py-0.5", COMMON_PANEL_BODY_TEXT_CLASS)}
+                >
+                  <CustomColorSchemeOptionLabel />
+                </SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -696,6 +737,19 @@ function ColorSchemeOptionLabel({
         style={colorSchemeTokenStyle(value)}
       />
       <span className="min-w-0 truncate">{label}</span>
+    </span>
+  );
+}
+
+function CustomColorSchemeOptionLabel() {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-2">
+      <span
+        aria-hidden="true"
+        className="h-3 w-6 shrink-0 rounded-full border border-border"
+        style={CUSTOM_COLOR_SCHEME_TOKEN_STYLE}
+      />
+      <span className="min-w-0 truncate">Custom</span>
     </span>
   );
 }

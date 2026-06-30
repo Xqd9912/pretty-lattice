@@ -106,6 +106,10 @@ export function elementColorForScheme(
   return color;
 }
 
+export function elementColorsForScheme(colorScheme: ColorScheme): Record<string, string> {
+  return { ...colormapById(colorScheme).elements };
+}
+
 export function colorSchemeTokenStyle(colorScheme: ColorScheme): CSSProperties {
   return colormapTokenStyle(colormapById(colorScheme));
 }

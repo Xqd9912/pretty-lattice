@@ -3,16 +3,17 @@ import { memo, useCallback, useLayoutEffect, useMemo } from "react";
 import { Fog } from "three";
 
 import type { SceneSpec } from "../api/scene";
-import {
-  autoDistinctElementColorOverrides,
-} from "../model/colorSchemes";
 import type {
   ComponentOpacityState,
   ExportMeshQuality,
   StyleState,
   UnitCellLineStyle,
 } from "../model";
-import { DEFAULT_BOND_COLOR } from "../model";
+import {
+  baseColorSchemeForStyle,
+  DEFAULT_BOND_COLOR,
+  elementColorOverridesForStyle,
+} from "../model";
 import type { ResolvedStructureMaterialFamilies } from "./materialPresetResolver";
 import type { SceneLayout } from "./sceneLayout";
 import type { VectorTuple } from "./viewMath";
@@ -266,14 +267,10 @@ export function StructureSceneObjects({
   unitCellLineWidthScale?: number;
 }) {
   const colorOverrides = useMemo(
-    () =>
-      autoDistinctElementColorOverrides(
-        scene.atoms,
-        style.colorScheme,
-        style.distinguishSimilarColors,
-    ),
-    [scene.atoms, style.colorScheme, style.distinguishSimilarColors],
+    () => elementColorOverridesForStyle(scene.atoms, style),
+    [scene.atoms, style],
   );
+  const colorScheme = baseColorSchemeForStyle(style);
   const bondRenderItems = useMemo(
     () =>
       createBondRenderItems({
@@ -281,16 +278,16 @@ export function StructureSceneObjects({
         bondColor: style.bondColor,
         bonds: scene.bonds,
         colorMode: style.bondColorMode,
-        colorScheme: style.colorScheme,
+        colorScheme,
         colorOverrides,
       }),
     [
+      colorScheme,
       colorOverrides,
       scene.atoms,
       scene.bonds,
       style.bondColor,
       style.bondColorMode,
-      style.colorScheme,
     ],
   );
   const handlePointerMissed = useCallback(() => {
@@ -316,7 +313,7 @@ export function StructureSceneObjects({
         ) : null}
         <MemoizedBatchedPolyhedra
           atoms={scene.atoms}
-          colorScheme={style.colorScheme}
+          colorScheme={colorScheme}
           colorOverrides={colorOverrides}
           materialFamily={materialFamilies.polyhedron}
           opacity={componentOpacity.polyhedra / 100}
@@ -334,7 +331,7 @@ export function StructureSceneObjects({
         {showAtoms ? (
           <InstancedAtoms
             atoms={scene.atoms}
-            colorScheme={style.colorScheme}
+            colorScheme={colorScheme}
             colorOverrides={colorOverrides}
             inspectedAtomId={inspectedAtomId}
             interactionLocked={interactionLocked}

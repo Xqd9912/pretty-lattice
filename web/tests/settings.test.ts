@@ -13,7 +13,10 @@ import {
   defaultPreviewMeshQualityForScene,
   createDefaultExportSettings,
   createDefaultStyle,
+  createCustomColormapFromScheme,
   createDefaultComponentVisibility,
+  elementColorOverridesForStyle,
+  hasCustomColormapChanges,
   INSPECTOR_OPEN_SCENE_OFFSET_X_PX,
   INSPECTOR_PREVIEW_SAFE_AREA,
   STRUCTURE_ATOM_COUNT_THRESHOLD,
@@ -58,6 +61,8 @@ describe("settings", () => {
       bondColorMode: "bicolor",
       bondThickness: 100,
       colorScheme: "vesta-soft",
+      colorSchemeMode: "preset",
+      customColormap: null,
       distinguishSimilarColors: true,
       fogAffectsUnitCell: false,
       fogAmount: 40,
@@ -72,6 +77,42 @@ describe("settings", () => {
     expect(STYLE_SCALE_MIN.atomRadius).toBe(0);
     expect(STYLE_SCALE_MAX.atomRadius).toBe(100);
     expect(STYLE_SCALE_MAX.bondThickness).toBe(200);
+  });
+
+  test("uses auto color overrides only for preset color schemes", () => {
+    const presetStyle = createDefaultStyle();
+    const presetOverrides = elementColorOverridesForStyle(
+      atomsWithElements(["O", "V"]),
+      presetStyle,
+    );
+
+    expect(presetOverrides?.V).toBeDefined();
+
+    const customColormap = createCustomColormapFromScheme("vesta-soft");
+    customColormap.elements.V = "#123456";
+    const customStyle = {
+      ...presetStyle,
+      colorSchemeMode: "custom" as const,
+      customColormap,
+    };
+
+    expect(elementColorOverridesForStyle(atomsWithElements(["O", "V"]), customStyle)).toEqual(
+      expect.objectContaining({ V: "#123456" }),
+    );
+  });
+
+  test("detects whether a custom color map differs from its base preset", () => {
+    const customColormap = createCustomColormapFromScheme("vesta-soft");
+
+    expect(hasCustomColormapChanges(customColormap)).toBe(false);
+
+    customColormap.elements.V = "#123456";
+    expect(hasCustomColormapChanges(customColormap)).toBe(true);
+
+    const baseVColor = createCustomColormapFromScheme("vesta-soft").elements.V;
+    expect(baseVColor).toBeDefined();
+    customColormap.elements.V = baseVColor!;
+    expect(hasCustomColormapChanges(customColormap)).toBe(false);
   });
 
   test("defaults figure export settings to PNG with separate 2D and 3D quality controls", () => {
@@ -511,6 +552,12 @@ function sceneWithAtomCount(atomCount: number): SceneSpec {
       atomCount,
     },
   };
+}
+
+function atomsWithElements(elements: string[]): AtomSpec[] {
+  return elements.map((element, index) =>
+    atom(`${element}-${index}`, element, [0, 0, 0], [], []),
+  );
 }
 
 function bondAtomIds(scene: SceneSpec | null): string[] {

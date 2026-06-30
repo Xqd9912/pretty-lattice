@@ -35,7 +35,6 @@ import {
 import { ViewControlRail } from "./controls/ViewControlRail";
 import { createCameraInteractionStore } from "./cameraInteractionStore";
 import { createPreviewFpsStore } from "../model/previewFpsStore";
-import { autoDistinctElementColorOverrides } from "./colorSchemes";
 import { deriveElementLegendEntries } from "./elementLegend";
 import { useFigureExportController } from "./hooks/useFigureExportController";
 import { useLockedInteractionFeedback } from "./hooks/useLockedInteractionFeedback";
@@ -56,9 +55,12 @@ import {
   createDefaultComponentOpacity,
   createDefaultComponentVisibility,
   createDefaultStyle,
+  baseColorSchemeForStyle,
   DEFAULT_SHOW_CRYSTAL_AXIS_LABELS,
   DEFAULT_UNIT_CELL_LINE_STYLE,
+  createCustomColormapFromScheme,
   defaultPreviewMeshQualityForScene,
+  elementColorOverridesForStyle,
   type MeshQuality,
   type UnitCellLineStyle,
   hasPolyhedra,
@@ -313,18 +315,36 @@ export function App() {
   const elementColorOverrides = useMemo(
     () =>
       scene
-        ? autoDistinctElementColorOverrides(
-            scene.atoms,
-            style.colorScheme,
-            style.distinguishSimilarColors,
-          )
+        ? elementColorOverridesForStyle(scene.atoms, style)
         : undefined,
-    [scene, style.colorScheme, style.distinguishSimilarColors],
+    [scene, style],
   );
+  const legendColorScheme = baseColorSchemeForStyle(style);
   const legendEntries = useMemo(
-    () => deriveElementLegendEntries(scene, style.colorScheme, elementColorOverrides),
-    [elementColorOverrides, scene, style.colorScheme],
+    () => deriveElementLegendEntries(scene, legendColorScheme, elementColorOverrides),
+    [elementColorOverrides, legendColorScheme, scene],
   );
+  const handleLegendElementColorChange = useCallback((element: string, color: string) => {
+    setStyle((currentStyle) => {
+      const draft =
+        currentStyle.colorSchemeMode === "custom" && currentStyle.customColormap
+          ? currentStyle.customColormap
+          : createCustomColormapFromScheme(currentStyle.colorScheme);
+
+      return {
+        ...currentStyle,
+        colorSchemeMode: "custom",
+        colorScheme: draft.baseColorScheme,
+        customColormap: {
+          baseColorScheme: draft.baseColorScheme,
+          elements: {
+            ...draft.elements,
+            [element]: color,
+          },
+        },
+      };
+    });
+  }, []);
   const previewSafeArea = previewSafeAreaForInspector();
   const sceneOffsetX = sceneOffsetXForInspector(isInspectorOpen, viewportSize.width);
   const effectivePreviewSafeArea = useMemo(
@@ -400,6 +420,7 @@ export function App() {
       <input
         ref={fileInputRef}
         type="file"
+        aria-label="Structure file"
         className="hidden"
         tabIndex={-1}
         onChange={(event) => void handleFileChange(event)}
@@ -500,13 +521,14 @@ export function App() {
         <ElementLegend
           entries={legendEntries}
           offsetX={sceneOffsetX}
+          onElementColorChange={handleLegendElementColorChange}
           safeArea={previewSafeArea}
         />
       ) : null}
 
       {inspectedAtomInfo ? (
         <AtomInspectorCard
-          colorScheme={style.colorScheme}
+          colorScheme={legendColorScheme}
           colorOverrides={elementColorOverrides}
           info={inspectedAtomInfo}
           isInspectorOpen={isInspectorOpen}
@@ -604,6 +626,7 @@ export function App() {
                   dragSensitivity={viewState.dragSensitivity}
                   interactionMode={viewState.interactionMode}
                   lightStrength={viewState.lightStrength}
+                  isCustomColorScheme={style.colorSchemeMode === "custom"}
                   isOpen={isInspectorOpen}
                   isSceneLoading={previewStatus === "loading"}
                   previewMeshQuality={previewMeshQuality}

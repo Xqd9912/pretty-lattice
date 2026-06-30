@@ -1,8 +1,11 @@
 import { deriveElementLegendEntries } from "./elementLegend";
-import { autoDistinctElementColorOverrides } from "./colorSchemes";
 import { createCameraPoseSnapshot } from "../scene/cameraPose";
 import type { ExportSettingsState } from "../model";
-import { validateExportSettings } from "../model";
+import {
+  baseColorSchemeForStyle,
+  elementColorOverridesForStyle,
+  validateExportSettings,
+} from "../model";
 import type {
   CreateFigureExportOptions,
   FigureExportFile,
@@ -108,14 +111,11 @@ export async function createFigureExportFiles({
   }
 
   if (settings.components.legend) {
-    const elementColorOverrides = autoDistinctElementColorOverrides(
-      scene.atoms,
-      style.colorScheme,
-      style.distinguishSimilarColors,
-    );
+    const colorScheme = baseColorSchemeForStyle(style);
+    const elementColorOverrides = elementColorOverridesForStyle(scene.atoms, style);
     files.push(
       await createLegendExportFile({
-        entries: deriveElementLegendEntries(scene, style.colorScheme, elementColorOverrides),
+        entries: deriveElementLegendEntries(scene, colorScheme, elementColorOverrides),
         fileName: `${stem}-legend.${settings.format}`,
         format: settings.format,
         background: settings.background,

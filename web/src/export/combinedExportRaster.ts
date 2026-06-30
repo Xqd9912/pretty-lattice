@@ -12,8 +12,11 @@ import type {
   StyleState,
   UnitCellLineStyle,
 } from "../model";
+import {
+  baseColorSchemeForStyle,
+  elementColorOverridesForStyle,
+} from "../model";
 import { deriveElementLegendEntries } from "../app/elementLegend";
-import { autoDistinctElementColorOverrides } from "../app/colorSchemes";
 import {
   canvasToPngBlob,
   canvasToRasterBlob,
@@ -96,14 +99,11 @@ export async function renderCombinedExportRaster({
   const accessoryPadding = Math.round(accessoryReferenceSize * EXPORT_ACCESSORY_PADDING_RATIO);
 
   if (settings.components.legend) {
-    const elementColorOverrides = autoDistinctElementColorOverrides(
-      scene.atoms,
-      style.colorScheme,
-      style.distinguishSimilarColors,
-    );
+    const colorScheme = baseColorSchemeForStyle(style);
+    const elementColorOverrides = elementColorOverridesForStyle(scene.atoms, style);
     const renderedLegend = renderLegendCanvas({
       background: "transparent",
-      entries: deriveElementLegendEntries(scene, style.colorScheme, elementColorOverrides),
+      entries: deriveElementLegendEntries(scene, colorScheme, elementColorOverrides),
       includeText: settings.format !== "pdf",
       layout: settings.legendLayout,
       style: legendExportStyle(settings, accessoryReferenceSize),
