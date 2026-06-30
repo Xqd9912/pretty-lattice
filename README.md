@@ -1,4 +1,4 @@
-<h1 align="center"><img src="web/public/favicon.svg" alt="Pretty Lattice logo" width="30" height="30"> Pretty Lattice</h1>
+<h1 align="center">Pretty Lattice</h1>
 
 <p align="center">
   Pretty Lattice is a crystal visualization tool for creating beautiful, publication-ready figures.
@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/songfeitong/pretty-lattice/actions/workflows/ci.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/songfeitong/pretty-lattice/ci.yml?branch=main&label=build&style=flat-square"></a>
+  <a href="https://pypi.org/project/pretty-lattice/"><img alt="PyPI" src="https://img.shields.io/pypi/v/pretty-lattice?style=flat-square"></a>
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
 </p>
