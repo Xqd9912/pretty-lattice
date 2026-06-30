@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,8 @@ export function ElementLegend({
   onElementColorChange?: (element: string, color: string) => void;
   safeArea: PreviewSafeArea;
 }) {
+  const [activeColorPickerElement, setActiveColorPickerElement] = useState<string | null>(null);
+
   return (
     <nav
       aria-label="Element legend"
@@ -31,9 +33,11 @@ export function ElementLegend({
         {entries.map((entry) => (
           <li key={entry.element} className="flex min-w-0 items-center gap-2">
             <ElementLegendColorControl
+              active={activeColorPickerElement === entry.element}
               color={entry.color}
               element={entry.element}
               onElementColorChange={onElementColorChange}
+              onPickerActiveChange={setActiveColorPickerElement}
             />
             <span className="font-sans text-[0.95rem] font-normal leading-none text-foreground">
               {entry.element}
@@ -46,13 +50,17 @@ export function ElementLegend({
 }
 
 function ElementLegendColorControl({
+  active,
   color,
   element,
   onElementColorChange,
+  onPickerActiveChange,
 }: {
+  active: boolean;
   color: string;
   element: string;
   onElementColorChange?: (element: string, color: string) => void;
+  onPickerActiveChange: (element: string | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const nativeColor = nativeColorValue(color);
@@ -66,6 +74,14 @@ function ElementLegendColorControl({
     if (!input) {
       return;
     }
+
+    if (active) {
+      input.blur();
+      onPickerActiveChange(null);
+      return;
+    }
+
+    onPickerActiveChange(element);
 
     try {
       if (typeof input.showPicker === "function") {
@@ -112,8 +128,10 @@ function ElementLegendColorControl({
         tabIndex={-1}
         value={nativeColor}
         className="pointer-events-none absolute size-px opacity-0"
+        onBlur={() => onPickerActiveChange(null)}
         onChange={(event) => {
           const nextColor = event.target.value.toLowerCase();
+          onPickerActiveChange(null);
           if (nextColor !== nativeColor) {
             onElementColorChange(element, nextColor);
           }

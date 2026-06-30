@@ -1100,9 +1100,19 @@ describe("App", () => {
     ).toBe("#d2d2d2");
     expect(fetchCalls).toHaveLength(1);
 
-    expect(screen.getByRole("button", { name: "Set Na color" }).isConnected).toBe(true);
+    const sodiumColorButton = screen.getByRole("button", { name: "Set Na color" });
+    expect(sodiumColorButton.isConnected).toBe(true);
     const sodiumColorInput = screen.getByLabelText("Na color value") as HTMLInputElement;
     expect(sodiumColorInput.value).toBe("#e7d15f");
+    const sodiumShowPicker = mock(() => {});
+    Object.defineProperty(sodiumColorInput, "showPicker", {
+      configurable: true,
+      value: sodiumShowPicker,
+    });
+    await user.click(sodiumColorButton);
+    expect(sodiumShowPicker).toHaveBeenCalledTimes(1);
+    await user.click(sodiumColorButton);
+    expect(sodiumShowPicker).toHaveBeenCalledTimes(1);
     fireEvent.change(sodiumColorInput, { target: { value: "#112233" } });
     expect(colorSchemeSelect.textContent).toContain("Custom");
 
