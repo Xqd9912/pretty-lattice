@@ -13,6 +13,7 @@ import type {
 } from "../model";
 import { DEFAULT_BOND_COLOR } from "../model";
 import { BOND_RADIUS } from "./sceneGeometry";
+import { STRUCTURE_RENDER_ORDER } from "./renderOrder";
 import { twoToneBondCylinderGeometry } from "./structureGeometry";
 import type { SceneMeshDetail } from "./StructureSceneObjects";
 import { StructureMaterial } from "./StructureMaterial";
@@ -101,6 +102,7 @@ export function BatchedBonds({
       key={batch.key}
       ref={meshRef}
       args={[batch.itemCount, batch.maxVertexCount, batch.maxIndexCount]}
+      renderOrder={STRUCTURE_RENDER_ORDER.structureMesh}
     >
       <StructureMaterial
         color={usesVertexColors ? undefined : unicolorBondColor}

@@ -9,6 +9,7 @@ import {
   CELL_FRAME_LINE_WIDTH_PIXELS,
   cellFrameLinePositions,
 } from "./sceneGeometry";
+import { STRUCTURE_RENDER_ORDER } from "./renderOrder";
 import type { VectorTuple } from "./viewMath";
 
 const CELL_FRAME_DASH_SIZE = 0.08;
@@ -37,16 +38,18 @@ export function CellFrame({
       alphaToCoverage: true,
       color,
       dashed: lineStyle === "dashed",
+      depthTest: true,
       depthWrite: false,
       dashSize: CELL_FRAME_DASH_SIZE,
       fog,
       gapSize: CELL_FRAME_GAP_SIZE,
       linewidth: lineWidth,
       opacity,
-      transparent: opacity < 1,
+      transparent: true,
       worldUnits: false,
     });
     const line = new LineSegments2(geometry, material);
+    line.renderOrder = STRUCTURE_RENDER_ORDER.unitCellFrame;
     if (lineStyle === "dashed") {
       material.defines.USE_DASH = "";
       material.needsUpdate = true;

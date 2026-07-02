@@ -1,0 +1,292 @@
+# Render Depth and Transparency Sorting Review
+
+调研日期：2026-07-02
+
+## 结论先行
+
+当前默认视觉路径大体是合理的：atoms 和 bonds 在 100% opacity 时作为实体对象写入 depth buffer；polyhedra 作为半透明语义壳层，先写入自己的深度来抑制后方面和后方白边叠色；unit-cell frame 作为 depth-tested overlay 在结构实体之后绘制；selection ring 最后绘制但仍参与 depth test。
+
+这套方案最重要的优点是它符合 Pretty Lattice 的用户语义，而不是追求物理正确的玻璃透明：polyhedra 是“配位壳层提示”，unit cell 是“空间参考线”，atoms/bonds 是主要结构实体。
+
+没有发现默认状态下的硬性排序错误。主要风险在 opacity 被拉低后的边界情况：
+
+1. `InstancedMesh` 不会自动按单个 atom 做透明排序，所以 atom opacity 低于 100% 时，多个透明原子之间的 alpha blending 只能算近似。
+2. polyhedra surface 当前 `transparent=true` 且 `depthWrite=true`。这能很好地阻止后方面和后方 edge 叠出来，但当 atoms/bonds 自己也变成 transparent queue 时，polyhedra 写入的 depth 可能会挡住后画的透明 atoms/bonds。
+3. material preset 目前可以透传 `depthTest` 等 Three.js props。虽然现有 preset 没有破坏排序，但未来如果某个 preset 设置 `depthTest: false`，会直接破坏 structure depth semantics。
+
+## 用户视角下的正确视觉语义
+
+我建议把当前渲染对象分成五类，而不是只用“透明/不透明”二分：
+
+| 对象 | 用户语义 | 正确视觉效果 |
+|---|---|---|
+| Atoms | 主结构实体 | 默认是 solid spheres，和 bonds/unit cell/polyhedra 按真实深度遮挡。低 opacity 时是“弱化显示”，不是精确玻璃模拟。 |
+| Bonds | 主结构实体 | 默认是 solid cylinders，应该被前方 atoms 遮挡，也能遮挡后方 unit-cell lines。低 opacity 时同 atoms，是近似 ghosting。 |
+| Unit cell | 空间参考线 | 不应该永远盖在最上面；它应该按真实 3D 深度被前方 atom/bond 遮挡，也应该在几何上位于前方时显示在 atom/bond 前面。 |
+| Polyhedra surface | 配位壳层提示 | 应该是半透明壳层，能让 atoms/bonds 透出来；但不应该让同一壳层背面的面、相邻重合面、后方 polyhedra edges 反复叠色。 |
+| Highlight/ring | 交互反馈 | 高亮 tint 属于 atom 本身；selection ring 是 scene-attached overlay，应该足够靠前，但仍可被更前方实体遮挡，避免变成纯屏幕 HUD。 |
+
+这个语义和物理透明不同。物理玻璃通常希望多层透明表面都叠加；我们对 polyhedra 的目标正好相反：它是一个“可看穿的壳层标注”，不是多层玻璃。
+
+## Three.js 排序规则依据
+
+本项目当前安装的是 `three@0.171.0`。我核对了 Three.js 官方文档、Context7 提供的 Three.js 文档摘要，以及本项目 `web/node_modules/three` 中的实际源码。
+
+关键规则如下：
+
+1. `Material.opacity` 只有在 `Material.transparent=true` 时才真正控制透明混合；`transparent=false` 时 material 仍按不透明对象处理。参考 Three.js Material docs。
+2. `depthTest=true` 表示绘制时会拿当前 fragment 深度和 depth buffer 比较；被前方物体挡住的 fragment 不会写颜色。
+3. `depthWrite=true` 表示绘制成功后会把自己的深度写进 depth buffer；`depthWrite=false` 常用于 overlay 或透明对象，避免它们挡住后续对象。
+4. WebGLRenderer 把 object/material 分到三个 render list：opaque、transmissive、transparent。本项目主要涉及 opaque 和 transparent。源码依据是 `WebGLRenderLists.js` 中 `material.transparent === true` 的分流。
+5. WebGLRenderer 总是先画 opaque，再画 transmissive，再画 transparent。`renderOrder` 只能影响各自 list 内部排序，不能让 transparent 对象跑到 opaque 之前。
+6. 默认 opaque sort 是 low-to-high `renderOrder`，再考虑 material id、z、object id；默认 transparent sort 也是 low-to-high `renderOrder`，然后 back-to-front z。源码依据是 `painterSortStable` 和 `reversePainterSortStable`。
+7. `Object3D.renderOrder` 对 `Group` 有特殊含义：Group 的 `renderOrder` 会成为后代的 group order。我们当前主要给 leaf objects 设置 `renderOrder`。
+8. `BatchedMesh` 有自己的 `sortObjects` 和 `perObjectFrustumCulled`，默认都是 `true`。它会在 `onBeforeRender` 中按 material 是否 transparent 对 batch 内 draw ranges 排序。
+9. `InstancedMesh` 不会自动重排单个 instance。Three.js examples 提供 `SceneUtils.sortInstancedMesh(...)`，但那会重排 `instanceMatrix` / `instanceColor` 等 attributes，必须同步维护 atom id 到 instance id 的映射。
+10. `transparent + DoubleSide` 的 material 默认 `forceSinglePass=false`，Three.js 会 back side 和 front side 各画一遍。这一点会影响 polyhedra surface。
+
+相关来源：
+
+- Three.js Material docs: <https://threejs.org/docs/#api/en/materials/Material>
+- Three.js Object3D renderOrder docs: <https://threejs.org/docs/#api/en/core/Object3D.renderOrder>
+- Three.js WebGLRenderer sortObjects docs: <https://threejs.org/docs/#api/en/renderers/WebGLRenderer.sortObjects>
+- Three.js BatchedMesh docs: <https://threejs.org/docs/#api/en/objects/BatchedMesh>
+- Three.js SceneUtils sortInstancedMesh docs: <https://threejs.org/docs/#examples/en/utils/SceneUtils.sortInstancedMesh>
+- Local source checked: `web/node_modules/three/src/renderers/webgl/WebGLRenderLists.js`
+- Local source checked: `web/node_modules/three/src/renderers/WebGLRenderer.js`
+- Local source checked: `web/node_modules/three/src/objects/BatchedMesh.js`
+- Local source checked: `web/node_modules/three/examples/jsm/utils/SceneUtils.js`
+
+## 当前实现
+
+当前集中排序常量在 `web/src/scene/renderOrder.ts`：
+
+```ts
+export const STRUCTURE_RENDER_ORDER = {
+  polyhedronSurface: 10,
+  polyhedronEdge: 11,
+  structureMesh: 20,
+  unitCellFrame: 30,
+  atomSelectionRing: 40,
+} as const;
+```
+
+这个顺序本身是合理的。需要注意的是，Three.js 的 opaque 和 transparent list 分开，所以这组数字不是全局绝对绘制顺序。它的真实含义是：
+
+1. 在 transparent list 内，polyhedra surface/edge 早于 transparent atoms/bonds，unit cell 晚于 structure mesh，selection ring 最晚。
+2. 在 opaque list 内，atoms/bonds 只有自己；默认 100% opacity 时它们会先于所有 transparent 对象绘制。
+
+### Atoms
+
+当前路径：`web/src/scene/InstancedAtoms.tsx`
+
+材质策略：
+
+- `opacity < 1` 时：`transparent=true`，`depthWrite=false`。
+- `opacity === 1` 时：`transparent=false`，`depthWrite=true`。
+- `renderOrder=STRUCTURE_RENDER_ORDER.structureMesh`。
+
+默认状态下这是正确的。atoms 是实体对象，会写 depth，和 bonds、unit cell、polyhedra 的遮挡关系由 depth buffer 决定。
+
+风险在低 opacity：所有 atoms 合在一个 `InstancedMesh`，WebGLRenderer 只能把整个 mesh 当成一个 render item 排序。它不会按每个 atom 的 depth 单独排序，所以透明原子之间的 blend 顺序可能不准确。这个问题在默认 100% opacity 时不存在。
+
+不要轻易直接调用 `SceneUtils.sortInstancedMesh(...)`。它会重排 instance attributes，当前交互逻辑依赖 `event.instanceId` 对应 `atomInstances[index]`。如果以后要支持透明 atom 的严格排序，必须同时引入稳定的 `instanceId -> atomId` 映射层，并处理高亮颜色、raycast、selection ring 的索引重写。
+
+### Bonds
+
+当前路径：`web/src/scene/BatchedBonds.tsx`
+
+材质策略和 atoms 一样：
+
+- `opacity < 1` 时：`transparent=true`，`depthWrite=false`。
+- `opacity === 1` 时：`transparent=false`，`depthWrite=true`。
+- `renderOrder=STRUCTURE_RENDER_ORDER.structureMesh`。
+
+默认状态下这是正确的。bond cylinders 和 atom spheres 同为实体结构对象，使用相同 render order，让 depth buffer 处理真实遮挡。
+
+`BatchedMesh` 对 bonds 比 `InstancedMesh` 更有利：Three.js `BatchedMesh.sortObjects=true` 默认会按 batch 内 draw ranges 排序，transparent bonds 至少有内部排序机制。当前代码没有显式设置 `mesh.sortObjects=true`，但构造默认就是 true。为了可读性和未来升级稳健性，可以考虑像 polyhedra 一样显式设置。
+
+### Unit Cell Frame
+
+当前路径：`web/src/scene/CellFrame.tsx`
+
+当前策略：
+
+- `transparent=true`，即使 opacity 是 100%。
+- `depthTest=true`。
+- `depthWrite=false`。
+- `renderOrder=STRUCTURE_RENDER_ORDER.unitCellFrame`。
+
+这正好对应 unit cell 的语义：它是参考线 overlay，但不是屏幕 HUD。它在 atom/bond 后画，因此前方的 unit-cell edge 能显示出来；同时它保留 `depthTest=true`，因此几何上在后方的 cell edge 会被前方 atom/bond 挡住。
+
+`transparent=true` at 100% 是有意的。它避免 100% opacity 时 cell frame 回到 opaque queue，从而再次依赖 Three.js 默认对象顺序。视觉上 100% 仍是实线；渲染管线里则按 transparent overlay 处理。
+
+这块当前逻辑是合理的。唯一要小心的是，未来如果有另一个 transparent overlay 的 `renderOrder` 大于 30，它会盖过 unit cell；应该继续通过 `STRUCTURE_RENDER_ORDER` 集中管理。
+
+### Polyhedra Surface
+
+当前路径：`web/src/scene/BatchedPolyhedra.tsx`
+
+当前策略：
+
+- `transparent=true`。
+- `depthWrite=true`。
+- `side=DoubleSide`。
+- `polygonOffset=true`，`polygonOffsetFactor=3`。
+- `renderOrder=STRUCTURE_RENDER_ORDER.polyhedronSurface`。
+- `BatchedMesh.sortObjects=true`，`BatchedMesh.perObjectFrustumCulled=true`。
+
+这是一套“语义透明壳层”方案，不是普通透明玻璃方案。
+
+它解决了你的核心诉求：polyhedra 可以半透明，但不希望透出后方 polyhedron surface 或后方白边。`depthWrite=true` 会让先绘制出的壳层把自己的深度写入 depth buffer，后方 polyhedron faces 和后方 edges 会被挡住。surface 去重逻辑又进一步删除共面的重复 faces，避免同一平面多次叠色。
+
+因为 atoms/bonds 默认是 opaque，它们先画进颜色和 depth，然后 polyhedra surface 在 transparent pass 里按 depth test 覆盖到它们之上。这样当 surface 位于 atom/bond 前方时，atom/bond 会通过半透明 surface 被看到；当 atom/bond 位于 surface 前方时，surface fragment 会被 depth test 挡掉。
+
+潜在问题：如果用户把 atoms/bonds opacity 也拉低，它们会进入 transparent pass，并在 renderOrder 20 处晚于 polyhedra surface 绘制。这时 polyhedra surface 已经 `depthWrite=true`，后方 transparent atom/bond fragment 可能被挡掉。也就是说，“polyhedra 透出 atoms/bonds”在默认 atoms/bonds 100% 时成立；在 atoms/bonds 也透明时只是近似，不是严格成立。
+
+### Polyhedra Edges
+
+当前路径：`web/src/scene/BatchedPolyhedra.tsx`
+
+当前策略：
+
+- `transparent=true`。
+- `depthWrite=false`。
+- `renderOrder=STRUCTURE_RENDER_ORDER.polyhedronEdge`。
+- edge opacity = `min(1, surfaceOpacity * POLYHEDRON_EDGE_OPACITY_RATIO)`。
+
+edge 晚于 surface 绘制，但 surface 已经写入 depth。因为默认 depth func 是 `LessEqualDepth`，同一前表面的边线通常还能通过；后表面或后方 polyhedron 的边线会被 surface depth 挡住。这正是“不透出后面的白边”的目标。
+
+这块当前设计是合理的。`polygonOffsetFactor=3` 也有助于让 surface depth 稍微后移，减少前表面 edge 和 surface 的 z-fighting。
+
+### Atom Highlight and Selection Ring
+
+当前路径：
+
+- `web/src/scene/InstancedAtoms.tsx`
+- `web/src/scene/AtomSelectionRing.tsx`
+
+高亮 tint 不是单独对象，而是直接改 `InstancedMesh.instanceColor` 中对应 atom 的颜色。这很好：它随 atom 本身参加同一套 depth/lighting/opacity 规则，不会产生额外排序层。
+
+selection ring 是一个 `SpriteMaterial`：
+
+- `transparent=true`。
+- `depthWrite=false`。
+- 没有显式 `depthTest`，所以继承 material 默认 `depthTest=true`。
+- `renderOrder=STRUCTURE_RENDER_ORDER.atomSelectionRing`。
+
+这意味着 selection ring 最后画，但仍然能被更前方的 scene geometry 遮挡。这个语义更像“贴在结构里的选中 halo”，不是永远置顶的 UI HUD。我认为当前选择是合理的。如果以后希望选中 atom 即使在背后也明显提示，可以考虑 `depthTest=false`，但那会变成屏幕级标记，可能干扰晶体深度感。
+
+## Opacity 100% 跳变策略
+
+当前有两套策略：
+
+1. atoms/bonds：`opacity === 100%` 时切回 opaque queue，并打开 `depthWrite`。
+2. unit cell/polyhedra/ring：即使 opacity 是 100%，也保持 transparent queue。
+
+这不是天然错误，因为它们的语义不同：
+
+- atoms/bonds 是实体结构，100% 时应该是 solid geometry。
+- unit cell 是 overlay line，需要稳定地在结构实体之后画。
+- polyhedra 是语义透明壳层，即使 100% 也仍然属于“壳层/标注”对象，不应该突然变成实体结构。
+- ring 是交互 overlay，必然属于 transparent path。
+
+但这套策略现在分散在不同组件里，缺少一个显式的 policy 名字。后续建议增加一个小的 render-policy helper 或至少注释，把这些规则写成项目语义，而不是让读代码的人误以为只是 Three.js flag 拼凑。
+
+## BatchedMesh and InstancedMesh 审计
+
+### Instanced atoms
+
+适合当前默认路径。优点是 draw call 少，raycast 能返回 `instanceId`，高亮可以通过 `instanceColor` 完成。
+
+主要限制：
+
+- 不自动 per-instance transparent sort。
+- 如果未来要 sort instances，会影响 `instanceId`、高亮索引、selection mapping。
+- 透明 atom 的严格排序不应作为当前默认渲染质量目标，除非产品上明确要做“玻璃/ghost mode”。
+
+### Batched bonds
+
+适合当前路径。`BatchedMesh` 自带 per-object sorting 和 culling，这比把所有 bonds merge 成一个普通 geometry 更适合透明 bonds。
+
+主要建议：
+
+- 显式设置 `mesh.sortObjects = true` 和 `mesh.perObjectFrustumCulled = true`，不是因为默认错，而是因为 bonds 和 polyhedra 都依赖这个语义，显式更稳。
+- 如果以后 bond selection/hover 变复杂，BatchedMesh 的 per-instance identity 需要额外设计。
+
+### Batched polyhedra
+
+当前选择是合理的，因为 polyhedra 需要：
+
+- 批量减少 draw calls。
+- 保留每个 polyhedron 的 surface item，以便 BatchedMesh 内部排序。
+- 分离 surface items 和 edge items，避免 surface 去重误删 outline。
+
+当前实现已经显式设置 `sortObjects` 和 `perObjectFrustumCulled`，这是对的。
+
+## 主要风险和建议
+
+### 风险 1：polyhedra depthWrite 与 transparent atoms/bonds 的组合
+
+级别：中
+
+默认状态没有问题。但当 atoms/bonds opacity 低于 100% 时，它们会变成 transparent 且后于 polyhedra surface 绘制。polyhedra surface 的 `depthWrite=true` 可能挡住本应透出的后方 transparent atoms/bonds。
+
+建议先不急着改，除非用户开始常用“透明 atoms/bonds + polyhedra”组合。要修时可以比较三种方案：
+
+1. 把 atoms/bonds 的透明策略改成 `depthWrite=true` 的 ghost object，牺牲部分透明叠加，换取更稳定的结构遮挡。
+2. 给 atoms/bonds 增加 depth/color prepass，让它们在 polyhedra 前先提供可见底色，再进入透明调和。
+3. 把 polyhedra 分成 depth shell 和 color shell 两层，更明确地实现“壳层遮罩 + 可看穿主结构”的语义。
+
+### 风险 2：transparent InstancedMesh 不做 per-instance sorting
+
+级别：中
+
+如果 atom opacity 低于 100%，多个 atom 之间的透明混合可能出现局部前后不准。Three.js 有 `SceneUtils.sortInstancedMesh(...)`，但直接使用会破坏当前 instance index 语义。
+
+建议把这个记录为已知限制。只有当产品明确需要高质量 transparent atom rendering 时，再设计新的 instance mapping 层。
+
+### 风险 3：material preset 可透传 depthTest
+
+级别：中
+
+`StructureMaterial` 现在会先 spread preset props，再 spread common props。common props 覆盖了 `color`、`opacity`、`transparent`、`depthWrite`、`side`、`vertexColors`，但没有覆盖 `depthTest`。模板里也允许 `depthTest`。
+
+这意味着未来某个 material preset 如果设置 `depthTest:false`，atoms/bonds/polyhedra 的 3D 遮挡会直接坏掉。
+
+建议：
+
+- 从 material preset schema 中禁止 `depthTest`、`depthWrite`、`transparent`、`opacity`、`side`、`color`、`vertexColors` 这类 scene policy props；或
+- 在 `StructureMaterial` 中显式接管 `depthTest`，让 object-level render policy 决定。
+
+### 风险 4：render policy 分散
+
+级别：低到中
+
+`opacity < 1` 的跳变规则写在 atoms/bonds 各自组件里；unit cell/polyhedra/ring 又各自手写 transparent/depth policy。现在还能读懂，但后续新增 object 类型时容易复发排序 bug。
+
+建议增加类似：
+
+```ts
+type StructureRenderRole =
+  | "structure-solid"
+  | "unit-cell-overlay"
+  | "polyhedron-shell"
+  | "selection-overlay";
+```
+
+然后通过一个小 helper 返回 `transparent`、`depthTest`、`depthWrite`、`renderOrder`。不一定立刻改，但这是后续清理的好方向。
+
+## 当前是否需要继续改代码
+
+如果目标是修复 issue 里 unit-cell line 被 atom/bond 错挡的问题，当前改法足够：unit cell 已经成为 `depthTest=true`、`depthWrite=false`、`transparent=true` 的 late overlay。
+
+如果目标是把所有 opacity 组合都做到严格透明正确，当前实现还不是最终答案。但我不建议现在立刻追求物理透明，因为这会和 polyhedra 的“不要后方面/白边叠出来”的产品语义冲突。更适合的方向是先把 render policy 命名并文档化，然后在真实视觉案例暴露问题时，针对“transparent atoms/bonds + polyhedra”单独设计。
+
+## 建议的下一步
+
+1. 保留当前视觉方案，不做大改。
+2. 在代码中给 `STRUCTURE_RENDER_ORDER` 和 polyhedra `depthWrite=true` 加短注释，说明它们是项目语义而不是任意数字。
+3. 在 `StructureMaterial` 或 material preset validation 中封住 `depthTest` 这类会破坏 scene policy 的 props。
+4. 给 `BatchedBonds` 显式设置 `sortObjects=true`，和 `BatchedPolyhedra` 保持一致。
+5. 如果以后要认真支持透明 atoms/bonds，再开一个单独设计：不要只加 `sortInstancedMesh`，需要同时设计 instance id mapping、高亮、raycast 和 camera-change resort。

@@ -18,6 +18,7 @@ import {
   EXPORT_SCENE_MESH_DETAIL_PRESETS,
   PREVIEW_SCENE_MESH_DETAIL,
   SCENE_FOG_COLOR,
+  STRUCTURE_RENDER_ORDER,
   cellFrameLinePositions,
   computeSceneLayout,
   createSceneFog,
@@ -213,6 +214,21 @@ describe("computeSceneLayout", () => {
     expect(positions).toHaveLength(72);
     expect(positions.slice(0, 6)).toEqual([0, 0, 0, 4, 0, 0]);
     expect(positions.slice(-6)).toEqual([1, 3, 2, 5, 3, 2]);
+  });
+
+  test("draws the unit-cell frame as a depth-tested overlay after atoms and bonds", () => {
+    expect(STRUCTURE_RENDER_ORDER.polyhedronSurface).toBeLessThan(
+      STRUCTURE_RENDER_ORDER.structureMesh,
+    );
+    expect(STRUCTURE_RENDER_ORDER.polyhedronEdge).toBeLessThan(
+      STRUCTURE_RENDER_ORDER.structureMesh,
+    );
+    expect(STRUCTURE_RENDER_ORDER.structureMesh).toBeLessThan(
+      STRUCTURE_RENDER_ORDER.unitCellFrame,
+    );
+    expect(STRUCTURE_RENDER_ORDER.unitCellFrame).toBeLessThan(
+      STRUCTURE_RENDER_ORDER.atomSelectionRing,
+    );
   });
 
   test("fits the preview layout from unit-cell bounds only", () => {

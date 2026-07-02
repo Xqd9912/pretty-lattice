@@ -49,6 +49,7 @@ export {
   createSceneFog,
   type SceneMeshDetail,
 } from "./StructureSceneObjects";
+export { STRUCTURE_RENDER_ORDER } from "./renderOrder";
 export {
   computeSceneLayout,
   computeSceneStructureLayout,

@@ -15,6 +15,7 @@ import { atomColorForScheme, type ElementColorOverrides } from "../model/colorSc
 import type { StyleState } from "../model";
 import { atomRadiusForModel } from "./sceneGeometry";
 import type { ResolvedStructureMaterialFamily } from "./materialPresetResolver";
+import { STRUCTURE_RENDER_ORDER } from "./renderOrder";
 import { StructureMaterial } from "./StructureMaterial";
 import type { SceneMeshDetail } from "./StructureSceneObjects";
 import { AtomSelectionRing } from "./AtomSelectionRing";
@@ -218,6 +219,7 @@ export function InstancedAtoms({
         args={[undefined, undefined, atomInstances.length]}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
+        renderOrder={STRUCTURE_RENDER_ORDER.structureMesh}
       >
         <sphereGeometry
           args={[

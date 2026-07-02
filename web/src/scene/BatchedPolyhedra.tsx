@@ -23,6 +23,7 @@ import {
 import type { StyleState } from "../model";
 import { StructureMaterial } from "./StructureMaterial";
 import type { ResolvedStructureMaterialFamily } from "./materialPresetResolver";
+import { STRUCTURE_RENDER_ORDER } from "./renderOrder";
 import { polyhedronGeometryFromAtoms } from "./structureGeometry";
 
 export const POLYHEDRON_SURFACE_OPACITY = 0.5;
@@ -31,8 +32,6 @@ export const POLYHEDRON_EDGE_LINE_WIDTH_PIXELS = 1;
 export const POLYHEDRON_EDGE_OPACITY = 0.6;
 const POLYHEDRON_EDGE_OPACITY_RATIO =
   POLYHEDRON_EDGE_OPACITY / POLYHEDRON_SURFACE_OPACITY;
-const POLYHEDRON_SURFACE_RENDER_ORDER = 10;
-const POLYHEDRON_EDGE_RENDER_ORDER = 11;
 
 export interface PolyhedronSurfaceBatchBuild {
   edgeItems: PolyhedronEdgeRenderItem[];
@@ -127,7 +126,7 @@ export function BatchedPolyhedra({
           key={batch.key}
           ref={meshRef}
           args={[batch.itemCount, batch.maxVertexCount, batch.maxIndexCount]}
-          renderOrder={POLYHEDRON_SURFACE_RENDER_ORDER}
+          renderOrder={STRUCTURE_RENDER_ORDER.polyhedronSurface}
         >
           <StructureMaterial
             color="#ffffff"
@@ -402,7 +401,7 @@ function PolyhedronEdges({
     });
 
     const line = new LineSegments2(lineGeometry, material);
-    line.renderOrder = POLYHEDRON_EDGE_RENDER_ORDER;
+    line.renderOrder = STRUCTURE_RENDER_ORDER.polyhedronEdge;
     return line;
   }, [geometry, lineWidthScale, opacity]);
 

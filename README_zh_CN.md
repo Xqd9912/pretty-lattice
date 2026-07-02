@@ -34,6 +34,9 @@
 
 Pretty Lattice 就是我为弥补二者之间的空白空缺所做的尝试。它基于 Three.js 构建，在相对轻量的同时保证高质量的画面。它提供了一个现代直观的用户界面，以及研究者熟悉的操作方式，开箱即用，直出干净又美观的晶体图。
 
+> [!NOTE]
+> 从设计的初衷开始，Pretty Lattice 就专注于**可视化**。它并不打算取代 VESTA、Materials Studio 这类成熟的材料分析工具，也不打算提供复杂的结构编辑或分析流程。打开的结构文件会被当作只读文件来处理。更推荐的工作方式是先用更专业的工具准备和分析结构，再把最终结构导入 Pretty Lattice 里查看、调整样式并导出图片。
+
 ## 安装
 
 ```shell
@@ -88,6 +91,14 @@ prl gui -p 0          # 自动选择可用端口
 <p align="center">
   <img src="assets/Ba2Ca2Cu3HgO8-color-schemes.png" alt="Ba2Ca2Cu3HgO8 color scheme examples" width="90%">
 </p>
+
+## 参与
+
+本项目还在早期开发阶段，主要功能也还没有完全成型。
+
+目前开发会先由维护者主导，暂时不接受 Pull Request。这样可以在核心体验还在打磨的时候，让项目方向保持清晰和集中。
+
+欢迎 fork 这个项目，也欢迎通过 issue 提交 bug、建议或反馈。
 
 ## 许可证
 
