@@ -219,7 +219,7 @@ export function InstancedAtoms({
         args={[undefined, undefined, atomInstances.length]}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
-        renderOrder={STRUCTURE_RENDER_ORDER.structureMesh}
+        renderOrder={STRUCTURE_RENDER_ORDER.atomMesh}
       >
         <sphereGeometry
           args={[
@@ -230,7 +230,9 @@ export function InstancedAtoms({
         />
         <StructureMaterial
           color="#ffffff"
-          depthWrite={!isTransparent}
+          // Transparent instanced atoms cannot be sorted per atom by Three.js.
+          // Keep depth writes so farther instances cannot repaint nearer ones.
+          depthWrite={true}
           materialFamily={materialFamily}
           opacity={opacity}
           transparent={isTransparent}

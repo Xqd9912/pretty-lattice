@@ -216,17 +216,20 @@ describe("computeSceneLayout", () => {
     expect(positions.slice(-6)).toEqual([1, 3, 2, 5, 3, 2]);
   });
 
-  test("draws the unit-cell frame as a depth-tested overlay after atoms and bonds", () => {
-    expect(STRUCTURE_RENDER_ORDER.polyhedronSurface).toBeLessThan(
-      STRUCTURE_RENDER_ORDER.structureMesh,
+  test("draws transparent structure objects before polyhedron shells and overlays", () => {
+    expect(STRUCTURE_RENDER_ORDER.atomMesh).toBeLessThan(
+      STRUCTURE_RENDER_ORDER.bondMesh,
     );
-    expect(STRUCTURE_RENDER_ORDER.polyhedronEdge).toBeLessThan(
-      STRUCTURE_RENDER_ORDER.structureMesh,
-    );
-    expect(STRUCTURE_RENDER_ORDER.structureMesh).toBeLessThan(
+    expect(STRUCTURE_RENDER_ORDER.bondMesh).toBeLessThan(
       STRUCTURE_RENDER_ORDER.unitCellFrame,
     );
     expect(STRUCTURE_RENDER_ORDER.unitCellFrame).toBeLessThan(
+      STRUCTURE_RENDER_ORDER.polyhedronSurface,
+    );
+    expect(STRUCTURE_RENDER_ORDER.polyhedronSurface).toBeLessThan(
+      STRUCTURE_RENDER_ORDER.polyhedronEdge,
+    );
+    expect(STRUCTURE_RENDER_ORDER.polyhedronEdge).toBeLessThan(
       STRUCTURE_RENDER_ORDER.atomSelectionRing,
     );
   });

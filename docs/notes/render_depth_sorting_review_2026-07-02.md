@@ -4,14 +4,14 @@
 
 ## 结论先行
 
-当前默认视觉路径大体是合理的：atoms 和 bonds 在 100% opacity 时作为实体对象写入 depth buffer；polyhedra 作为半透明语义壳层，先写入自己的深度来抑制后方面和后方白边叠色；unit-cell frame 作为 depth-tested overlay 在结构实体之后绘制；selection ring 最后绘制但仍参与 depth test。
+当前默认视觉路径大体是合理的：atoms 和 bonds 在 100% opacity 时作为实体对象写入 depth buffer；低 opacity atoms 仍写入 depth buffer，用稳定的结构遮挡优先于物理玻璃式混色；unit-cell frame 作为 depth-tested 参考线在主结构之后、polyhedra 之前绘制；polyhedra 作为半透明语义壳层，在主结构和 unit cell 之后绘制并写入自己的深度来抑制后方面和后方白边叠色；selection ring 最后绘制但仍参与 depth test。
 
 这套方案最重要的优点是它符合 Pretty Lattice 的用户语义，而不是追求物理正确的玻璃透明：polyhedra 是“配位壳层提示”，unit cell 是“空间参考线”，atoms/bonds 是主要结构实体。
 
 没有发现默认状态下的硬性排序错误。主要风险在 opacity 被拉低后的边界情况：
 
-1. `InstancedMesh` 不会自动按单个 atom 做透明排序，所以 atom opacity 低于 100% 时，多个透明原子之间的 alpha blending 只能算近似。
-2. polyhedra surface 当前 `transparent=true` 且 `depthWrite=true`。这能很好地阻止后方面和后方 edge 叠出来，但当 atoms/bonds 自己也变成 transparent queue 时，polyhedra 写入的 depth 可能会挡住后画的透明 atoms/bonds。
+1. `InstancedMesh` 不会自动按单个 atom 做透明排序，所以 atom opacity 低于 100% 时，多个透明原子之间的 alpha blending 只能算近似。当前用 `depthWrite=true` 避免后方 atom 反向盖住前方 atom。
+2. polyhedra surface 当前 `transparent=true` 且 `depthWrite=true`。这能很好地阻止后方面和后方 edge 叠出来；它必须晚于 atoms/bonds/unit cell 绘制，否则会挡住 polyhedra 内部的 transparent atoms 和后方 unit-cell lines。
 3. material preset 目前可以透传 `depthTest` 等 Three.js props。虽然现有 preset 没有破坏排序，但未来如果某个 preset 设置 `depthTest: false`，会直接破坏 structure depth semantics。
 
 ## 用户视角下的正确视觉语义
@@ -63,17 +63,18 @@
 
 ```ts
 export const STRUCTURE_RENDER_ORDER = {
-  polyhedronSurface: 10,
-  polyhedronEdge: 11,
-  structureMesh: 20,
-  unitCellFrame: 30,
+  atomMesh: 10,
+  bondMesh: 11,
+  unitCellFrame: 12,
+  polyhedronSurface: 20,
+  polyhedronEdge: 21,
   atomSelectionRing: 40,
 } as const;
 ```
 
 这个顺序本身是合理的。需要注意的是，Three.js 的 opaque 和 transparent list 分开，所以这组数字不是全局绝对绘制顺序。它的真实含义是：
 
-1. 在 transparent list 内，polyhedra surface/edge 早于 transparent atoms/bonds，unit cell 晚于 structure mesh，selection ring 最晚。
+1. 在 transparent list 内，transparent atoms 早于 transparent bonds，unit cell 早于 polyhedra surface/edge，selection ring 最晚。
 2. 在 opaque list 内，atoms/bonds 只有自己；默认 100% opacity 时它们会先于所有 transparent 对象绘制。
 
 ### Atoms
@@ -82,13 +83,15 @@ export const STRUCTURE_RENDER_ORDER = {
 
 材质策略：
 
-- `opacity < 1` 时：`transparent=true`，`depthWrite=false`。
+- `opacity < 1` 时：`transparent=true`，`depthWrite=true`。
 - `opacity === 1` 时：`transparent=false`，`depthWrite=true`。
-- `renderOrder=STRUCTURE_RENDER_ORDER.structureMesh`。
+- `renderOrder=STRUCTURE_RENDER_ORDER.atomMesh`。
 
 默认状态下这是正确的。atoms 是实体对象，会写 depth，和 bonds、unit cell、polyhedra 的遮挡关系由 depth buffer 决定。
 
-风险在低 opacity：所有 atoms 合在一个 `InstancedMesh`，WebGLRenderer 只能把整个 mesh 当成一个 render item 排序。它不会按每个 atom 的 depth 单独排序，所以透明原子之间的 blend 顺序可能不准确。这个问题在默认 100% opacity 时不存在。
+风险在低 opacity：所有 atoms 合在一个 `InstancedMesh`，WebGLRenderer 只能把整个 mesh 当成一个 render item 排序。它不会按每个 atom 的 depth 单独排序，所以透明原子之间的 blend 顺序可能不准确。当前保留 `depthWrite=true`，让前方 atom 写入 depth buffer，避免后方 instance 因为绘制顺序较晚而反向盖住前方 atom。代价是 transparent atoms 更像 ghosted solid objects，而不是物理正确的玻璃球。
+
+Atoms 的 render order 早于 bonds。这样当 atoms 和 bonds 都进入 transparent list 时，atoms 会先写入 depth buffer；随后 bonds 仍然做 depth test，插入原子球内部的 bond 片段会被 atom depth 挡掉，避免相机拖动时因为 atom/bond 自动排序变化而随机显隐。
 
 不要轻易直接调用 `SceneUtils.sortInstancedMesh(...)`。它会重排 instance attributes，当前交互逻辑依赖 `event.instanceId` 对应 `atomInstances[index]`。如果以后要支持透明 atom 的严格排序，必须同时引入稳定的 `instanceId -> atomId` 映射层，并处理高亮颜色、raycast、selection ring 的索引重写。
 
@@ -100,9 +103,9 @@ export const STRUCTURE_RENDER_ORDER = {
 
 - `opacity < 1` 时：`transparent=true`，`depthWrite=false`。
 - `opacity === 1` 时：`transparent=false`，`depthWrite=true`。
-- `renderOrder=STRUCTURE_RENDER_ORDER.structureMesh`。
+- `renderOrder=STRUCTURE_RENDER_ORDER.bondMesh`。
 
-默认状态下这是正确的。bond cylinders 和 atom spheres 同为实体结构对象，使用相同 render order，让 depth buffer 处理真实遮挡。
+默认 100% opacity 下这是正确的。bond cylinders 和 atom spheres 同为实体结构对象，depth buffer 会处理真实遮挡；低 opacity 下 bonds 晚于 atoms 绘制，以便 transparent atoms 先写 depth，稳定遮挡插入原子球内部的 bond 片段。
 
 `BatchedMesh` 对 bonds 比 `InstancedMesh` 更有利：Three.js `BatchedMesh.sortObjects=true` 默认会按 batch 内 draw ranges 排序，transparent bonds 至少有内部排序机制。当前代码没有显式设置 `mesh.sortObjects=true`，但构造默认就是 true。为了可读性和未来升级稳健性，可以考虑像 polyhedra 一样显式设置。
 
@@ -117,11 +120,11 @@ export const STRUCTURE_RENDER_ORDER = {
 - `depthWrite=false`。
 - `renderOrder=STRUCTURE_RENDER_ORDER.unitCellFrame`。
 
-这正好对应 unit cell 的语义：它是参考线 overlay，但不是屏幕 HUD。它在 atom/bond 后画，因此前方的 unit-cell edge 能显示出来；同时它保留 `depthTest=true`，因此几何上在后方的 cell edge 会被前方 atom/bond 挡住。
+这正好对应 unit cell 的语义：它是参考线 overlay，但不是屏幕 HUD。它在 atom/bond 后画，因此前方的 unit-cell edge 能显示出来；同时它保留 `depthTest=true`，因此几何上在后方的 cell edge 会被前方 atom/bond 挡住。它在 polyhedra surface 前画，所以 polyhedra 的透明壳层会像覆盖 atoms/bonds 一样覆盖 unit cell，后方 unit-cell lines 能透过 polyhedra 壳层看到。
 
 `transparent=true` at 100% 是有意的。它避免 100% opacity 时 cell frame 回到 opaque queue，从而再次依赖 Three.js 默认对象顺序。视觉上 100% 仍是实线；渲染管线里则按 transparent overlay 处理。
 
-这块当前逻辑是合理的。唯一要小心的是，未来如果有另一个 transparent overlay 的 `renderOrder` 大于 30，它会盖过 unit cell；应该继续通过 `STRUCTURE_RENDER_ORDER` 集中管理。
+这块当前逻辑是合理的。唯一要小心的是，未来如果有另一个 transparent overlay 需要和 unit cell/polyhedra 交互，应该继续通过 `STRUCTURE_RENDER_ORDER` 集中管理，不要回到 Three.js 默认对象排序。
 
 ### Polyhedra Surface
 
@@ -140,9 +143,7 @@ export const STRUCTURE_RENDER_ORDER = {
 
 它解决了你的核心诉求：polyhedra 可以半透明，但不希望透出后方 polyhedron surface 或后方白边。`depthWrite=true` 会让先绘制出的壳层把自己的深度写入 depth buffer，后方 polyhedron faces 和后方 edges 会被挡住。surface 去重逻辑又进一步删除共面的重复 faces，避免同一平面多次叠色。
 
-因为 atoms/bonds 默认是 opaque，它们先画进颜色和 depth，然后 polyhedra surface 在 transparent pass 里按 depth test 覆盖到它们之上。这样当 surface 位于 atom/bond 前方时，atom/bond 会通过半透明 surface 被看到；当 atom/bond 位于 surface 前方时，surface fragment 会被 depth test 挡掉。
-
-潜在问题：如果用户把 atoms/bonds opacity 也拉低，它们会进入 transparent pass，并在 renderOrder 20 处晚于 polyhedra surface 绘制。这时 polyhedra surface 已经 `depthWrite=true`，后方 transparent atom/bond fragment 可能被挡掉。也就是说，“polyhedra 透出 atoms/bonds”在默认 atoms/bonds 100% 时成立；在 atoms/bonds 也透明时只是近似，不是严格成立。
+因为 atoms/bonds/unit cell 先画进颜色，polyhedra surface 后画到同一片 framebuffer 上。这样当 surface 位于这些对象前方时，它们会通过半透明 surface 被看到；当 surface 位于它们后方且前方对象已经写入 depth 时，surface fragment 会被 depth test 挡掉。这个顺序对 transparent atoms 和 unit cell 尤其重要：如果 polyhedra surface 先写 depth，包在里面的 transparent atom 或后方 unit-cell line 会在后续绘制时被 depth test 直接挡掉。
 
 ### Polyhedra Edges
 
@@ -175,7 +176,7 @@ selection ring 是一个 `SpriteMaterial`：
 - 没有显式 `depthTest`，所以继承 material 默认 `depthTest=true`。
 - `renderOrder=STRUCTURE_RENDER_ORDER.atomSelectionRing`。
 
-这意味着 selection ring 最后画，但仍然能被更前方的 scene geometry 遮挡。这个语义更像“贴在结构里的选中 halo”，不是永远置顶的 UI HUD。我认为当前选择是合理的。如果以后希望选中 atom 即使在背后也明显提示，可以考虑 `depthTest=false`，但那会变成屏幕级标记，可能干扰晶体深度感。
+这意味着 selection ring 最后画，但仍然能被更前方的 scene geometry 遮挡。这个语义更像“贴在结构里的选中 halo”，不是永远置顶的 UI HUD。已知限制是：当选中 atom 位于 polyhedra 内部时，polyhedra surface 已经写入 depth buffer，ring 后画时可能被 depth test 挡住。要彻底改善这个问题，应该考虑 selected atom 的几何 halo，而不是继续只调整 sprite render order。
 
 ## Opacity 100% 跳变策略
 
@@ -187,7 +188,7 @@ selection ring 是一个 `SpriteMaterial`：
 这不是天然错误，因为它们的语义不同：
 
 - atoms/bonds 是实体结构，100% 时应该是 solid geometry。
-- unit cell 是 overlay line，需要稳定地在结构实体之后画。
+- unit cell 是 overlay line，需要稳定地在结构实体之后画，但为了能透过 polyhedra 壳层看到，它应该在 polyhedra surface 之前画。
 - polyhedra 是语义透明壳层，即使 100% 也仍然属于“壳层/标注”对象，不应该突然变成实体结构。
 - ring 是交互 overlay，必然属于 transparent path。
 
@@ -226,25 +227,21 @@ selection ring 是一个 `SpriteMaterial`：
 
 ## 主要风险和建议
 
-### 风险 1：polyhedra depthWrite 与 transparent atoms/bonds 的组合
+### 风险 1：transparent InstancedMesh 不做 per-instance sorting
 
 级别：中
 
-默认状态没有问题。但当 atoms/bonds opacity 低于 100% 时，它们会变成 transparent 且后于 polyhedra surface 绘制。polyhedra surface 的 `depthWrite=true` 可能挡住本应透出的后方 transparent atoms/bonds。
-
-建议先不急着改，除非用户开始常用“透明 atoms/bonds + polyhedra”组合。要修时可以比较三种方案：
-
-1. 把 atoms/bonds 的透明策略改成 `depthWrite=true` 的 ghost object，牺牲部分透明叠加，换取更稳定的结构遮挡。
-2. 给 atoms/bonds 增加 depth/color prepass，让它们在 polyhedra 前先提供可见底色，再进入透明调和。
-3. 把 polyhedra 分成 depth shell 和 color shell 两层，更明确地实现“壳层遮罩 + 可看穿主结构”的语义。
-
-### 风险 2：transparent InstancedMesh 不做 per-instance sorting
-
-级别：中
-
-如果 atom opacity 低于 100%，多个 atom 之间的透明混合可能出现局部前后不准。Three.js 有 `SceneUtils.sortInstancedMesh(...)`，但直接使用会破坏当前 instance index 语义。
+如果 atom opacity 低于 100%，多个 atom 之间的透明混合可能出现局部前后不准。当前通过 `depthWrite=true` 把 atom opacity 解释成 ghosted solid object，优先保证前后遮挡稳定，而不是追求真实透明混色。Three.js 有 `SceneUtils.sortInstancedMesh(...)`，但直接使用会破坏当前 instance index 语义。
 
 建议把这个记录为已知限制。只有当产品明确需要高质量 transparent atom rendering 时，再设计新的 instance mapping 层。
+
+### 风险 2：polyhedra shell 与 transparent atoms/bonds 的组合
+
+级别：低到中
+
+当前顺序已经让 transparent atoms/bonds/unit cell 先于 polyhedra shell 绘制，因此被 polyhedra 包住的 transparent atom 或位于 polyhedra 后方的 unit-cell line 不会因为 shell 先写 depth 而消失。polyhedra surface 仍然 `depthWrite=true`，所以后方 polyhedra faces 和后方 edges 仍会被挡住。
+
+剩余风险是这套方案仍是语义透明，不是物理透明：如果用户期待多个透明壳层、透明 atoms、透明 bonds 完全按玻璃方式叠色，当前方案仍只是近似。
 
 ### 风险 3：material preset 可透传 depthTest
 
@@ -279,7 +276,7 @@ type StructureRenderRole =
 
 ## 当前是否需要继续改代码
 
-如果目标是修复 issue 里 unit-cell line 被 atom/bond 错挡的问题，当前改法足够：unit cell 已经成为 `depthTest=true`、`depthWrite=false`、`transparent=true` 的 late overlay。
+如果目标是修复 issue 里 unit-cell line 被 atom/bond 错挡的问题，当前改法足够：unit cell 已经成为 `depthTest=true`、`depthWrite=false`、`transparent=true` 的 structure overlay，并且排在 atom/bond 之后、polyhedra 之前。
 
 如果目标是把所有 opacity 组合都做到严格透明正确，当前实现还不是最终答案。但我不建议现在立刻追求物理透明，因为这会和 polyhedra 的“不要后方面/白边叠出来”的产品语义冲突。更适合的方向是先把 render policy 命名并文档化，然后在真实视觉案例暴露问题时，针对“transparent atoms/bonds + polyhedra”单独设计。
 

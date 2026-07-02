@@ -102,7 +102,7 @@ export function BatchedBonds({
       key={batch.key}
       ref={meshRef}
       args={[batch.itemCount, batch.maxVertexCount, batch.maxIndexCount]}
-      renderOrder={STRUCTURE_RENDER_ORDER.structureMesh}
+      renderOrder={STRUCTURE_RENDER_ORDER.bondMesh}
     >
       <StructureMaterial
         color={usesVertexColors ? undefined : unicolorBondColor}
