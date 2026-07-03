@@ -62,7 +62,7 @@ def _start_browser_opener(url: str, host: str, port: int) -> None:
 def gui(
     host: str = typer.Option("127.0.0.1", help="Host address for the local GUI server."),
     port: int = typer.Option(
-        8765,
+        8790,
         "--port",
         "-p",
         help="Port for the local GUI server. Use 0 for any free port.",
