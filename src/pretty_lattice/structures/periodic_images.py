@@ -238,7 +238,7 @@ def canonicalize_fractional_position(
             continue
 
         canonical_position.append(wrapped_value)
-        canonical_image_offset.append(0)
+        canonical_image_offset.append(int(math.floor(float(value))))
 
     return (
         canonical_position,
