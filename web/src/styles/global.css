@@ -555,3 +555,20 @@
     }
   }
 }
+
+/* Publication-plot typography: Arial, black, non-bold across every chart. */
+.plot-chart {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.plot-chart text {
+  fill: #000000;
+  font-weight: 400;
+}
+
+.plot-labels,
+.plot-labels * {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #000000;
+  font-weight: 400;
+}

@@ -99,7 +99,7 @@ export function Heatmap({ matrix, axis, colormap, vmax, xLabel, yLabel }: Heatma
   const colorbar = [0, 0.25, 0.5, 0.75, 1].map((t) => sample(colormap, t));
 
   return (
-    <div className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+    <div className="plot-labels flex flex-col gap-1 text-[10px] text-muted-foreground">
       <div className="flex items-start gap-2">
         <div className="flex flex-col items-end justify-between py-0.5" style={{ height: SIZE }}>
           <span>{ticks[2]}</span>

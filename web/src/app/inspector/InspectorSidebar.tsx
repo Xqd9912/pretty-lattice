@@ -1,12 +1,16 @@
 import {
   type CSSProperties,
   type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  useCallback,
   useEffect,
   useState,
 } from "react";
 
 import { PanelRight } from "lucide-react";
+
+import { INSPECTOR_PANEL_MIN_WIDTH_PX } from "../../model/layout";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -89,7 +93,7 @@ export function InspectorToggle({
             aria-label={label}
             className={cn(
               TOOL_ICON_BUTTON_CLASS,
-              "absolute right-4 top-4 z-30 size-8 rounded-[10px] [&_svg]:size-4",
+              "absolute right-4 top-4 z-40 size-8 rounded-[10px] [&_svg]:size-4",
               isOpen
                 ? TOOL_ICON_BUTTON_ACTIVE_CLASS
                 : "border-foreground/10 bg-card/80 backdrop-blur-xl backdrop-saturate-150",
@@ -120,6 +124,9 @@ export function InspectorSidebar({
   showFpsOverlay,
   showCrystalAxisLabels,
   unitCellLineStyle,
+  width,
+  onWidthChange,
+  onResizeActiveChange,
   onBondAlgorithmChange,
   onBondCutoffChange,
   onDistinguishSimilarColorsChange,
@@ -146,6 +153,9 @@ export function InspectorSidebar({
   showFpsOverlay: boolean;
   showCrystalAxisLabels: boolean;
   unitCellLineStyle: UnitCellLineStyle;
+  width: number;
+  onWidthChange: (width: number) => void;
+  onResizeActiveChange: (active: boolean) => void;
   onBondAlgorithmChange: (bondAlgorithm: BondAlgorithm) => void;
   onBondCutoffChange: (key: string, distance: number) => void;
   onDistinguishSimilarColorsChange: (distinguishSimilarColors: boolean) => void;
@@ -158,18 +168,46 @@ export function InspectorSidebar({
   onShowCrystalAxisLabelsChange: (showCrystalAxisLabels: boolean) => void;
   onUnitCellLineStyleChange: (lineStyle: UnitCellLineStyle) => void;
 }) {
+  const handleResizeStart = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      onResizeActiveChange(true);
+      const onMove = (moveEvent: PointerEvent) => {
+        const next = window.innerWidth - moveEvent.clientX;
+        onWidthChange(
+          Math.max(INSPECTOR_PANEL_MIN_WIDTH_PX, Math.min(next, window.innerWidth - 220)),
+        );
+      };
+      const onUp = () => {
+        onResizeActiveChange(false);
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [onResizeActiveChange, onWidthChange],
+  );
+
   return (
     <aside
       id="inspector-sidebar"
       aria-label="Sidebar"
       aria-hidden={!isOpen}
       inert={!isOpen}
+      style={{ width }}
       className={cn(
-        "absolute inset-y-0 right-0 z-20 flex w-[360px] max-w-[calc(100vw-1rem)] flex-col border-l border-border bg-[#fdfdfd] text-foreground",
+        "absolute inset-y-0 right-0 z-20 flex max-w-[calc(100vw-1rem)] flex-col border-l border-border bg-[#fdfdfd] text-foreground",
         "transition-transform duration-[260ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
         isOpen ? "translate-x-0" : "translate-x-full",
       )}
     >
+      <div
+        aria-hidden="true"
+        onPointerDown={handleResizeStart}
+        className="absolute inset-y-0 left-0 z-40 w-1.5 cursor-col-resize hover:bg-foreground/10"
+        title="Drag to resize"
+      />
       <Tabs
         defaultValue="settings"
         className="flex min-h-0 flex-1 flex-col gap-0"

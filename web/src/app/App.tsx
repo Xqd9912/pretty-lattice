@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, FolderOpen, ImageDown, RefreshCw, RotateCcw } from "lucide-react";
+import { AlertTriangleIcon, FolderOpen, ImageDown, RefreshCw, RotateCcw, Zap } from "lucide-react";
 import {
   type ChangeEvent,
   useCallback,
@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -22,6 +23,8 @@ import {
 } from "@/components/ui/context-menu";
 import { AtomInspectorCard } from "./AtomInspectorCard";
 import type { SceneSpec } from "../api/scene";
+import type { IsosurfaceOverlay } from "../scene/DensityIsosurface";
+import { TOOL_ICON_BUTTON_ACTIVE_CLASS, TOOL_ICON_BUTTON_CLASS } from "./surface";
 import { inspectedAtomInfoForId } from "./atomInspector";
 import {
   LatticeScene,
@@ -46,6 +49,7 @@ import { isTrajectoryFileName } from "../api/trajectory";
 import { bondCutoffPairsFromScene, updateBondCutoff } from "../model/bondCutoffs";
 import { TrajectoryPlayer } from "./trajectory/TrajectoryPlayer";
 import { AnalysisPanel } from "./analysis/AnalysisPanel";
+import { ElectronicPanel } from "./electronic/ElectronicPanel";
 import { ElementLegend } from "./legend/ElementLegend";
 import {
   orientationGizmoContainerStyle,
@@ -71,7 +75,10 @@ import {
   type UnitCellLineStyle,
   hasPolyhedra,
   previewSafeAreaForInspector,
-  sceneOffsetXForInspector,
+  rightPanelsSceneOffsetX,
+  electronicPanelRightOffset,
+  ELECTRONIC_PANEL_DEFAULT_WIDTH_PX,
+  INSPECTOR_PANEL_DEFAULT_WIDTH_PX,
   visibleSceneForComponents,
 } from "../model";
 
@@ -154,6 +161,17 @@ export function App() {
 
   const [trajectoryFileName, setTrajectoryFileName] = useState<string | null>(null);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
+  const [isElectronicOpen, setIsElectronicOpen] = useState(false);
+  const [electronicPanelWidth, setElectronicPanelWidth] = useState(
+    ELECTRONIC_PANEL_DEFAULT_WIDTH_PX,
+  );
+  const [inspectorPanelWidth, setInspectorPanelWidth] = useState(
+    INSPECTOR_PANEL_DEFAULT_WIDTH_PX,
+  );
+  const [isResizingRightPanel, setIsResizingRightPanel] = useState(false);
+  const [densityScene, setDensityScene] = useState<SceneSpec | null>(null);
+  const [densityFileName, setDensityFileName] = useState<string | null>(null);
+  const [densityIsosurface, setDensityIsosurface] = useState<IsosurfaceOverlay | null>(null);
   const handleFrameSceneLoaded = useCallback(() => {}, []);
   const handleTrajectoryLoaded = useCallback(
     (nextScene: SceneSpec) => {
@@ -182,15 +200,48 @@ export function App() {
     onElementsRemapped: handleElementsRemapped,
   });
 
+  const handleDensitySceneChange = useCallback(
+    (next: { scene: SceneSpec; fileName: string } | null) => {
+      if (next) {
+        setDensityScene(next.scene);
+        setDensityFileName(next.fileName);
+        resetLoadedPreviewStateForPreview(next.scene);
+      } else {
+        setDensityScene(null);
+        setDensityFileName(null);
+        setDensityIsosurface(null);
+      }
+    },
+    [resetLoadedPreviewStateForPreview],
+  );
+  const handleIsosurfaceChange = useCallback((overlay: IsosurfaceOverlay | null) => {
+    setDensityIsosurface(overlay);
+  }, []);
+
   const trajectoryActive = trajectory.isActive;
-  const scene = trajectoryActive ? trajectory.frameScene : structureScene;
-  const previewStatus = trajectoryActive ? trajectory.status : structurePreviewStatus;
+  // A loaded CHGCAR density (structure + electron-cloud isosurface) takes over
+  // the main viewport, reusing the structure renderer.
+  const densityActive = densityScene !== null;
+  const scene = densityActive
+    ? densityScene
+    : trajectoryActive
+      ? trajectory.frameScene
+      : structureScene;
+  const previewStatus = densityActive
+    ? "ready"
+    : trajectoryActive
+      ? trajectory.status
+      : structurePreviewStatus;
   const errorMessage = trajectoryActive
     ? trajectory.error
     : structureErrorMessage;
   const errorTitle =
     trajectoryActive && trajectory.error ? "Unsupported file" : structureErrorTitle;
-  const displayFileName = trajectoryActive ? trajectoryFileName : selectedFileName;
+  const displayFileName = densityActive
+    ? densityFileName
+    : trajectoryActive
+      ? trajectoryFileName
+      : selectedFileName;
 
   const handleFileChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
@@ -199,6 +250,10 @@ export function App() {
       if (!file) {
         return;
       }
+      // Opening a structure/trajectory dismisses any active CHGCAR density view
+      // and closes the electronic panel so it does not linger over the new file.
+      handleDensitySceneChange(null);
+      setIsElectronicOpen(false);
       if (isTrajectoryFileName(file.name)) {
         setTrajectoryFileName(file.name);
         // Switch to fast cutoff bonding before loading so frame 0 (and every
@@ -213,7 +268,14 @@ export function App() {
         await loadStructureFile(file);
       }
     },
-    [loadStructureFile, setBondAlgorithm, setBondCutoffs, trajectory],
+    [
+      handleDensitySceneChange,
+      loadStructureFile,
+      setBondAlgorithm,
+      setBondCutoffs,
+      setIsElectronicOpen,
+      trajectory,
+    ],
   );
 
   const handleUnifiedBondAlgorithmChange = useCallback(
@@ -443,7 +505,12 @@ export function App() {
     });
   }, []);
   const previewSafeArea = previewSafeAreaForInspector();
-  const sceneOffsetX = sceneOffsetXForInspector(isInspectorOpen, viewportSize.width);
+  const inspectorOpenWidth = isInspectorOpen && scene !== null ? inspectorPanelWidth : 0;
+  const sceneOffsetX = rightPanelsSceneOffsetX(
+    inspectorOpenWidth,
+    isElectronicOpen ? electronicPanelWidth : 0,
+    viewportSize.width,
+  );
   const effectivePreviewSafeArea = useMemo(
     () => previewSafeAreaForViewport(previewSafeArea, viewportSize.width),
     [previewSafeArea, viewportSize.width],
@@ -526,7 +593,11 @@ export function App() {
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <section
-            className="scene-stage absolute inset-0 transition-transform duration-[260ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+            className={cn(
+              "scene-stage absolute inset-0",
+              !isResizingRightPanel &&
+                "transition-transform duration-[260ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+            )}
             style={{ transform: `translateX(${sceneOffsetX}px)` }}
             aria-label="Crystal structure preview"
             onPointerCancelCapture={handleScenePointerEndCapture}
@@ -559,6 +630,7 @@ export function App() {
                 }
                 interactionLocked={viewState.interactionLocked}
                 interactionMode={viewState.interactionMode}
+                isosurface={densityActive ? densityIsosurface : null}
                 layoutScene={scene ?? visibleScene}
                 resetCounter={viewState.resetCounter}
                 safeArea={previewSafeArea}
@@ -635,6 +707,37 @@ export function App() {
         trajectoryId={trajectory.meta?.trajectoryId ?? null}
         symbols={trajectory.meta?.elements ?? []}
         frameCount={trajectory.meta?.frameCount ?? 0}
+      />
+
+      {/* Electronic-properties toggle: an independent icon button stacked below
+          the inspector toggle (or at the corner when no structure is loaded). */}
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Electronic properties"
+        aria-pressed={isElectronicOpen}
+        title="Electronic properties"
+        className={cn(
+          TOOL_ICON_BUTTON_CLASS,
+          "absolute right-4 z-40 size-8 rounded-[10px] [&_svg]:size-4",
+          scene ? "top-[3.25rem]" : "top-4",
+          isElectronicOpen
+            ? TOOL_ICON_BUTTON_ACTIVE_CLASS
+            : "border-foreground/10 bg-card/80 backdrop-blur-xl backdrop-saturate-150",
+        )}
+        onClick={() => setIsElectronicOpen((open) => !open)}
+      >
+        <Zap aria-hidden="true" />
+      </Button>
+
+      <ElectronicPanel
+        isOpen={isElectronicOpen}
+        width={electronicPanelWidth}
+        onWidthChange={setElectronicPanelWidth}
+        onResizeActiveChange={setIsResizingRightPanel}
+        rightOffset={electronicPanelRightOffset(inspectorOpenWidth)}
+        onDensitySceneChange={handleDensitySceneChange}
+        onIsosurfaceChange={handleIsosurfaceChange}
       />
 
       {legendEntries.length > 0 ? (
@@ -751,6 +854,9 @@ export function App() {
                   isCustomColorScheme={style.colorSchemeMode === "custom"}
                   isOpen={isInspectorOpen}
                   isSceneLoading={previewStatus === "loading"}
+                  width={inspectorPanelWidth}
+                  onWidthChange={setInspectorPanelWidth}
+                  onResizeActiveChange={setIsResizingRightPanel}
                   previewMeshQuality={previewMeshQuality}
                   fogAffectsUnitCell={style.fogAffectsUnitCell}
                   distinguishSimilarColors={style.distinguishSimilarColors}

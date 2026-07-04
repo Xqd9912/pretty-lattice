@@ -663,7 +663,7 @@ describe("App", () => {
     const fpsOverlay = screen.getByTestId("fps-overlay");
     expect(fpsOverlay.textContent).toBe("fps 0");
 
-    expect(legend.getAttribute("style")).toContain("calc(50% + 0px)");
+    expect(legend.getAttribute("style")).toContain("calc(50% + -58px)");
     expect(inspectorButton.getAttribute("aria-expanded")).toBe("true");
     expect(inspectorButton.className).toContain("tool-icon-button-active");
 

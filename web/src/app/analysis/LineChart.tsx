@@ -91,7 +91,7 @@ export function LineChart({
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className="w-full"
+      className="plot-chart w-full"
       role="img"
       aria-label={`${yLabel ?? "value"} vs ${xLabel ?? "x"}`}
     >

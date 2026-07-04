@@ -41,7 +41,7 @@ export function BarChart({ series, xDomain, yDomain, xLabel, yLabel, height = 22
   const labelEvery = Math.max(1, Math.ceil(n / 12));
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img" aria-label={`${yLabel ?? "value"} by ${xLabel ?? "category"}`}>
+    <svg viewBox={`0 0 ${width} ${height}`} className="plot-chart w-full" role="img" aria-label={`${yLabel ?? "value"} by ${xLabel ?? "category"}`}>
       {yTicks.map((tick) => (
         <g key={`y${tick}`}>
           <line x1={MARGIN.left} x2={MARGIN.left + plotWidth} y1={scaleY(tick)} y2={scaleY(tick)} stroke="currentColor" strokeOpacity={0.08} />

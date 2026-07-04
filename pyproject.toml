@@ -16,6 +16,7 @@ dependencies = [
     "numba>=0.61.0",
     "numpy>=2.0.0",
     "pymatgen-core>=2026.5.18",
+    "scikit-image>=0.26.0",
     "scipy>=1.11.0",
     "typer>=0.16.0",
     "uvicorn[standard]>=0.30.0",

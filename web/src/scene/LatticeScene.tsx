@@ -16,6 +16,7 @@ import {
 import type { PreviewFpsStore } from "../model/previewFpsStore";
 import type { InteractionMode } from "../model/viewState";
 import { computeCrystalCameraPose, type CrystalCameraState } from "./crystalCamera";
+import { DensityIsosurface, type IsosurfaceOverlay } from "./DensityIsosurface";
 import { MaterialPresetLights } from "./MaterialPresetLights";
 import {
   resolveStructureMaterialFamiliesForStyle,
@@ -91,6 +92,7 @@ export function LatticeScene({
   dragSensitivity = DEFAULT_DRAG_SENSITIVITY,
   interactionLocked,
   interactionMode,
+  isosurface = null,
   layoutScene,
   lightStrength = 1,
   onCameraCommandAnimationActiveChange,
@@ -124,6 +126,7 @@ export function LatticeScene({
   dragSensitivity?: number;
   interactionLocked: boolean;
   interactionMode: InteractionMode;
+  isosurface?: IsosurfaceOverlay | null;
   layoutScene?: SceneSpec;
   lightStrength?: number;
   onCameraCommandAnimationActiveChange?: (isActive: boolean) => void;
@@ -235,6 +238,11 @@ export function LatticeScene({
         style={style}
         unitCellLineStyle={unitCellLineStyle}
       />
+      {isosurface ? (
+        <group position={layout.groupPosition}>
+          <DensityIsosurface {...isosurface} />
+        </group>
+      ) : null}
       <CameraOrientationTracker
         cameraOrientationRef={cameraOrientationRef}
         onCameraOrientationFrame={onCameraOrientationFrame}
