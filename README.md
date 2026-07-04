@@ -152,6 +152,14 @@ Analyze and visualize electronic-structure output from VASP:
 </p>
 
 <p align="center">
+  <img src="assets/electronic_elf.png" alt="ELFCAR: ELF isosurface and slice, ELF value distribution curve, and the bonding-path profile between an atom pair" width="90%">
+</p>
+
+<p align="center">
+  <img src="assets/electronic_lobster.png" alt="LOBSTER bonding analysis: BWDF and per-element-pair -ICOHP / ICOOP scatter plots versus bond length" width="90%">
+</p>
+
+<p align="center">
   <img src="assets/electronic_dos_ipr.png" alt="Density of states and DOS + IPR dual-axis chart" width="90%">
 </p>
 

@@ -143,6 +143,14 @@ prl gui -p 0          # 自动选择可用端口
 </p>
 
 <p align="center">
+  <img src="assets/electronic_elf.png" alt="ELFCAR：ELF 等值面与切片、ELF 值统计分布曲线，以及原子对间的成键路径分布" width="90%">
+</p>
+
+<p align="center">
+  <img src="assets/electronic_lobster.png" alt="LOBSTER 成键分析：BWDF 与按元素对区分的 -ICOHP / ICOOP 随键长散点图" width="90%">
+</p>
+
+<p align="center">
   <img src="assets/electronic_dos_ipr.png" alt="态密度与 DOS + IPR 双轴图" width="90%">
 </p>
 
