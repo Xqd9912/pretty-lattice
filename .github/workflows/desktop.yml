@@ -23,9 +23,6 @@ jobs:
           - os: macos-latest
             label: macOS (Apple Silicon)
             artifact: macos-arm64
-          - os: macos-13
-            label: macOS (Intel)
-            artifact: macos-x64
           - os: windows-latest
             label: Windows
             artifact: windows-x64
