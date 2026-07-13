@@ -1,3 +1,4 @@
+import { apiFetch } from "./runtime";
 import {
   BACKEND_UNAVAILABLE_MESSAGE,
   StructurePreviewError,
@@ -48,7 +49,7 @@ export async function uploadTrajectory(
 
   let response: Response;
   try {
-    response = await fetch(endpoint, {
+    response = await apiFetch(endpoint, {
       method: "POST",
       headers: {
         "content-type": file.type || "application/octet-stream",
@@ -67,7 +68,7 @@ export async function updateTrajectoryTypeMap(
   trajectoryId: string,
   typeMap: Record<number, string>,
 ): Promise<TrajectoryMeta> {
-  const response = await fetch(
+  const response = await apiFetch(
     `/api/trajectory/${trajectoryId}/type-map?${typeMapQuery(typeMap)}`,
     { method: "POST" },
   );
@@ -93,7 +94,7 @@ export async function fetchTrajectoryFrame(
 
   let response: Response;
   try {
-    response = await fetch(endpoint);
+    response = await apiFetch(endpoint);
   } catch {
     throw new StructurePreviewError(BACKEND_UNAVAILABLE_MESSAGE, "backend-unavailable");
   }

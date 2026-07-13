@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Base permissions for the splash and main windows. The API server is spawned from Rust, so the frontend itself needs no shell permissions.",
+  "windows": ["splash", "main"],
+  "permissions": ["core:default"]
+}

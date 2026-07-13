@@ -13,6 +13,9 @@ export const INSPECTOR_PREVIEW_SAFE_AREA: PreviewSafeArea = {
 };
 export const INSPECTOR_OPEN_SCENE_OFFSET_X_PX = -122;
 export const INSPECTOR_SCENE_OFFSET_BREAKPOINT_PX = 760;
+// The structure-analysis panel is a resizable left-hand column.
+export const ANALYSIS_PANEL_DEFAULT_WIDTH_PX = 440;
+export const ANALYSIS_PANEL_MIN_WIDTH_PX = 360;
 // The structure inspector is a resizable right-hand column.
 export const INSPECTOR_PANEL_DEFAULT_WIDTH_PX = 360;
 export const INSPECTOR_PANEL_MIN_WIDTH_PX = 300;

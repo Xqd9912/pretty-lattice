@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
+import { ChartExportButtons, type CsvColumn } from "../analysis/chartExport";
 import { DosIprChart } from "./DosIprChart";
 
 const NUMBER_INPUT_CLASS =
@@ -42,9 +43,17 @@ export function DosIprCard({
   const [dosMax, setDosMax] = useState("");
   const [iprMin, setIprMin] = useState("");
   const [iprMax, setIprMax] = useState("");
+  const cardRef = useRef<HTMLElement>(null);
+
+  const csvColumns = (): CsvColumn[] => [
+    { header: "dos_energy (eV)", values: dosEnergy },
+    { header: "dos", values: dosTotal },
+    { header: "ipr_energy (eV)", values: iprEnergy },
+    { header: "ipr", values: iprValue },
+  ];
 
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
+    <section ref={cardRef} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
       <div className="flex items-center justify-between">
         <h3 className="text-[13px] font-semibold text-foreground">DOS &amp; IPR</h3>
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
@@ -56,6 +65,7 @@ export function DosIprCard({
             IPR w
             <input type="range" min={0.3} max={2} step={0.1} value={barWidth} className="h-1 w-12 accent-foreground" onChange={(e) => setBarWidth(Number(e.currentTarget.value))} />
           </label>
+          <ChartExportButtons targetRef={cardRef} fileStem="dos-ipr" csvColumns={csvColumns} />
         </div>
       </div>
 

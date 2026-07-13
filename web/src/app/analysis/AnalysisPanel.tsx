@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { ANALYSIS_PANEL_MIN_WIDTH_PX } from "../../model/layout";
 import type { BondCutoffSpec } from "../../api/scene";
 import {
   computeDescriptors,
@@ -34,12 +35,18 @@ export function AnalysisPanel({
   onClose,
   symbols,
   trajectoryId,
+  width,
+  onWidthChange,
+  onResizeActiveChange,
 }: {
   frameCount: number;
   isOpen: boolean;
   onClose: () => void;
   symbols: string[];
   trajectoryId: string | null;
+  width: number;
+  onWidthChange: (width: number) => void;
+  onResizeActiveChange?: (active: boolean) => void;
 }) {
   const [frameStart, setFrameStart] = useState("0");
   const [frameEnd, setFrameEnd] = useState(String(frameCount));
@@ -82,6 +89,29 @@ export function AnalysisPanel({
       stride: Math.max(1, Number(stride) || 1),
     }),
     [frameStart, frameEnd, stride, frameCount],
+  );
+
+  // The panel is pinned to the left edge, so its width tracks the pointer's x.
+  const handleResizeStart = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      onResizeActiveChange?.(true);
+      const onMove = (moveEvent: PointerEvent) => {
+        const clamped = Math.max(
+          ANALYSIS_PANEL_MIN_WIDTH_PX,
+          Math.min(moveEvent.clientX, window.innerWidth - 220),
+        );
+        onWidthChange(clamped);
+      };
+      const onUp = () => {
+        onResizeActiveChange?.(false);
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [onResizeActiveChange, onWidthChange],
   );
 
   const runGr = useCallback(async () => {
@@ -143,12 +173,19 @@ export function AnalysisPanel({
       aria-label="Structure analysis"
       aria-hidden={!isOpen}
       inert={!isOpen}
+      style={{ width }}
       className={cn(
-        "absolute inset-y-0 left-0 z-30 flex w-[440px] max-w-[calc(100vw-1rem)] flex-col border-r border-border bg-[#fdfdfd] text-foreground",
+        "absolute inset-y-0 left-0 z-30 flex max-w-[calc(100vw-1rem)] flex-col border-r border-border bg-[#fdfdfd] text-foreground",
         "transition-transform duration-[260ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
         isOpen ? "translate-x-0" : "-translate-x-full",
       )}
     >
+      <div
+        aria-hidden="true"
+        onPointerDown={handleResizeStart}
+        className="absolute inset-y-0 right-0 z-40 w-1.5 cursor-col-resize hover:bg-foreground/10"
+        title="Drag to resize"
+      />
       <header className="flex h-14 shrink-0 items-center justify-between px-4">
         <h2 className="text-sm font-semibold">Structure analysis</h2>
         <Button variant="ghost" size="icon" aria-label="Close analysis" className="size-8" onClick={onClose}>

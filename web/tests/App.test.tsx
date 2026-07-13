@@ -582,13 +582,48 @@ describe("App", () => {
     render(<App />);
     await user.upload(getFileInput(), structureFile());
 
-    expect(screen.getByText("Loading structure").isConnected).toBe(true);
+    expect(screen.getByText(/Loading structure/).isConnected).toBe(true);
     const spinner = screen.getByTestId("loading-structure-spinner");
     expect(spinner.className).toContain("motion-safe:animate-spin");
 
     resolveScene(sceneWithPeriodicImages());
 
     await screen.findByTestId("lattice-canvas");
+  });
+
+  test("shows a trajectory-labeled loading overlay while a trajectory is parsed", async () => {
+    const user = userEvent.setup();
+    // A trajectory reports "loading" before its metadata arrives, which is the slow parse
+    // window this overlay exists to cover. Hold the upload response open to observe it.
+    let resolveMeta: (meta: unknown) => void = () => {};
+    const metaPromise = new Promise<unknown>((resolve) => {
+      resolveMeta = resolve;
+    });
+    queueFetchResponse({
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => metaPromise,
+      ok: true,
+    } as Response);
+
+    render(<App />);
+    await user.upload(
+      getFileInput(),
+      new File(["frame"], "run.dump", { type: "application/octet-stream" }),
+    );
+
+    expect(await screen.findByTestId("preview-loading-overlay")).toBeTruthy();
+    expect(screen.getByText(/Loading trajectory/).isConnected).toBe(true);
+
+    queueFetchResponse(jsonResponse(sceneWithPeriodicImages()));
+    resolveMeta({
+      trajectoryId: "t1",
+      format: "lammps-dump",
+      frameCount: 1,
+      elements: ["Si"],
+    });
+
+    await screen.findByTestId("lattice-canvas");
+    expect(screen.queryByTestId("preview-loading-overlay")).toBeNull();
   });
 
   test("does not restore a previously uploaded scene after the app remounts", async () => {

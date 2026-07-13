@@ -8,6 +8,7 @@ import {
   type BwdfResponse,
   type PairListResponse,
 } from "../../api/electronic";
+import { ChartExportButtons, slugify, type CsvColumn } from "../analysis/chartExport";
 import { ScatterChart, type ScatterSeries } from "../analysis/ScatterChart";
 
 type Status = "idle" | "loading" | "ready" | "error";
@@ -167,6 +168,7 @@ function PairScatterCard({ data, title }: { data: PairListResponse; title: strin
   const [xMax, setXMax] = useState("");
   const [yMin, setYMin] = useState("");
   const [yMax, setYMax] = useState("");
+  const cardRef = useRef<HTMLElement>(null);
 
   // ICOHP is conventionally plotted as −ICOHP so that bonding states point up
   // (more positive = more bonding); ICOOP already has that sign convention.
@@ -199,11 +201,23 @@ function PairScatterCard({ data, title }: { data: PairListResponse; title: strin
 
   const yLabel = negate ? "−ICOHP (eV)" : "ICOOP";
 
+  const csvColumns = (): CsvColumn[] =>
+    data.pairs.flatMap((pair) => {
+      const points = pointsByPair[pair] ?? [];
+      return [
+        { header: `${pair} r (Å)`, values: points.map((point) => point.x) },
+        { header: `${pair} ${yLabel}`, values: points.map((point) => point.y) },
+      ];
+    });
+
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
+    <section ref={cardRef} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
       <div className="flex items-center justify-between">
         <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
-        <SizeControl size={size} onChange={setSize} />
+        <div className="flex items-center gap-3">
+          <SizeControl size={size} onChange={setSize} />
+          <ChartExportButtons targetRef={cardRef} fileStem={slugify(title)} csvColumns={csvColumns} />
+        </div>
       </div>
       <ScatterChart
         series={series}
@@ -262,6 +276,12 @@ function BwdfScatterCard({ data }: { data: BwdfResponse }) {
   const [xMax, setXMax] = useState("");
   const [yMin, setYMin] = useState("");
   const [yMax, setYMax] = useState("");
+  const cardRef = useRef<HTMLElement>(null);
+
+  const csvColumns = (): CsvColumn[] => [
+    { header: "r (Å)", values: data.r },
+    { header: "BWDF", values: data.value },
+  ];
 
   const series: ScatterSeries[] = [
     {
@@ -273,7 +293,7 @@ function BwdfScatterCard({ data }: { data: BwdfResponse }) {
   ];
 
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
+    <section ref={cardRef} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
       <div className="flex items-center justify-between">
         <h3 className="text-[13px] font-semibold text-foreground">Bond-weighted distribution</h3>
         <div className="flex items-center gap-3">
@@ -288,6 +308,7 @@ function BwdfScatterCard({ data }: { data: BwdfResponse }) {
             color
           </label>
           <SizeControl size={size} onChange={setSize} />
+          <ChartExportButtons targetRef={cardRef} fileStem="bwdf" csvColumns={csvColumns} />
         </div>
       </div>
       <ScatterChart

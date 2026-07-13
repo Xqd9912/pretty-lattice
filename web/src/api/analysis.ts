@@ -1,3 +1,4 @@
+import { apiFetch } from "./runtime";
 import { BACKEND_UNAVAILABLE_MESSAGE, StructurePreviewError, type BondCutoffSpec } from "./scene";
 
 export interface FrameRange {
@@ -78,7 +79,7 @@ async function postAnalysis<T>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`/api/trajectory/${trajectoryId}/analysis/${endpoint}`, {
+    response = await apiFetch(`/api/trajectory/${trajectoryId}/analysis/${endpoint}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),

@@ -4,14 +4,48 @@ from importlib import resources
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from pretty_lattice.server.routes import router
+from pretty_lattice.server.security import ApiTokenMiddleware
 
 
-def create_app(static_root: Path | None = None, dev_static_fallback: bool = True) -> FastAPI:
+def create_app(
+    static_root: Path | None = None,
+    dev_static_fallback: bool = True,
+    api_token: str | None = None,
+    allow_origins: list[str] | None = None,
+) -> FastAPI:
+    """Build the app.
+
+    `prl gui` calls this with no token and no extra origins: the page is served from the
+    same origin as the API, so neither is needed. The desktop shell passes both, because
+    there the webview is a foreign origin talking to a local port.
+    """
     app = FastAPI(title="Pretty Lattice", version="0.1.0")
+
+    # Starlette runs the last-added middleware outermost. Add the token guard first so
+    # CORS ends up wrapping it, otherwise a 401 comes back without CORS headers and the
+    # webview reports an opaque network failure instead of the real status.
+    if api_token is not None:
+        app.add_middleware(ApiTokenMiddleware, token=api_token)
+
+    if allow_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allow_origins,
+            allow_credentials=False,
+            allow_methods=["*"],
+            # Allow any request header. The webview sends the API token plus per-request
+            # headers such as x-pretty-lattice-filename, and a preflight that omits any one
+            # of them is rejected by the browser before the real request is ever sent.
+            # Safe here because credentials are disabled and the only allowed origin is the
+            # app's own webview.
+            allow_headers=["*"],
+        )
+
     app.include_router(router, prefix="/api")
     _mount_static_web(app, static_root=static_root, dev_static_fallback=dev_static_fallback)
     return app

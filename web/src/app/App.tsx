@@ -77,6 +77,7 @@ import {
   previewSafeAreaForInspector,
   rightPanelsSceneOffsetX,
   electronicPanelRightOffset,
+  ANALYSIS_PANEL_DEFAULT_WIDTH_PX,
   ELECTRONIC_PANEL_DEFAULT_WIDTH_PX,
   INSPECTOR_PANEL_DEFAULT_WIDTH_PX,
   visibleSceneForComponents,
@@ -168,6 +169,9 @@ export function App() {
   const [inspectorPanelWidth, setInspectorPanelWidth] = useState(
     INSPECTOR_PANEL_DEFAULT_WIDTH_PX,
   );
+  const [analysisPanelWidth, setAnalysisPanelWidth] = useState(
+    ANALYSIS_PANEL_DEFAULT_WIDTH_PX,
+  );
   const [isResizingRightPanel, setIsResizingRightPanel] = useState(false);
   const [densityScene, setDensityScene] = useState<SceneSpec | null>(null);
   const [densityFileName, setDensityFileName] = useState<string | null>(null);
@@ -227,11 +231,19 @@ export function App() {
     : trajectoryActive
       ? trajectory.frameScene
       : structureScene;
+  // A trajectory reports "loading" from the moment upload starts, but it only becomes
+  // "active" once its metadata arrives. Parsing a large trajectory is the slowest step, so
+  // surface that loading state during the gap too — otherwise the preview shows nothing
+  // happening while the file is being read.
+  const trajectoryLoading = trajectory.status === "loading";
   const previewStatus = densityActive
     ? "ready"
     : trajectoryActive
       ? trajectory.status
-      : structurePreviewStatus;
+      : trajectoryLoading
+        ? "loading"
+        : structurePreviewStatus;
+  const loadingLabel = trajectoryLoading ? "Loading trajectory…" : "Loading structure…";
   const errorMessage = trajectoryActive
     ? trajectory.error
     : structureErrorMessage;
@@ -654,20 +666,28 @@ export function App() {
                 className="grid h-full w-full place-items-center bg-background text-sm text-muted-foreground"
                 data-state={previewStatus}
               >
-                {previewStatus === "loading" ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span
-                      aria-hidden="true"
-                      data-testid="loading-structure-spinner"
-                      className="inline-flex size-3 shrink-0 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground motion-safe:animate-spin motion-safe:[animation-duration:450ms]"
-                    />
-                    Loading structure
-                  </span>
-                ) : (
-                  "No structure loaded"
-                )}
+                {previewStatus === "loading" ? null : "No structure loaded"}
               </div>
             )}
+            {previewStatus === "loading" ? (
+              // Sits above the canvas so the loading state is visible while a large file is
+              // parsed, even when an earlier scene is still on screen (e.g. loading a new
+              // trajectory over the current one).
+              <div
+                className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-background/70 backdrop-blur-[2px] animate-in fade-in-0 duration-200"
+                data-testid="preview-loading-overlay"
+                data-state={previewStatus}
+              >
+                <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/90 px-3.5 py-1.5 text-sm text-muted-foreground shadow-sm">
+                  <span
+                    aria-hidden="true"
+                    data-testid="loading-structure-spinner"
+                    className="inline-flex size-3 shrink-0 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground motion-safe:animate-spin motion-safe:[animation-duration:450ms]"
+                  />
+                  {loadingLabel}
+                </span>
+              </div>
+            ) : null}
           </section>
         </ContextMenuTrigger>
         {renderPreviewContextMenuContent()}
@@ -707,6 +727,9 @@ export function App() {
         trajectoryId={trajectory.meta?.trajectoryId ?? null}
         symbols={trajectory.meta?.elements ?? []}
         frameCount={trajectory.meta?.frameCount ?? 0}
+        width={analysisPanelWidth}
+        onWidthChange={setAnalysisPanelWidth}
+        onResizeActiveChange={setIsResizingRightPanel}
       />
 
       {/* Electronic-properties toggle: an independent icon button stacked below

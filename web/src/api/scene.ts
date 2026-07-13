@@ -1,3 +1,4 @@
+import { apiFetch } from "./runtime";
 import { STRUCTURE_ATOM_COUNT_THRESHOLD } from "../model/structureLimits";
 import sceneContract from "../../../src/pretty_lattice/structures/scene_contract.json";
 
@@ -180,7 +181,7 @@ export async function uploadStructurePreview(
   const endpoint = previewEndpointForOptions(options);
   let response: Response;
   try {
-    response = await fetch(endpoint, {
+    response = await apiFetch(endpoint, {
       method: "POST",
       headers: {
         "content-type": file.type || "application/octet-stream",

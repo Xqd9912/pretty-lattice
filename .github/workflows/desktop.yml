@@ -1,0 +1,80 @@
+name: Desktop
+
+# PyInstaller cannot cross-compile, so the frozen server has to be built on the same OS and
+# architecture it will ship to. That is the whole reason this runs as a matrix rather than
+# as one job producing every installer.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macOS (Apple Silicon)
+            artifact: macos-arm64
+          - os: macos-13
+            label: macOS (Intel)
+            artifact: macos-x64
+          - os: windows-latest
+            label: Windows
+            artifact: windows-x64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.2.0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: web/src-tauri
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      # Freezes the API server and drops it into web/src-tauri/binaries/. The script also
+      # launches the result and waits for its handshake, so a bundle that is missing a
+      # lazily imported module fails here rather than on a user's machine.
+      - name: Build the Python sidecar
+        run: uv run --group desktop python scripts/build_sidecar.py
+
+      - name: Build the desktop app
+        working-directory: web
+        run: bun run desktop:build
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: pretty-lattice-${{ matrix.artifact }}
+          if-no-files-found: error
+          path: |
+            web/src-tauri/target/release/bundle/dmg/*.dmg
+            web/src-tauri/target/release/bundle/msi/*.msi
+            web/src-tauri/target/release/bundle/nsis/*.exe

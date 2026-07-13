@@ -24,6 +24,7 @@ import {
   type ValueHistogram,
 } from "../../api/electronic";
 import { LineChartCard } from "../analysis/chartCards";
+import { ChartExportButtons, slugify, type CsvColumn } from "../analysis/chartExport";
 import { DensityHeatmap, type DensityColormap } from "./DensityHeatmap";
 
 type Status = "idle" | "loading" | "ready" | "error";
@@ -338,10 +339,22 @@ export function VolumetricSection({
     }
   }, [grid, atomI, atomJ, profileRadius, onError]);
 
+  const sliceCardRef = useRef<HTMLElement>(null);
   const sliceCount = slice?.count ?? 1;
   const vminValue = Number(vmin) || 0;
   const vmaxValue = Number(vmax) || 1;
   const distributionValueLabel = grid?.valueLabel ?? (isChgcar ? "ρ / ρ̄" : "ELF");
+
+  const sliceCsvColumns = (): CsvColumn[] => {
+    if (!slice || slice.matrix.length === 0) {
+      return [];
+    }
+    const cols = slice.matrix[0]?.length ?? 0;
+    return Array.from({ length: cols }, (_, colIndex) => ({
+      header: `${slice.colAxis}[${colIndex}]`,
+      values: slice.matrix.map((row) => row[colIndex] ?? ""),
+    }));
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -432,12 +445,13 @@ export function VolumetricSection({
       ) : null}
 
       {slice ? (
-        <section className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
+        <section ref={sliceCardRef} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
           <div className="flex items-center justify-between">
             <h3 className="text-[13px] font-semibold">
               {isChgcar ? "Density slice (ρ / ρ̄)" : "ELF slice"}
             </h3>
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-1">
               {SLICE_AXES.map((axis) => (
                 <button
                   key={axis}
@@ -450,6 +464,12 @@ export function VolumetricSection({
                   {axis}
                 </button>
               ))}
+              </div>
+              <ChartExportButtons
+                targetRef={sliceCardRef}
+                fileStem={slugify(`${title} ${isChgcar ? "density" : "elf"} slice`)}
+                csvColumns={sliceCsvColumns}
+              />
             </div>
           </div>
           <DensityHeatmap

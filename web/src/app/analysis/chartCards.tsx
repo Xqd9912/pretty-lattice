@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { BarChart } from "./BarChart";
+import { ChartExportButtons, slugify, type CsvColumn } from "./chartExport";
 import { Heatmap, type Colormap } from "./Heatmap";
 import { LineChart, type LineSeries } from "./LineChart";
 
@@ -64,6 +65,17 @@ export function LineChartCard({
   const [xMax, setXMax] = useState("");
   const [yMin, setYMin] = useState("");
   const [yMax, setYMax] = useState("");
+  const cardRef = useRef<HTMLElement>(null);
+
+  const csvColumns = (): CsvColumn[] => {
+    if (series.length === 0) {
+      return [];
+    }
+    return [
+      { header: xLabel, values: series[0]!.x },
+      ...series.map((line) => ({ header: line.label, values: line.y })),
+    ];
+  };
 
   const resolved = useMemo<LineSeries[]>(
     () =>
@@ -80,34 +92,37 @@ export function LineChartCard({
   );
 
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
+    <section ref={cardRef} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
       <div className="flex items-center justify-between">
         <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
-        {variant === "line" ? (
-          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-            <label className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={smooth}
-                className="size-3 accent-foreground"
-                onChange={(event) => setSmooth(event.target.checked)}
-              />
-              smooth
-            </label>
-            <label className="flex items-center gap-1">
-              width
-              <input
-                type="range"
-                min={0.5}
-                max={4}
-                step={0.5}
-                value={width}
-                className="h-1 w-16 accent-foreground"
-                onChange={(event) => setWidth(Number(event.currentTarget.value))}
-              />
-            </label>
-          </div>
-        ) : null}
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+          {variant === "line" ? (
+            <>
+              <label className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={smooth}
+                  className="size-3 accent-foreground"
+                  onChange={(event) => setSmooth(event.target.checked)}
+                />
+                smooth
+              </label>
+              <label className="flex items-center gap-1">
+                width
+                <input
+                  type="range"
+                  min={0.5}
+                  max={4}
+                  step={0.5}
+                  value={width}
+                  className="h-1 w-16 accent-foreground"
+                  onChange={(event) => setWidth(Number(event.currentTarget.value))}
+                />
+              </label>
+            </>
+          ) : null}
+          <ChartExportButtons targetRef={cardRef} fileStem={slugify(title)} csvColumns={csvColumns} />
+        </div>
       </div>
 
       {variant === "bar" ? (
@@ -175,9 +190,18 @@ export function HeatmapCard({
 }) {
   const [colormap, setColormap] = useState<Colormap>("viridis");
   const [vmax, setVmax] = useState("");
+  const cardRef = useRef<HTMLElement>(null);
+
+  const csvColumns = (): CsvColumn[] => [
+    { header: `${yLabel} \\ ${xLabel}`, values: axis },
+    ...axis.map((columnValue, columnIndex) => ({
+      header: String(columnValue),
+      values: matrix.map((row) => row[columnIndex] ?? ""),
+    })),
+  ];
 
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
+    <section ref={cardRef} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2">
       <div className="flex items-center justify-between">
         <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
@@ -203,6 +227,7 @@ export function HeatmapCard({
               onChange={(event) => setVmax(event.target.value)}
             />
           </label>
+          <ChartExportButtons targetRef={cardRef} fileStem={slugify(title)} csvColumns={csvColumns} />
         </div>
       </div>
       <Heatmap matrix={matrix} axis={axis} colormap={colormap} vmax={parseBound(vmax) ?? null} xLabel={xLabel} yLabel={yLabel} />

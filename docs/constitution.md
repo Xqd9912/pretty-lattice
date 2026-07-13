@@ -31,25 +31,36 @@ So I decided to build a lightweight tool based on modern web tech (Three.js), th
 
 ## Release Shape
 
-Developer side:
+Pretty Lattice ships in two shapes. Both run the same Python backend and the same web
+frontend; they differ only in what the user has to install and where the UI is drawn.
+
+**Python package.** Users install `pretty-lattice` and run `prl gui`. This starts a local
+Python server and opens a browser page, which runs the bundled web app.
 
 ```mermaid
 flowchart LR
     A[Web source<br/>Bun + React + Three.js] --> B[Build static web assets]
     B --> C[Bundle assets into Python package]
-
-```
-
-Users install a Python package and launch a local GUI via the command `prl gui`. This starts a local Python server and opens a browser page. The browser runs the bundled web app and uses Three.js/WebGL for rendering.
-
-```mermaid
-flowchart LR
-    D[User installs pretty-lattice]
-    D --> E[prl gui]
+    D[User installs pretty-lattice] --> E[prl gui]
     E --> F[Local browser GUI]
 ```
 
-Users should **not need JS developer tools** (Node, Bun, pnpm, Vite, etc.).
+**Desktop app.** Users install a normal application and double-click it. The Python server
+is frozen with PyInstaller and shipped inside the app, which runs it as a child process and
+draws the UI in a native window. See [Desktop App](desktop.md).
+
+```mermaid
+flowchart LR
+    G[Freeze Python server<br/>PyInstaller] --> H[Bundle into Tauri app]
+    A --> H
+    I[User installs Pretty Lattice.app] --> J[Native window + local API]
+```
+
+Users should **not need JS developer tools** (Node, Bun, pnpm, Vite, etc.). Users of the
+desktop app should not need **Python** either.
+
+The desktop app is an additional shape, not a replacement: the `pip install` + `prl gui`
+path stays supported, and no change should break it.
 
 ## Tech Stack
 

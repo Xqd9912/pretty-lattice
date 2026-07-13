@@ -1,3 +1,4 @@
+import { apiFetch } from "./runtime";
 import { BACKEND_UNAVAILABLE_MESSAGE, StructurePreviewError, type SceneSpec } from "./scene";
 
 export type SliceAxis = "a" | "b" | "c";
@@ -111,7 +112,7 @@ async function readError(response: Response): Promise<string> {
 async function uploadFile<T>(endpoint: string, file: File): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(endpoint, {
+    response = await apiFetch(endpoint, {
       method: "POST",
       headers: {
         "content-type": file.type || "application/octet-stream",
@@ -143,7 +144,7 @@ export async function fetchChgcarSlice(
   const params = new URLSearchParams({ axis, index: String(index) });
   let response: Response;
   try {
-    response = await fetch(`/api/electronic/chgcar/${chgcarId}/slice?${params}`);
+    response = await apiFetch(`/api/electronic/chgcar/${chgcarId}/slice?${params}`);
   } catch {
     throw new StructurePreviewError(BACKEND_UNAVAILABLE_MESSAGE, "backend-unavailable");
   }
@@ -160,7 +161,7 @@ export async function fetchChgcarLed(
   const params = new URLSearchParams({ threshold: String(threshold) });
   let response: Response;
   try {
-    response = await fetch(`/api/electronic/chgcar/${chgcarId}/led?${params}`);
+    response = await apiFetch(`/api/electronic/chgcar/${chgcarId}/led?${params}`);
   } catch {
     throw new StructurePreviewError(BACKEND_UNAVAILABLE_MESSAGE, "backend-unavailable");
   }
@@ -174,7 +175,7 @@ export async function fetchIsosurface(chgcarId: string, level: number): Promise<
   const params = new URLSearchParams({ level: String(level) });
   let response: Response;
   try {
-    response = await fetch(`/api/electronic/chgcar/${chgcarId}/isosurface?${params}`);
+    response = await apiFetch(`/api/electronic/chgcar/${chgcarId}/isosurface?${params}`);
   } catch {
     throw new StructurePreviewError(BACKEND_UNAVAILABLE_MESSAGE, "backend-unavailable");
   }
@@ -208,7 +209,7 @@ export function uploadElfcar(file: File): Promise<ElfcarResponse> {
 async function fetchJson<T>(url: string): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(url);
+    response = await apiFetch(url);
   } catch {
     throw new StructurePreviewError(BACKEND_UNAVAILABLE_MESSAGE, "backend-unavailable");
   }
