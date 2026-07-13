@@ -4,8 +4,8 @@
   Glance 是一个晶体结构可视化工具，用来快速做出美观、适合发表的结构图。
 </p>
 <p align="center">
-  <a href="https://github.com/songfeitong/glance/actions/workflows/ci.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/songfeitong/glance/ci.yml?branch=main&label=CI&style=flat-square"></a>
-  <a href="https://pypi.org/project/glance/"><img alt="PyPI" src="https://img.shields.io/pypi/v/glance?style=flat-square"></a>
+  <a href="https://github.com/songfeitong/pretty-lattice/actions/workflows/ci.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/songfeitong/pretty-lattice/ci.yml?branch=main&label=CI&style=flat-square"></a>
+  <a href="https://pypi.org/project/pretty-lattice/"><img alt="PyPI" src="https://img.shields.io/pypi/v/pretty-lattice?style=flat-square"></a>
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
 </p>
@@ -15,7 +15,7 @@
   <a href="README.md">English</a> | 简体中文
 </p>
 
-> 本项目是原项目 [glance](https://github.com/songfeitong/glance)
+> 本项目是原项目 [pretty-lattice](https://github.com/songfeitong/pretty-lattice)
 > (作者 [@songfeitong](https://github.com/songfeitong))的扩展 fork。晶体**可视化**核心来自上游项目;
 > 本 fork 增加了**轨迹可视化**、**结构分析**与**电子性质分析**。详见[致谢](#致谢)。
 
@@ -44,7 +44,7 @@ Glance 就是我为弥补二者之间的空白空缺所做的尝试。它基于 
 ## 安装
 
 > [!IMPORTANT]
-> 本 fork 新增的模块（轨迹、结构分析、电子性质）**没有发布到 PyPI**。`pip install glance`
+> 本 fork 新增的模块（轨迹、结构分析、电子性质）**没有发布到 PyPI**。`pip install pretty-lattice`
 > 装的是上游发布版，不含这些功能。要获取此版本，请按下面的方式从本仓库安装。
 
 从本仓库安装最新版（打包时已内置构建好的前端，无需 Node/bun 构建步骤）：
@@ -59,8 +59,8 @@ pip install git+https://github.com/Xqd9912/glance.git
 uv tool install git+https://github.com/Xqd9912/glance.git
 ```
 
-上游的 PyPI 发布版（仅含可视化核心）仍可用 `pip install glance` /
-`uv tool install glance` 安装。
+上游的 PyPI 发布版（仅含可视化核心）仍可用 `pip install pretty-lattice` /
+`uv tool install pretty-lattice` 安装。
 
 运行环境：
 
@@ -166,7 +166,7 @@ glance gui -p 0          # 自动选择可用端口
 ## 致谢
 
 本项目的晶体**可视化**基础——Three.js/React 渲染、材质、配色、相机与取向控制、元素图例、图像导出——
-来自原项目 [glance](https://github.com/songfeitong/glance)
+来自原项目 [pretty-lattice](https://github.com/songfeitong/pretty-lattice)
 (作者 [@songfeitong](https://github.com/songfeitong),MIT License 发布),这部分工作的功劳归原作者。
 
 本 fork 在其基础上增加了:

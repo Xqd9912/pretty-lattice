@@ -4,8 +4,8 @@
   Glance is a crystal visualization tool for creating beautiful, publication-ready figures.
 </p>
 <p align="center">
-  <a href="https://github.com/songfeitong/glance/actions/workflows/ci.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/songfeitong/glance/ci.yml?branch=main&label=CI&style=flat-square"></a>
-  <a href="https://pypi.org/project/glance/"><img alt="PyPI" src="https://img.shields.io/pypi/v/glance?style=flat-square"></a>
+  <a href="https://github.com/songfeitong/pretty-lattice/actions/workflows/ci.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/songfeitong/pretty-lattice/ci.yml?branch=main&label=CI&style=flat-square"></a>
+  <a href="https://pypi.org/project/pretty-lattice/"><img alt="PyPI" src="https://img.shields.io/pypi/v/pretty-lattice?style=flat-square"></a>
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
 </p>
@@ -14,7 +14,7 @@
   English | <a href="README_zh_CN.md">简体中文</a>
 </p>
 
-> This is an extended fork of the original [glance](https://github.com/songfeitong/glance)
+> This is an extended fork of the original [pretty-lattice](https://github.com/songfeitong/pretty-lattice)
 > by [@songfeitong](https://github.com/songfeitong). The crystal **visualization** core is from the
 > upstream project; this fork adds **trajectory visualization**, **structure analysis**, and
 > **electronic-property analysis**. See [Acknowledgements](#acknowledgements).
@@ -45,7 +45,7 @@ Glance is my attempt to fill that gap. Built on [Three.js](https://github.com/mr
 
 > [!IMPORTANT]
 > This fork's extra modules (trajectory, structure analysis, electronic properties) are **not
-> published to PyPI**. `pip install glance` installs the upstream release, which does not
+> published to PyPI**. `pip install pretty-lattice` installs the upstream release, which does not
 > include them. To get this version, install from this repository as shown below.
 
 Install the latest from this repository (the bundled frontend ships with the package, so no
@@ -62,7 +62,7 @@ uv tool install git+https://github.com/Xqd9912/glance.git
 ```
 
 The upstream release on PyPI (visualization core only) can still be installed with
-`pip install glance` / `uv tool install glance`.
+`pip install pretty-lattice` / `uv tool install pretty-lattice`.
 
 Requirements:
 
@@ -178,7 +178,7 @@ Analyze and visualize electronic-structure output from VASP:
 
 The crystal **visualization** foundation of this project — the Three.js/React renderer,
 materials, color schemes, camera and orientation controls, element legend, and figure
-export — comes from the original [glance](https://github.com/songfeitong/glance)
+export — comes from the original [pretty-lattice](https://github.com/songfeitong/pretty-lattice)
 by [@songfeitong](https://github.com/songfeitong), released under the MIT License. All credit for
 that work goes to the original author.
 
