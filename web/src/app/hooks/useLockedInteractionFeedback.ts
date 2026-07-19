@@ -7,7 +7,8 @@ import {
   useState,
 } from "react";
 
-const LOCKED_INTERACTION_DRAG_THRESHOLD_PX = 4;
+import { ATOM_PICK_MAX_DELTA_PX } from "../../scene/atomPicking";
+
 const LOCKED_INTERACTION_WHEEL_IDLE_MS = 150;
 const REDISPATCHED_CONTEXT_MENU_EVENT = "__prettyLatticeRedispatchedContextMenu";
 
@@ -145,7 +146,7 @@ export function useLockedInteractionFeedback({
         event.clientX - lockedPointer.startX,
         event.clientY - lockedPointer.startY,
       );
-      if (dragDistance < LOCKED_INTERACTION_DRAG_THRESHOLD_PX) {
+      if (dragDistance <= ATOM_PICK_MAX_DELTA_PX) {
         return;
       }
 

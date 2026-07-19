@@ -1,5 +1,6 @@
 export const STRUCTURE_RENDER_ORDER = {
   atomMesh: 10,
+  atomSelectionHalo: 10.5,
   bondMesh: 11,
   unitCellFrame: 12,
   polyhedronSurface: 20,

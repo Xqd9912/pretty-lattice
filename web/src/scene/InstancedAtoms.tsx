@@ -1,6 +1,7 @@
 import { type ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
+  BackSide,
   Color,
   Group,
   InstancedMesh,
@@ -32,18 +33,28 @@ import {
   easeOutCubic,
 } from "./atomHighlight";
 import type { VectorTuple } from "./viewMath";
+import {
+  resolveAtomSelectionAction,
+  selectedAtomInstanceIndices,
+} from "./atomPicking";
 
 interface AtomColorInstanceSpec {
-  atom: AtomSpec;
-  baseColor: Color;
   color: string;
+  restingColor: Color;
 }
 
-interface AtomInstanceSpec extends AtomColorInstanceSpec {
+interface AtomInstanceSpec {
+  atom: AtomSpec;
   radius: number;
 }
 
+const EMPTY_SELECTED_SITE_INDICES: ReadonlySet<number> = new Set();
+const ATOM_SELECTION_HALO_COLOR = "#38bdf8";
+const ATOM_SELECTION_HALO_OPACITY = 0.9;
+const ATOM_SELECTION_HALO_SCALE = 1.12;
+
 export function InstancedAtoms({
+  atomPickingEnabled = false,
   atoms,
   colorScheme,
   colorOverrides,
@@ -53,13 +64,16 @@ export function InstancedAtoms({
   meshDetail,
   onInspect,
   onPulse,
+  onAtomSelectionToggle,
   onLockedInteractionAttempt,
   opacity,
   pulseAtomId,
   pulseToken,
   radiusModel,
   radiusScale,
+  selectedSiteIndices = EMPTY_SELECTED_SITE_INDICES,
 }: {
+  atomPickingEnabled?: boolean;
   atoms: AtomSpec[];
   colorScheme: StyleState["colorScheme"];
   colorOverrides?: ElementColorOverrides;
@@ -69,14 +83,20 @@ export function InstancedAtoms({
   meshDetail: SceneMeshDetail;
   onInspect?: (atomId: string | null) => void;
   onPulse?: (atomId: string) => void;
+  onAtomSelectionToggle?: (siteIndex: number) => void;
   onLockedInteractionAttempt?: () => void;
   opacity: number;
   pulseAtomId: string | null;
   pulseToken: number;
   radiusModel: AtomRadiusModel;
   radiusScale: number;
+  selectedSiteIndices?: ReadonlySet<number>;
 }) {
   const meshRef = useRef<InstancedMesh | null>(null);
+  const selectionPointerDownRef = useRef<{
+    clientX: number;
+    clientY: number;
+  } | null>(null);
   const invalidate = useThree((state) => state.invalidate);
   const isTransparent = opacity < 1;
   const atomColorInstances = useMemo<AtomColorInstanceSpec[]>(
@@ -84,20 +104,23 @@ export function InstancedAtoms({
       atoms.map((atom) => {
         const color = atomColorForScheme(atom, colorScheme, colorOverrides);
         return {
-          atom,
-          baseColor: new Color(color),
           color,
+          restingColor: new Color(color),
         };
       }),
     [atoms, colorOverrides, colorScheme],
   );
   const atomInstances = useMemo<AtomInstanceSpec[]>(
     () =>
-      atomColorInstances.map((instance) => ({
-        ...instance,
-        radius: atomRadiusForModel(instance.atom, radiusModel) * radiusScale,
+      atoms.map((atom) => ({
+        atom,
+        radius: atomRadiusForModel(atom, radiusModel) * radiusScale,
       })),
-    [atomColorInstances, radiusModel, radiusScale],
+    [atoms, radiusModel, radiusScale],
+  );
+  const selectedInstanceIndices = useMemo(
+    () => selectedAtomInstanceIndices(atoms, selectedSiteIndices),
+    [atoms, selectedSiteIndices],
   );
   const atomIndexById = useMemo(() => {
     const indexById = new Map<string, number>();
@@ -106,8 +129,9 @@ export function InstancedAtoms({
     });
     return indexById;
   }, [atomInstances]);
-  const inspectedInstance = instanceForAtomId(
+  const inspectedInstance = highlightedInstanceForAtomId(
     atomInstances,
+    atomColorInstances,
     atomIndexById,
     inspectedAtomId,
   );
@@ -116,7 +140,12 @@ export function InstancedAtoms({
     : null;
   const pulseInstance = inspectedInstance || !activePulse
     ? null
-    : instanceForAtomId(atomInstances, atomIndexById, activePulse.atomId);
+    : highlightedInstanceForAtomId(
+        atomInstances,
+        atomColorInstances,
+        atomIndexById,
+        activePulse.atomId,
+      );
   const activeHighlight = inspectedInstance ?? pulseInstance;
 
   const handlePulseComplete = useCallback(() => {}, []);
@@ -153,7 +182,7 @@ export function InstancedAtoms({
 
     for (let index = 0; index < atomColorInstances.length; index += 1) {
       const instance = atomColorInstances[index]!;
-      mesh.setColorAt(index, instance.baseColor);
+      mesh.setColorAt(index, instance.restingColor);
     }
 
     if (mesh.instanceColor) {
@@ -180,6 +209,32 @@ export function InstancedAtoms({
         return;
       }
 
+      if (atomPickingEnabled) {
+        const pointerDown = selectionPointerDownRef.current;
+        selectionPointerDownRef.current = null;
+        const selectionAction = resolveAtomSelectionAction(
+          {
+            button: event.button,
+            detail: event.detail,
+            pointerDown,
+            pointerUp: event,
+          },
+          interactionLocked,
+        );
+        if (selectionAction === "ignore") {
+          return;
+        }
+
+        event.stopPropagation();
+        if (selectionAction === "locked") {
+          onLockedInteractionAttempt?.();
+          return;
+        }
+
+        onAtomSelectionToggle?.(atom.siteIndex);
+        return;
+      }
+
       event.stopPropagation();
       if (interactionLocked) {
         return;
@@ -187,8 +242,29 @@ export function InstancedAtoms({
 
       onPulse?.(atom.id);
     },
-    [atomForEvent, interactionLocked, onPulse],
+    [
+      atomForEvent,
+      atomPickingEnabled,
+      interactionLocked,
+      onAtomSelectionToggle,
+      onLockedInteractionAttempt,
+      onPulse,
+    ],
   );
+
+  const handlePointerDown = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      selectionPointerDownRef.current =
+        atomPickingEnabled && event.button === 0
+          ? { clientX: event.clientX, clientY: event.clientY }
+          : null;
+    },
+    [atomPickingEnabled],
+  );
+
+  const handlePointerCancel = useCallback(() => {
+    selectionPointerDownRef.current = null;
+  }, []);
 
   const handleDoubleClick = useCallback(
     (event: ThreeEvent<MouseEvent>) => {
@@ -198,6 +274,10 @@ export function InstancedAtoms({
       }
 
       event.stopPropagation();
+      if (atomPickingEnabled) {
+        return;
+      }
+
       if (interactionLocked) {
         onLockedInteractionAttempt?.();
         return;
@@ -205,7 +285,13 @@ export function InstancedAtoms({
 
       onInspect?.(atom.id);
     },
-    [atomForEvent, interactionLocked, onInspect, onLockedInteractionAttempt],
+    [
+      atomForEvent,
+      atomPickingEnabled,
+      interactionLocked,
+      onInspect,
+      onLockedInteractionAttempt,
+    ],
   );
 
   if (atomInstances.length === 0) {
@@ -214,11 +300,18 @@ export function InstancedAtoms({
 
   return (
     <>
+      <InstancedAtomSelectionHalos
+        atomInstances={atomInstances}
+        meshDetail={meshDetail}
+        selectedInstanceIndices={selectedInstanceIndices}
+      />
       <instancedMesh
         ref={meshRef}
         args={[undefined, undefined, atomInstances.length]}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
+        onPointerCancel={handlePointerCancel}
+        onPointerDown={handlePointerDown}
         renderOrder={STRUCTURE_RENDER_ORDER.atomMesh}
       >
         <sphereGeometry
@@ -246,7 +339,7 @@ export function InstancedAtoms({
             inspectedInstance ? "" : pulseToken,
             activeHighlight.instance.color,
           ].join(":")}
-          baseColor={activeHighlight.instance.baseColor}
+          restingColor={activeHighlight.instance.restingColor}
           index={activeHighlight.index}
           inspected={inspectedInstance !== null}
           meshRef={meshRef}
@@ -263,6 +356,83 @@ export function InstancedAtoms({
     </>
   );
 }
+
+function InstancedAtomSelectionHalos({
+  atomInstances,
+  meshDetail,
+  selectedInstanceIndices,
+}: {
+  atomInstances: AtomInstanceSpec[];
+  meshDetail: SceneMeshDetail;
+  selectedInstanceIndices: number[];
+}) {
+  const meshRef = useRef<InstancedMesh | null>(null);
+  const invalidate = useThree((state) => state.invalidate);
+
+  useLayoutEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) {
+      // Removing the final halo still needs a frame on the demand-rendered canvas.
+      invalidate();
+      return;
+    }
+
+    const matrix = new Matrix4();
+    const position = new Vector3();
+    const scale = new Vector3();
+    const quaternion = new Quaternion();
+    let haloIndex = 0;
+
+    for (const atomIndex of selectedInstanceIndices) {
+      const instance = atomInstances[atomIndex];
+      if (!instance) {
+        continue;
+      }
+
+      position.fromArray(instance.atom.position);
+      scale.setScalar(instance.radius * ATOM_SELECTION_HALO_SCALE);
+      matrix.compose(position, quaternion, scale);
+      mesh.setMatrixAt(haloIndex, matrix);
+      haloIndex += 1;
+    }
+
+    mesh.count = haloIndex;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    invalidate();
+  }, [atomInstances, invalidate, selectedInstanceIndices]);
+
+  if (selectedInstanceIndices.length === 0) {
+    return null;
+  }
+
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[undefined, undefined, selectedInstanceIndices.length]}
+      raycast={ignoreAtomSelectionHaloRaycast}
+      renderOrder={STRUCTURE_RENDER_ORDER.atomSelectionHalo}
+    >
+      <sphereGeometry
+        args={[
+          1,
+          meshDetail.sphereWidthSegments,
+          meshDetail.sphereHeightSegments,
+        ]}
+      />
+      <meshBasicMaterial
+        color={ATOM_SELECTION_HALO_COLOR}
+        depthWrite={false}
+        opacity={ATOM_SELECTION_HALO_OPACITY}
+        side={BackSide}
+        toneMapped={false}
+        transparent
+      />
+    </instancedMesh>
+  );
+}
+
+function ignoreAtomSelectionHaloRaycast() {}
 
 function instanceForAtomId(
   atomInstances: AtomInstanceSpec[],
@@ -282,6 +452,26 @@ function instanceForAtomId(
   return instance ? { index, instance } : null;
 }
 
+function highlightedInstanceForAtomId(
+  atomInstances: AtomInstanceSpec[],
+  atomColorInstances: AtomColorInstanceSpec[],
+  atomIndexById: Map<string, number>,
+  atomId: string | null,
+): { index: number; instance: AtomInstanceSpec & AtomColorInstanceSpec } | null {
+  const atomInstance = instanceForAtomId(atomInstances, atomIndexById, atomId);
+  if (!atomInstance) {
+    return null;
+  }
+
+  const colorInstance = atomColorInstances[atomInstance.index];
+  return colorInstance
+    ? {
+        index: atomInstance.index,
+        instance: { ...atomInstance.instance, ...colorInstance },
+      }
+    : null;
+}
+
 function setAtomInstanceColor(
   mesh: InstancedMesh,
   index: number,
@@ -294,17 +484,17 @@ function setAtomInstanceColor(
 }
 
 function InstancedAtomHighlightAnimator({
-  baseColor,
   index,
   inspected,
   meshRef,
   onComplete,
+  restingColor,
 }: {
-  baseColor: Color;
   index: number;
   inspected: boolean;
   meshRef: { current: InstancedMesh | null };
   onComplete: () => void;
+  restingColor: Color;
 }) {
   const invalidate = useThree((state) => state.invalidate);
   const startTimeRef = useRef(performance.now());
@@ -318,11 +508,11 @@ function InstancedAtomHighlightAnimator({
     return () => {
       const mesh = meshRef.current;
       if (mesh) {
-        setAtomInstanceColor(mesh, index, baseColor);
+        setAtomInstanceColor(mesh, index, restingColor);
         invalidate();
       }
     };
-  }, [baseColor, index, inspected, invalidate, meshRef]);
+  }, [index, inspected, invalidate, meshRef, restingColor]);
 
   useFrame(() => {
     if (!isActiveRef.current) {
@@ -341,12 +531,14 @@ function InstancedAtomHighlightAnimator({
     const durationMs = inspected ? ATOM_HIGHLIGHT_SELECT_MS : ATOM_HIGHLIGHT_PULSE_MS;
     const progress = Math.min(1, elapsedMs / durationMs);
     const fade = inspected ? easeOutCubic(progress) : atomPulseFade(progress);
-    const color = baseColor.clone().lerp(ATOM_HIGHLIGHT_TARGET_COLOR, targetMix * fade);
+    const color = restingColor
+      .clone()
+      .lerp(ATOM_HIGHLIGHT_TARGET_COLOR, targetMix * fade);
     setAtomInstanceColor(mesh, index, color);
 
     if (progress >= 1) {
+      setAtomInstanceColor(mesh, index, restingColor);
       if (!inspected) {
-        setAtomInstanceColor(mesh, index, baseColor);
         onComplete();
       }
       isActiveRef.current = false;

@@ -38,6 +38,7 @@ export const BOND_COLOR = DEFAULT_BOND_COLOR;
 export const BOND_TUBE_RADIAL_SEGMENTS = 24;
 export const SCENE_FOG_COLOR = "#fafafa";
 const FOG_FRONT_PADDING_RATIO = 0.4;
+const EMPTY_SELECTED_SITE_INDICES: ReadonlySet<number> = new Set();
 
 export const PREVIEW_SCENE_MESH_DETAIL: SceneMeshDetail = {
   bondRadialSegments: 16,
@@ -65,6 +66,7 @@ export const EXPORT_SCENE_MESH_DETAIL_PRESETS: Record<ExportMeshQuality, SceneMe
 };
 
 export function PreviewSceneContent({
+  atomPickingEnabled = false,
   componentOpacity,
   layout,
   materialFamilies,
@@ -74,16 +76,19 @@ export function PreviewSceneContent({
   interactionLocked,
   onAtomInspect,
   onAtomPulse,
+  onAtomSelectionToggle,
   onLockedInteractionAttempt,
   polyhedronEdgeLineWidthScale = 1,
   pulseAtomId,
   pulseToken,
+  selectedSiteIndices = EMPTY_SELECTED_SITE_INDICES,
   showAtoms,
   showUnitCell,
   style,
   unitCellLineStyle = "solid",
   unitCellLineWidthScale = 1,
 }: {
+  atomPickingEnabled?: boolean;
   componentOpacity: ComponentOpacityState;
   layout: SceneLayout;
   materialFamilies: ResolvedStructureMaterialFamilies;
@@ -93,10 +98,12 @@ export function PreviewSceneContent({
   interactionLocked: boolean;
   onAtomInspect?: (atomId: string | null) => void;
   onAtomPulse?: (atomId: string) => void;
+  onAtomSelectionToggle?: (siteIndex: number) => void;
   onLockedInteractionAttempt?: () => void;
   polyhedronEdgeLineWidthScale?: number;
   pulseAtomId: string | null;
   pulseToken: number;
+  selectedSiteIndices?: ReadonlySet<number>;
   showAtoms: boolean;
   showUnitCell: boolean;
   style: StyleState;
@@ -105,8 +112,14 @@ export function PreviewSceneContent({
 }) {
   return (
     <>
+      <SceneRenderInvalidator
+        scene={scene}
+        showAtoms={showAtoms}
+        showUnitCell={showUnitCell}
+      />
       <SceneFog layout={layout} style={style} />
       <MemoizedStructureSceneObjects
+        atomPickingEnabled={atomPickingEnabled}
         componentOpacity={componentOpacity}
         groupPosition={layout.groupPosition}
         materialFamilies={materialFamilies}
@@ -116,10 +129,12 @@ export function PreviewSceneContent({
         interactionLocked={interactionLocked}
         onAtomInspect={onAtomInspect}
         onAtomPulse={onAtomPulse}
+        onAtomSelectionToggle={onAtomSelectionToggle}
         onLockedInteractionAttempt={onLockedInteractionAttempt}
         polyhedronEdgeLineWidthScale={polyhedronEdgeLineWidthScale}
         pulseAtomId={pulseAtomId}
         pulseToken={pulseToken}
+        selectedSiteIndices={selectedSiteIndices}
         showAtoms={showAtoms}
         showUnitCell={showUnitCell}
         style={style}
@@ -128,6 +143,25 @@ export function PreviewSceneContent({
       />
     </>
   );
+}
+
+/** Ensure removals are painted when the preview canvas runs on demand. */
+export function SceneRenderInvalidator({
+  scene,
+  showAtoms,
+  showUnitCell,
+}: {
+  scene: SceneSpec;
+  showAtoms: boolean;
+  showUnitCell: boolean;
+}) {
+  const invalidate = useThree((state) => state.invalidate);
+
+  useLayoutEffect(() => {
+    invalidate();
+  }, [invalidate, scene, showAtoms, showUnitCell]);
+
+  return null;
 }
 
 export function SceneFog({
@@ -226,6 +260,7 @@ function lerp(start: number, end: number, amount: number): number {
 }
 
 export function StructureSceneObjects({
+  atomPickingEnabled = false,
   componentOpacity,
   groupPosition,
   interactionLocked = false,
@@ -235,10 +270,12 @@ export function StructureSceneObjects({
   inspectedAtomId = null,
   onAtomInspect,
   onAtomPulse,
+  onAtomSelectionToggle,
   onLockedInteractionAttempt,
   polyhedronEdgeLineWidthScale = 1,
   pulseAtomId = null,
   pulseToken = 0,
+  selectedSiteIndices = EMPTY_SELECTED_SITE_INDICES,
   showAtoms,
   showUnitCell,
   style,
@@ -246,6 +283,7 @@ export function StructureSceneObjects({
   unitCellLineStyle = "solid",
   unitCellLineWidthScale = 1,
 }: {
+  atomPickingEnabled?: boolean;
   componentOpacity: ComponentOpacityState;
   groupPosition: VectorTuple;
   interactionLocked?: boolean;
@@ -255,10 +293,12 @@ export function StructureSceneObjects({
   inspectedAtomId?: string | null;
   onAtomInspect?: (atomId: string | null) => void;
   onAtomPulse?: (atomId: string) => void;
+  onAtomSelectionToggle?: (siteIndex: number) => void;
   onLockedInteractionAttempt?: () => void;
   polyhedronEdgeLineWidthScale?: number;
   pulseAtomId?: string | null;
   pulseToken?: number;
+  selectedSiteIndices?: ReadonlySet<number>;
   showAtoms: boolean;
   showUnitCell: boolean;
   style: StyleState;
@@ -330,6 +370,7 @@ export function StructureSceneObjects({
         />
         {showAtoms ? (
           <InstancedAtoms
+            atomPickingEnabled={atomPickingEnabled}
             atoms={scene.atoms}
             colorScheme={colorScheme}
             colorOverrides={colorOverrides}
@@ -339,11 +380,13 @@ export function StructureSceneObjects({
             meshDetail={meshDetail}
             onInspect={onAtomInspect}
             onPulse={onAtomPulse}
+            onAtomSelectionToggle={onAtomSelectionToggle}
             onLockedInteractionAttempt={onLockedInteractionAttempt}
             pulseAtomId={pulseAtomId}
             pulseToken={pulseToken}
             radiusModel={style.atomRadiusModel}
             radiusScale={style.atomRadius / 100}
+            selectedSiteIndices={selectedSiteIndices}
             opacity={componentOpacity.atoms / 100}
           />
         ) : null}

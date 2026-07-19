@@ -50,10 +50,20 @@ export function atomSiteIndex(atom: AtomSpec): number | string {
   return match?.[1] ?? "-";
 }
 
+export function atomDisplayNumber(atom: AtomSpec): number | string {
+  const siteIndex = atomSiteIndex(atom);
+  if (typeof siteIndex === "number") {
+    return siteIndex + 1;
+  }
+
+  const parsedIndex = Number(siteIndex);
+  return Number.isFinite(parsedIndex) ? parsedIndex + 1 : siteIndex;
+}
+
 export function atomInspectorCopyText(info: InspectedAtomInfo): string {
   return [
     `Element: ${info.canonicalAtom.element}`,
-    `Index: ${atomSiteIndex(info.canonicalAtom)}`,
+    `Atom number: ${atomDisplayNumber(info.canonicalAtom)}`,
     `Fractional: ${formatAtomCoordinateForCopy(info.canonicalAtom.fractionalPosition)}`,
     `Cartesian (A): ${formatAtomCoordinateForCopy(info.canonicalAtom.position)}`,
     `Cell offset: ${formatCellOffset(info.atom.imageOffset)}`,

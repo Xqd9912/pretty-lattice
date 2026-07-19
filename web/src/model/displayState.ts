@@ -1,10 +1,6 @@
-import type {
-  AtomSpec,
-  BondSpec,
-  PolyhedronSpec,
-  SceneSpec,
-  VisibilityDependency,
-} from "../api/scene";
+import type { AtomSpec, SceneSpec, VisibilityDependency } from "../api/scene";
+
+import { filterSceneAtoms } from "./sceneFiltering";
 
 export interface ComponentVisibilityState {
   atoms: boolean;
@@ -91,27 +87,10 @@ export function visibleSceneForComponents(
     return scene;
   }
 
-  const atomIndexMap = new Map<number, number>();
-  const atoms: AtomSpec[] = [];
-  scene.atoms.forEach((atom, atomIndex) => {
-    if (isAtomAvailable(atom, visibility)) {
-      atomIndexMap.set(atomIndex, atoms.length);
-      atoms.push(atom);
-    }
+  return filterSceneAtoms(scene, (atom) => isAtomAvailable(atom, visibility), {
+    bonds: visibility.bonds,
+    polyhedra: visibility.polyhedra,
   });
-  const bonds = visibility.bonds
-    ? scene.bonds.flatMap((bond) => remapBond(bond, atomIndexMap))
-    : [];
-  const polyhedra = visibility.polyhedra
-    ? scene.polyhedra.flatMap((polyhedron) => remapPolyhedron(polyhedron, atomIndexMap))
-    : [];
-
-  return {
-    ...scene,
-    atoms,
-    bonds,
-    polyhedra,
-  };
 }
 
 function isAtomAvailable(atom: AtomSpec, visibility: ComponentVisibilityState): boolean {
@@ -120,40 +99,6 @@ function isAtomAvailable(atom: AtomSpec, visibility: ComponentVisibilityState): 
   }
 
   return dependencyGroupsAllow(atom.visibilityDependencyGroups, visibility);
-}
-
-function remapBond(
-  bond: BondSpec,
-  atomIndexMap: Map<number, number>,
-): BondSpec[] {
-  const startAtomIndex = atomIndexMap.get(bond.startAtomIndex);
-  const endAtomIndex = atomIndexMap.get(bond.endAtomIndex);
-  if (startAtomIndex === undefined || endAtomIndex === undefined) {
-    return [];
-  }
-
-  return [{ ...bond, startAtomIndex, endAtomIndex }];
-}
-
-function remapPolyhedron(
-  polyhedron: PolyhedronSpec,
-  atomIndexMap: Map<number, number>,
-): PolyhedronSpec[] {
-  const hullAtomIndices: number[] = [];
-  for (const atomIndex of polyhedron.hullAtomIndices) {
-    const visibleAtomIndex = atomIndexMap.get(atomIndex);
-    if (visibleAtomIndex === undefined) {
-      return [];
-    }
-    hullAtomIndices.push(visibleAtomIndex);
-  }
-
-  const centerAtomIndex = atomIndexMap.get(polyhedron.centerAtomIndex);
-  if (centerAtomIndex === undefined) {
-    return [];
-  }
-
-  return [{ ...polyhedron, centerAtomIndex, hullAtomIndices }];
 }
 
 function dependencyGroupsAllow(

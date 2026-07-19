@@ -218,6 +218,9 @@ describe("computeSceneLayout", () => {
 
   test("draws transparent structure objects before polyhedron shells and overlays", () => {
     expect(STRUCTURE_RENDER_ORDER.atomMesh).toBeLessThan(
+      STRUCTURE_RENDER_ORDER.atomSelectionHalo,
+    );
+    expect(STRUCTURE_RENDER_ORDER.atomSelectionHalo).toBeLessThan(
       STRUCTURE_RENDER_ORDER.bondMesh,
     );
     expect(STRUCTURE_RENDER_ORDER.bondMesh).toBeLessThan(

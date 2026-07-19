@@ -81,8 +81,10 @@ const CAMERA_ORIENTATION_CHANGE_EPSILON = 0.002;
 const FPS_IDLE_TIMEOUT_MS = 550;
 const FPS_REPORT_INTERVAL_MS = 250;
 const FPS_SMOOTHING_WEIGHT = 0.18;
+const EMPTY_SELECTED_SITE_INDICES: ReadonlySet<number> = new Set();
 
 export function LatticeScene({
+  atomPickingEnabled = false,
   cameraOrientationRef,
   cameraAnimatedCommandVersion = 0,
   cameraInteractionStore,
@@ -101,10 +103,12 @@ export function LatticeScene({
   onCameraOrientationChange,
   onAtomInspect,
   onAtomPulse,
+  onAtomSelectionToggle,
   onLockedInteractionAttempt,
   resetCounter,
   safeArea = EMPTY_SAFE_AREA,
   scene,
+  selectedSiteIndices = EMPTY_SELECTED_SITE_INDICES,
   inspectedAtomId = null,
   pulseAtomId = null,
   pulseToken = 0,
@@ -117,6 +121,7 @@ export function LatticeScene({
   suspendCameraOrientationUpdates = false,
   unitCellLineStyle = "solid",
 }: {
+  atomPickingEnabled?: boolean;
   cameraOrientationRef?: CameraOrientationRef;
   cameraAnimatedCommandVersion?: number;
   cameraInteractionStore: CameraInteractionStore;
@@ -138,10 +143,12 @@ export function LatticeScene({
   onCameraOrientationChange?: () => void;
   onAtomInspect?: (atomId: string | null) => void;
   onAtomPulse?: (atomId: string) => void;
+  onAtomSelectionToggle?: (siteIndex: number) => void;
   onLockedInteractionAttempt?: () => void;
   resetCounter: number;
   safeArea?: PreviewSafeArea;
   scene: SceneSpec;
+  selectedSiteIndices?: ReadonlySet<number>;
   inspectedAtomId?: string | null;
   pulseAtomId?: string | null;
   pulseToken?: number;
@@ -200,6 +207,7 @@ export function LatticeScene({
       frameloop="demand"
       gl={DEFAULT_RENDERER_PARAMETERS}
       data-testid="lattice-canvas"
+      style={atomPickingEnabled ? { cursor: "crosshair" } : undefined}
     >
       <MaterialPresetLights
         intensityScale={lightStrength}
@@ -221,6 +229,7 @@ export function LatticeScene({
         safeArea={safeArea}
       />
       <PreviewSceneContent
+        atomPickingEnabled={atomPickingEnabled}
         componentOpacity={componentOpacity}
         layout={layout}
         materialFamilies={materialFamilies}
@@ -230,9 +239,11 @@ export function LatticeScene({
         interactionLocked={interactionLocked}
         onAtomInspect={onAtomInspect}
         onAtomPulse={onAtomPulse}
+        onAtomSelectionToggle={onAtomSelectionToggle}
         onLockedInteractionAttempt={onLockedInteractionAttempt}
         pulseAtomId={pulseAtomId}
         pulseToken={pulseToken}
+        selectedSiteIndices={selectedSiteIndices}
         showAtoms={showAtoms}
         showUnitCell={showUnitCell}
         style={style}

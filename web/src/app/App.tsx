@@ -28,6 +28,7 @@ import { TOOL_ICON_BUTTON_ACTIVE_CLASS, TOOL_ICON_BUTTON_CLASS } from "./surface
 import { inspectedAtomInfoForId } from "./atomInspector";
 import { LatticeScene } from "../scene/LatticeScene";
 import { ATOM_HIGHLIGHT_PULSE_MS } from "../scene/atomHighlight";
+import { selectedSiteIndicesForHighlight } from "../scene/atomPicking";
 import { OrientationGizmo } from "../scene/OrientationGizmo";
 import {
   CommonControlsPanel,
@@ -38,6 +39,7 @@ import { createCameraInteractionStore } from "./cameraInteractionStore";
 import { createPreviewFpsStore } from "../model/previewFpsStore";
 import { deriveElementLegendEntries } from "./elementLegend";
 import { useFigureExportController } from "./hooks/useFigureExportController";
+import { useAtomSelection } from "./hooks/useAtomSelection";
 import { useLockedInteractionFeedback } from "./hooks/useLockedInteractionFeedback";
 import { usePreviewCameraCommands } from "./hooks/usePreviewCameraCommands";
 import { useStructurePreview } from "./hooks/useStructurePreview";
@@ -72,9 +74,13 @@ import {
   rightPanelsSceneOffsetX,
   electronicPanelRightOffset,
   ANALYSIS_PANEL_DEFAULT_WIDTH_PX,
+  canonicalSites,
   ELECTRONIC_PANEL_DEFAULT_WIDTH_PX,
   INSPECTOR_PANEL_DEFAULT_WIDTH_PX,
+  isolateSelectedSites,
+  isSiteVisible,
   visibleSceneForComponents,
+  visibleSceneForSites,
 } from "../model";
 
 interface ResetLoadedPreviewOptions {
@@ -107,6 +113,22 @@ export function App() {
   const [pulseAtom, setPulseAtom] = useState<{ atomId: string; token: number } | null>(null);
   const [activeCommonPanelTab, setActiveCommonPanelTab] =
     useState<CommonPanelTab>("display");
+  const {
+    handleClearSelection,
+    handleElementVisibilityToggle,
+    handleHideSelected,
+    handleInvertSelection,
+    handleSelectedOnlyChange,
+    handleShowAll,
+    handleSiteSelectionToggle,
+    handleSiteVisibilityToggle,
+    reconcileAtomSelection,
+    resetAtomSelection,
+    selectedSiteIndices,
+    selectedOnly,
+    sessionVersion: atomSelectionSessionVersion,
+    siteVisibility,
+  } = useAtomSelection();
   const [cameraInteractionStore] = useState(createCameraInteractionStore);
   const [previewFpsStore] = useState(createPreviewFpsStore);
   const [isStructureSummaryCollapsed, setIsStructureSummaryCollapsed] = useState(true);
@@ -125,7 +147,8 @@ export function App() {
     setPulseAtom(null);
     setIsInspectorOpen(false);
     setIsStructureSummaryCollapsed(true);
-  }, []);
+    resetAtomSelection();
+  }, [resetAtomSelection]);
   const handleBondAlgorithmSceneLoaded = useCallback((nextScene: SceneSpec) => {
     setInspectedAtomId(null);
     setPulseAtom(null);
@@ -208,9 +231,10 @@ export function App() {
         setDensityScene(null);
         setDensityFileName(null);
         setDensityIsosurface(null);
+        resetAtomSelection();
       }
     },
-    [resetLoadedPreviewStateForPreview],
+    [resetAtomSelection, resetLoadedPreviewStateForPreview],
   );
   const handleIsosurfaceChange = useCallback((overlay: IsosurfaceOverlay | null) => {
     setDensityIsosurface(overlay);
@@ -306,9 +330,43 @@ export function App() {
     [handleBondCutoffChange, setBondCutoffs, trajectoryActive],
   );
 
+  const canonicalAtoms = useMemo(() => canonicalSites(scene), [scene]);
+  const effectiveSiteVisibility = useMemo(
+    () =>
+      selectedOnly
+        ? isolateSelectedSites(
+            new Set(
+              Array.from(selectedSiteIndices).filter((siteIndex) =>
+                isSiteVisible(siteVisibility, siteIndex),
+              ),
+            ),
+          )
+        : siteVisibility,
+    [selectedOnly, selectedSiteIndices, siteVisibility],
+  );
+  const siteFilteredScene = useMemo(
+    () => visibleSceneForSites(scene, effectiveSiteVisibility),
+    [effectiveSiteVisibility, scene],
+  );
   const visibleScene = useMemo(
-    () => visibleSceneForComponents(scene, componentVisibility),
-    [componentVisibility, scene],
+    () => visibleSceneForComponents(siteFilteredScene, componentVisibility),
+    [componentVisibility, siteFilteredScene],
+  );
+  const handleIsSiteVisible = useCallback(
+    (siteIndex: number) => isSiteVisible(effectiveSiteVisibility, siteIndex),
+    [effectiveSiteVisibility],
+  );
+  const handleIsSiteBaseVisible = useCallback(
+    (siteIndex: number) => isSiteVisible(siteVisibility, siteIndex),
+    [siteVisibility],
+  );
+  const handleSelectElementVisibilityToggle = useCallback(
+    (element: string) => handleElementVisibilityToggle(scene, element),
+    [handleElementVisibilityToggle, scene],
+  );
+  const handleSelectInvertSelection = useCallback(
+    () => handleInvertSelection(scene),
+    [handleInvertSelection, scene],
   );
   const inspectedAtomInfo = useMemo(
     () => inspectedAtomInfoForId(visibleScene, inspectedAtomId),
@@ -365,7 +423,7 @@ export function App() {
     componentOpacity,
     componentVisibility,
     lightStrength: viewState.lightStrength,
-    scene,
+    scene: siteFilteredScene,
     selectedFileName: displayFileName,
     showCrystalAxisLabels,
     style,
@@ -389,6 +447,10 @@ export function App() {
   useEffect(() => {
     inspectedAtomIdRef.current = inspectedAtomId;
   }, [inspectedAtomId]);
+
+  useEffect(() => {
+    reconcileAtomSelection(scene);
+  }, [reconcileAtomSelection, scene]);
 
   useEffect(() => {
     if (!pulseAtom) {
@@ -424,6 +486,7 @@ export function App() {
       setPreviewMeshQuality(defaultPreviewMeshQualityForScene(nextScene));
       setUnitCellLineStyle(DEFAULT_UNIT_CELL_LINE_STYLE);
       setShowCrystalAxisLabels(DEFAULT_SHOW_CRYSTAL_AXIS_LABELS);
+      resetAtomSelection();
       if (!options.preserveActiveCommonPanelTab) {
         setActiveCommonPanelTab("display");
       }
@@ -433,6 +496,7 @@ export function App() {
     },
     [
       resetCameraForScene,
+      resetAtomSelection,
       resetExportState,
       resetLockedInteractionFeedback,
     ],
@@ -479,15 +543,20 @@ export function App() {
 
   const elementColorOverrides = useMemo(
     () =>
-      scene
-        ? elementColorOverridesForStyle(scene.atoms, style)
+      siteFilteredScene
+        ? elementColorOverridesForStyle(siteFilteredScene.atoms, style)
         : undefined,
-    [scene, style],
+    [siteFilteredScene, style],
   );
   const legendColorScheme = baseColorSchemeForStyle(style);
   const legendEntries = useMemo(
-    () => deriveElementLegendEntries(scene, legendColorScheme, elementColorOverrides),
-    [elementColorOverrides, legendColorScheme, scene],
+    () =>
+      deriveElementLegendEntries(
+        siteFilteredScene,
+        legendColorScheme,
+        elementColorOverrides,
+      ),
+    [elementColorOverrides, legendColorScheme, siteFilteredScene],
   );
   const handleLegendElementColorChange = useCallback((element: string, color: string) => {
     setStyle((currentStyle) => {
@@ -614,6 +683,7 @@ export function App() {
           >
             {visibleScene ? (
               <LatticeScene
+                atomPickingEnabled={activeCommonPanelTab === "select"}
                 cameraAnimatedCommandVersion={cameraAnimatedCommandVersion}
                 cameraCommandVersion={cameraCommandVersion}
                 cameraState={viewState.camera}
@@ -626,6 +696,7 @@ export function App() {
                 }
                 onAtomInspect={handleAtomInspect}
                 onAtomPulse={handleAtomPulse}
+                onAtomSelectionToggle={handleSiteSelectionToggle}
                 onLockedInteractionAttempt={triggerLockedInteractionFeedback}
                 cameraInteractionStore={cameraInteractionStore}
                 suspendCameraOrientationUpdates={
@@ -640,6 +711,9 @@ export function App() {
                 resetCounter={viewState.resetCounter}
                 safeArea={previewSafeArea}
                 scene={visibleScene}
+                selectedSiteIndices={
+                  selectedSiteIndicesForHighlight(selectedSiteIndices, selectedOnly)
+                }
                 inspectedAtomId={inspectedAtomId}
                 pulseAtomId={pulseAtom?.atomId ?? null}
                 pulseToken={pulseAtom?.token ?? 0}
@@ -787,7 +861,9 @@ export function App() {
           <div>
             <CommonControlsPanel
               activeTab={activeCommonPanelTab}
+              atomSelectionSessionVersion={atomSelectionSessionVersion}
               cameraState={cameraControlsPanelState}
+              canonicalAtoms={canonicalAtoms}
               cellVectors={scene.cell.vectors}
               componentOpacity={componentOpacity}
               style={style}
@@ -797,6 +873,8 @@ export function App() {
               exportSettings={exportSettings}
               hasPolyhedra={hasPolyhedra(scene)}
               isExporting={isExporting}
+              isSiteVisible={handleIsSiteVisible}
+              isSiteBaseVisible={handleIsSiteBaseVisible}
               onActiveTabChange={setActiveCommonPanelTab}
               onAtomRadiusModelChange={(atomRadiusModel) => {
                 setStyle((currentStyle) => ({ ...currentStyle, atomRadiusModel }));
@@ -812,6 +890,16 @@ export function App() {
               onExportSettingsChange={handleExportSettingsChange}
               onStyleChange={setStyle}
               onComponentVisibilityChange={setComponentVisibility}
+              onElementVisibilityToggle={handleSelectElementVisibilityToggle}
+              onHideSelected={handleHideSelected}
+              onInvertSelection={handleSelectInvertSelection}
+              onSelectedOnlyChange={handleSelectedOnlyChange}
+              onSelectionClear={handleClearSelection}
+              onShowAllSites={handleShowAll}
+              onSiteSelectionToggle={handleSiteSelectionToggle}
+              onSiteVisibilityToggle={handleSiteVisibilityToggle}
+              selectedSiteIndices={selectedSiteIndices}
+              selectedOnly={selectedOnly}
             />
           </div>
         ) : null}

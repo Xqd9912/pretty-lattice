@@ -626,6 +626,53 @@ describe("App", () => {
     expect(screen.queryByTestId("preview-loading-overlay")).toBeNull();
   });
 
+  test("keeps atom selection and visibility while changing trajectory frames", async () => {
+    const user = userEvent.setup();
+    const trajectoryScene = sceneWithPeriodicImages();
+    queueFetchResponse(
+      jsonResponse({
+        trajectoryId: "t-selection",
+        format: "lammps-dump",
+        frameCount: 2,
+        atomCount: 2,
+        elements: ["Na", "Cl"],
+        typeIds: null,
+      }),
+    );
+    queueFetchResponse(jsonResponse(trajectoryScene));
+    // The trajectory hook warms repeated frame-1 lookups within its small
+    // forward-prefetch window before the first request settles.
+    queueFetchResponse(jsonResponse(trajectoryScene));
+    queueFetchResponse(jsonResponse(trajectoryScene));
+    queueFetchResponse(jsonResponse(trajectoryScene));
+
+    render(<App />);
+    await user.upload(
+      getFileInput(),
+      new File(["frames"], "selection.dump", { type: "application/octet-stream" }),
+    );
+    await screen.findByText("1 / 2");
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    await user.click(within(commonControls).getByRole("tab", { name: "Select" }));
+    await user.click(
+      within(commonControls).getByRole("checkbox", { name: "Select atom #1 Na" }),
+    );
+    await user.click(within(commonControls).getByRole("button", { name: "Selected only" }));
+
+    fireEvent.change(screen.getByRole("slider", { name: "Trajectory frame" }), {
+      target: { value: "1" },
+    });
+    await screen.findByText("2 / 2");
+
+    expect(within(commonControls).getByText("1 selected · 1 / 2 visible")).toBeTruthy();
+    expect(
+      within(commonControls)
+        .getByRole("checkbox", { name: "Select atom #1 Na" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+  });
+
   test("does not restore a previously uploaded scene after the app remounts", async () => {
     const user = userEvent.setup();
     queueFetchResponse(jsonResponse(sceneWithPeriodicImages()));
@@ -845,6 +892,199 @@ describe("App", () => {
     expect(exportRequests[0]?.unitCellLineStyle).toBe("dashed");
     expect(exportRequests[0]?.style.fogAffectsUnitCell).toBe(true);
     expect(exportRequests[0]?.style.distinguishSimilarColors).toBe(true);
+  });
+
+  test("selects canonical atoms, isolates their periodic images, and exports the filtered scene", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    await user.click(within(commonControls).getByRole("tab", { name: "Select" }));
+
+    const canvas = screen.getByTestId("lattice-canvas") as HTMLCanvasElement;
+    expect(canvas.style.cursor).toBe("crosshair");
+    expect(within(commonControls).getByText("0 selected · 2 / 2 visible")).toBeTruthy();
+    expect(within(commonControls).getAllByRole("listitem")).toHaveLength(2);
+    expect(
+      within(commonControls).queryByRole("checkbox", {
+        name: /Na-0-image/,
+      }),
+    ).toBeNull();
+
+    await user.click(
+      within(commonControls).getByRole("checkbox", { name: "Select atom #1 Na" }),
+    );
+    await user.click(within(commonControls).getByRole("button", { name: "Selected only" }));
+
+    expect(within(commonControls).getByText("1 selected · 1 / 2 visible")).toBeTruthy();
+    const hiddenClRow = within(commonControls)
+      .getByRole("checkbox", { name: "Select atom #2 Cl" })
+      .closest("[role='listitem']");
+    expect(hiddenClRow?.getAttribute("data-visible")).toBe("false");
+    expect(
+      within(commonControls).getByRole("button", { name: "Hide atom #2 Cl" }),
+    ).toBeTruthy();
+    const legend = screen.getByRole("navigation", { name: "Element legend" });
+    expect(within(legend).getByText("Na")).toBeTruthy();
+    expect(within(legend).queryByText("Cl")).toBeNull();
+    const structureCard = screen.getByRole("complementary", { name: "Current structure" });
+    expect(within(structureCard).getByText("NaCl")).toBeTruthy();
+    expect(within(structureCard).getByText("2")).toBeTruthy();
+
+    await user.click(
+      within(commonControls).getByRole("button", { name: "Hide atom #1 Na" }),
+    );
+    expect(within(commonControls).getByText("1 selected · 0 / 2 visible")).toBeTruthy();
+    await user.click(
+      within(commonControls).getByRole("checkbox", { name: "Select atom #1 Na" }),
+    );
+    expect(within(commonControls).getByText("0 selected · 0 / 2 visible")).toBeTruthy();
+    expect(
+      within(commonControls).getByRole("button", { name: "Show hidden atom #1 Na" }),
+    ).toBeTruthy();
+    await user.click(
+      within(commonControls).getByRole("checkbox", { name: "Select atom #1 Na" }),
+    );
+    expect(within(commonControls).getByText("1 selected · 1 / 2 visible")).toBeTruthy();
+
+    await user.click(
+      within(commonControls).getByRole("checkbox", { name: "Select atom #2 Cl" }),
+    );
+    expect(within(commonControls).getByText("2 selected · 2 / 2 visible")).toBeTruthy();
+    expect(
+      within(screen.getByRole("navigation", { name: "Element legend" })).getByText("Cl"),
+    ).toBeTruthy();
+    await user.click(
+      within(commonControls).getByRole("checkbox", { name: "Select atom #2 Cl" }),
+    );
+    expect(within(commonControls).getByText("1 selected · 1 / 2 visible")).toBeTruthy();
+
+    await user.click(within(commonControls).getByRole("tab", { name: "Export" }));
+    expect(canvas.style.cursor).toBe("");
+    await user.click(within(commonControls).getByRole("button", { name: "Export PNG" }));
+    await waitFor(() => expect(exportRequests).toHaveLength(1));
+
+    expect(exportRequests[0]?.scene.atoms.map((atom) => atom.id)).toEqual([
+      "Na-0",
+      "Na-0-image-1-0-0",
+    ]);
+    expect(exportRequests[0]?.scene.bonds).toEqual([]);
+    expect(exportRequests[0]?.scene.polyhedra).toEqual([]);
+    expect(exportRequests[0]?.style).not.toHaveProperty("selectedSiteIndices");
+
+    await user.click(within(commonControls).getByRole("tab", { name: "Select" }));
+    await user.click(within(commonControls).getByRole("button", { name: "Show all atoms" }));
+    expect(within(commonControls).getByText("1 selected · 2 / 2 visible")).toBeTruthy();
+    expect(
+      within(commonControls)
+        .getByRole("checkbox", { name: "Select atom #1 Na" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(within(screen.getByRole("navigation", { name: "Element legend" })).getByText("Cl"))
+      .toBeTruthy();
+
+    await user.click(within(commonControls).getByRole("button", { name: "Clear selection" }));
+    await user.click(within(commonControls).getByRole("button", { name: "Invert selection" }));
+    await user.click(within(commonControls).getByRole("button", { name: "Hide selected" }));
+    expect(within(commonControls).getByText("2 selected · 0 / 2 visible")).toBeTruthy();
+    expect(screen.getByTestId("lattice-canvas")).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Element legend" })).toBeNull();
+
+    await user.click(within(commonControls).getByRole("tab", { name: "Export" }));
+    await user.click(within(commonControls).getByRole("button", { name: "Export PNG" }));
+    await waitFor(() => expect(exportRequests).toHaveLength(2));
+    expect(exportRequests[1]?.scene.atoms).toEqual([]);
+    expect(exportRequests[1]?.scene.bonds).toEqual([]);
+    expect(exportRequests[1]?.scene.polyhedra).toEqual([]);
+    expect(exportRequests[1]?.componentVisibility.unitCell).toBe(true);
+  });
+
+  test("keeps Select search and visibility across tabs, then clears them on Reset all", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    await user.click(within(commonControls).getByRole("tab", { name: "Select" }));
+    const search = within(commonControls).getByRole("searchbox", { name: "Search atoms" });
+    await user.type(search, "cl");
+    await user.click(
+      within(commonControls).getByRole("checkbox", { name: "Select atom #2 Cl" }),
+    );
+    await user.click(within(commonControls).getByRole("button", { name: "Hide selected" }));
+    expect(within(commonControls).getByText("1 selected · 1 / 2 visible")).toBeTruthy();
+
+    await user.click(within(commonControls).getByRole("tab", { name: "Style" }));
+    await user.click(within(commonControls).getByRole("tab", { name: "Select" }));
+    expect(
+      (within(commonControls).getByRole("searchbox", {
+        name: "Search atoms",
+      }) as HTMLInputElement).value,
+    ).toBe("cl");
+    expect(within(commonControls).getByText("1 selected · 1 / 2 visible")).toBeTruthy();
+
+    await openPreviewContextMenu();
+    await user.click(await screen.findByRole("menuitem", { name: "Reset all" }));
+
+    expect(fetchCalls).toHaveLength(1);
+    await waitFor(() => {
+      expect(
+        (within(commonControls).getByRole("searchbox", {
+          name: "Search atoms",
+        }) as HTMLInputElement).value,
+      ).toBe("");
+    });
+    expect(within(commonControls).getByText("0 selected · 2 / 2 visible")).toBeTruthy();
+    const legend = screen.getByRole("navigation", { name: "Element legend" });
+    expect(within(legend).getByText("Na")).toBeTruthy();
+    expect(within(legend).getByText("Cl")).toBeTruthy();
+  });
+
+  test("keeps selection through a bond recompute and clears it for a new file", async () => {
+    const user = userEvent.setup();
+
+    await renderLoadedStructure(user);
+
+    const commonControls = screen.getByRole("complementary", { name: "Common controls" });
+    await user.click(within(commonControls).getByRole("tab", { name: "Select" }));
+    await user.click(
+      within(commonControls).getByRole("checkbox", { name: "Select atom #1 Na" }),
+    );
+    await user.click(within(commonControls).getByRole("button", { name: "Selected only" }));
+
+    await user.click(screen.getByRole("button", { name: "Sidebar" }));
+    queueFetchResponse(jsonResponse(sceneWithPeriodicImages()));
+    await user.click(screen.getByRole("combobox", { name: "Bonding algorithm" }));
+    await user.click(await screen.findByRole("option", { name: "Minimum distance" }));
+    await waitFor(() => expect(fetchCalls).toHaveLength(2));
+
+    expect(within(commonControls).getByText("1 selected · 1 / 2 visible")).toBeTruthy();
+    expect(
+      within(commonControls)
+        .getByRole("checkbox", { name: "Select atom #1 Na" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+
+    queueFetchResponse(jsonResponse(sceneWithPeriodicImages()));
+    await user.upload(getFileInput(), structureFile("second.cif"));
+    await waitFor(() => expect(fetchCalls).toHaveLength(3));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("complementary", { name: "Common controls" }),
+      ).not.toBe(commonControls);
+    });
+    const nextCommonControls = screen.getByRole("complementary", {
+      name: "Common controls",
+    });
+    await user.click(within(nextCommonControls).getByRole("tab", { name: "Select" }));
+
+    expect(within(nextCommonControls).getByText("0 selected · 2 / 2 visible")).toBeTruthy();
+    expect(
+      within(nextCommonControls)
+        .getByRole("checkbox", { name: "Select atom #1 Na" })
+        .getAttribute("aria-checked"),
+    ).toBe("false");
   });
 
   test("toggles polyhedra independently from atoms, bonds, and unit cell", async () => {
@@ -1540,7 +1780,7 @@ describe("App", () => {
       within(commonControls)
         .getAllByRole("tab")
         .map((tab) => tab.getAttribute("aria-label")),
-    ).toEqual(["Display", "Pose", "Style", "Export"]);
+    ).toEqual(["Display", "Select", "Pose", "Style", "Export"]);
     const displayTab = within(commonControls).getByRole("tab", { name: "Display" });
     const cameraTab = within(commonControls).getByRole("tab", { name: "Pose" });
     expect(displayTab.style.flexGrow).toBe("");

@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import type { AtomSpec, SceneSpec } from "../src/api/scene";
 import {
+  atomDisplayNumber,
   atomInspectorCopyText,
-  atomSiteIndex,
   formatAtomCoordinateForCopy,
   formatAtomCoordinateForDisplay,
   formatCellOffset,
@@ -31,7 +31,7 @@ describe("atom inspector formatting", () => {
     expect(info?.canonicalAtom.siteIndex).toBe(1);
     expect(atomInspectorCopyText(info!)).toBe([
       "Element: Al",
-      "Index: 1",
+      "Atom number: 2",
       "Fractional: 0.250000, 0.500000, 0.147904",
       "Cartesian (A): 1.200000, 2.300000, 1.939946",
       "Cell offset: 1, 0, -1",
@@ -45,8 +45,8 @@ describe("atom inspector formatting", () => {
 
     const info = inspectedAtomInfoForId(scene, "Al-1-image-1-0--1");
 
-    expect(atomSiteIndex(info!.canonicalAtom)).toBe("1");
-    expect(atomInspectorCopyText(info!).split("\n")[1]).toBe("Index: 1");
+    expect(atomDisplayNumber(info!.canonicalAtom)).toBe(2);
+    expect(atomInspectorCopyText(info!).split("\n")[1]).toBe("Atom number: 2");
   });
 });
 

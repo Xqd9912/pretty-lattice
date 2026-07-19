@@ -6,8 +6,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 
 import {
+  atomDisplayNumber,
   atomInspectorCopyText,
-  atomSiteIndex,
   formatAtomCoordinateForDisplay,
   formatCellOffset,
   type InspectedAtomInfo,
@@ -71,7 +71,7 @@ export function AtomInspectorCard({
           style={{ backgroundColor: atomColor }}
         />
         <span className="min-w-0 whitespace-nowrap text-[0.78rem] font-semibold text-foreground">
-          {canonicalAtom.element}, idx: {atomSiteIndex(canonicalAtom)}
+          {canonicalAtom.element}, Atom #{atomDisplayNumber(canonicalAtom)}
         </span>
 
         <TooltipProvider delayDuration={500}>

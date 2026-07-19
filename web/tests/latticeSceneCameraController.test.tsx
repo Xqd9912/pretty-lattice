@@ -101,19 +101,22 @@ mock.module("@react-three/fiber", () => ({
   useFrame: (callback: () => void) => {
     latestFrameCallback = callback;
   },
-  useThree: () => ({
-    camera: mockCamera,
-    gl: {
-      domElement: mockDomElement,
-    },
-    invalidate: () => {
-      invalidateCalls += 1;
-    },
-    size: {
-      height: 800,
-      width: 1000,
-    },
-  }),
+  useThree: (selector?: (state: unknown) => unknown) => {
+    const state = {
+      camera: mockCamera,
+      gl: {
+        domElement: mockDomElement,
+      },
+      invalidate: () => {
+        invalidateCalls += 1;
+      },
+      size: {
+        height: 800,
+        width: 1000,
+      },
+    };
+    return selector ? selector(state) : state;
+  },
 }));
 
 mock.module("three/examples/jsm/controls/OrbitControls.js", () => ({
@@ -129,6 +132,7 @@ const { createDefaultComponentOpacity, createDefaultStyle } =
 const { createCameraInteractionStore } =
   await import("../src/app/cameraInteractionStore");
 const { LatticeScene } = await import("../src/scene/LatticeScene");
+const { SceneRenderInvalidator } = await import("../src/scene/StructureSceneObjects");
 const {
   applyCrystalCameraRoll,
   computeCrystalCameraPose,
@@ -147,6 +151,24 @@ afterEach(() => {
 });
 
 describe("LatticeScene camera commands", () => {
+  test("invalidates the demand canvas when the rendered scene becomes empty", () => {
+    const scene = orthogonalScene();
+    const { rerender } = render(
+      <SceneRenderInvalidator scene={scene} showAtoms={true} showUnitCell={true} />,
+    );
+    invalidateCalls = 0;
+
+    rerender(
+      <SceneRenderInvalidator
+        scene={{ ...scene, atoms: [], bonds: [], polyhedra: [] }}
+        showAtoms={true}
+        showUnitCell={true}
+      />,
+    );
+
+    expect(invalidateCalls).toBeGreaterThan(0);
+  });
+
   test("runs the main preview canvas on demand", () => {
     const scene = orthogonalScene();
 

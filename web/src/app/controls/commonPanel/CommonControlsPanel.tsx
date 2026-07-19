@@ -1,5 +1,6 @@
 import {
   ImageDown,
+  MousePointer2,
   Palette,
   Rotate3d as CameraIcon,
   View as DisplayIcon,
@@ -18,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-import type { AtomRadiusModel } from "../../../api/scene";
+import type { AtomRadiusModel, AtomSpec } from "../../../api/scene";
 import type {
   ComponentOpacityState,
   ComponentVisibilityState,
@@ -35,9 +36,10 @@ import { DisplayTabContent } from "./DisplayTab";
 import { ExportTabContent } from "./ExportTab";
 import { MaterialPresetTokenPreloadPool } from "./MaterialPresetToken3D";
 import { OrientationTabContent } from "./OrientationTab";
+import { SelectTabContent } from "./SelectTab";
 import { StyleTabContent } from "./StyleTab";
 
-export type CommonPanelTab = "camera" | "display" | "style" | "export";
+export type CommonPanelTab = "camera" | "display" | "select" | "style" | "export";
 
 interface TabIndicatorRect {
   left: number;
@@ -50,6 +52,7 @@ const COMMON_PANEL_TABS: {
   value: CommonPanelTab;
 }[] = [
   { Icon: DisplayIcon, label: "Display", value: "display" },
+  { Icon: MousePointer2, label: "Select", value: "select" },
   { Icon: CameraIcon, label: "Pose", value: "camera" },
   { Icon: Palette, label: "Style", value: "style" },
   { Icon: ImageDown, label: "Export", value: "export" },
@@ -57,7 +60,9 @@ const COMMON_PANEL_TABS: {
 
 export function CommonControlsPanel({
   activeTab: targetActiveTab,
+  atomSelectionSessionVersion,
   cameraState,
+  canonicalAtoms,
   cellVectors,
   componentOpacity,
   componentVisibility,
@@ -66,6 +71,8 @@ export function CommonControlsPanel({
   exportSettings,
   hasPolyhedra,
   isExporting,
+  isSiteBaseVisible,
+  isSiteVisible,
   onComponentOpacityChange,
   onComponentVisibilityChange,
   onAtomRadiusModelChange,
@@ -78,11 +85,23 @@ export function CommonControlsPanel({
   onActiveTabChange,
   onExport,
   onExportSettingsChange,
+  onElementVisibilityToggle,
+  onHideSelected,
+  onInvertSelection,
+  onSelectedOnlyChange,
+  onSelectionClear,
+  onShowAllSites,
+  onSiteSelectionToggle,
+  onSiteVisibilityToggle,
+  selectedSiteIndices,
+  selectedOnly,
   onStyleChange,
   style,
 }: {
   activeTab: CommonPanelTab;
+  atomSelectionSessionVersion: string | number;
   cameraState: CrystalCameraState;
+  canonicalAtoms: readonly AtomSpec[];
   cellVectors: VectorTuple[];
   componentOpacity: ComponentOpacityState;
   componentVisibility: ComponentVisibilityState;
@@ -91,6 +110,8 @@ export function CommonControlsPanel({
   exportSettings: ExportSettingsState;
   hasPolyhedra: boolean;
   isExporting: boolean;
+  isSiteBaseVisible: (siteIndex: number) => boolean;
+  isSiteVisible: (siteIndex: number) => boolean;
   onAtomRadiusModelChange: (atomRadiusModel: AtomRadiusModel) => void;
   onCameraPrimaryChange: (primary: CrystalCameraPrimaryDirection) => void;
   onCameraRollPreviewChange: (rollDegrees: number) => void;
@@ -103,6 +124,16 @@ export function CommonControlsPanel({
   onComponentVisibilityChange: Dispatch<SetStateAction<ComponentVisibilityState>>;
   onExport: () => void;
   onExportSettingsChange: (settings: ExportSettingsState) => void;
+  onElementVisibilityToggle: (element: string) => void;
+  onHideSelected: () => void;
+  onInvertSelection: () => void;
+  onSelectedOnlyChange: (enabled: boolean) => void;
+  onSelectionClear: () => void;
+  onShowAllSites: () => void;
+  onSiteSelectionToggle: (siteIndex: number) => void;
+  onSiteVisibilityToggle: (siteIndex: number) => void;
+  selectedSiteIndices: ReadonlySet<number>;
+  selectedOnly: boolean;
   onStyleChange: Dispatch<SetStateAction<StyleState>>;
   style: StyleState;
 }) {
@@ -110,10 +141,14 @@ export function CommonControlsPanel({
     camera: null,
     display: null,
     export: null,
+    select: null,
     style: null,
   });
   const contentRef = useRef<HTMLDivElement>(null);
   const [hasMountedCameraTab, setHasMountedCameraTab] = useState(() => cellVectors.length > 0);
+  const [hasMountedSelectTab, setHasMountedSelectTab] = useState(
+    () => targetActiveTab === "select",
+  );
   const [tabIndicatorRect, setTabIndicatorRect] = useState<TabIndicatorRect | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
   const activeTab = targetActiveTab;
@@ -230,6 +265,9 @@ export function CommonControlsPanel({
     if (nextTab === "camera") {
       setHasMountedCameraTab(true);
     }
+    if (nextTab === "select") {
+      setHasMountedSelectTab(true);
+    }
 
     onActiveTabChange?.(nextTab);
   }
@@ -334,6 +372,28 @@ export function CommonControlsPanel({
                 onOpacityChange={onComponentOpacityChange}
                 visibility={componentVisibility}
                 onVisibilityChange={onComponentVisibilityChange}
+              />
+            </TabsContent>
+            <TabsContent
+              value="select"
+              className="common-controls-keepalive-tab"
+              {...(hasMountedSelectTab ? { forceMount: true } : {})}
+            >
+              <SelectTabContent
+                canonicalAtoms={canonicalAtoms}
+                isSiteBaseVisible={isSiteBaseVisible}
+                isSiteVisible={isSiteVisible}
+                onClearSelection={onSelectionClear}
+                onElementVisibilityToggle={onElementVisibilityToggle}
+                onHideSelected={onHideSelected}
+                onInvertSelection={onInvertSelection}
+                onSelectedOnlyChange={onSelectedOnlyChange}
+                onShowAll={onShowAllSites}
+                onSiteSelectionToggle={onSiteSelectionToggle}
+                onSiteVisibilityToggle={onSiteVisibilityToggle}
+                selectedSiteIndices={selectedSiteIndices}
+                selectedOnly={selectedOnly}
+                sessionVersion={atomSelectionSessionVersion}
               />
             </TabsContent>
             <TabsContent value="style">
