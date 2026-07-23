@@ -257,6 +257,7 @@ function selectionScene(): SceneSpec {
     ],
     bondCutoffs: [],
     cell: {
+      periodic: true,
       vectors: [
         [1, 0, 0],
         [0, 1, 0],

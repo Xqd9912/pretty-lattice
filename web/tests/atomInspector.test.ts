@@ -73,7 +73,7 @@ function sceneWithImageAtom(): SceneSpec {
       }),
     ],
     bonds: [],
-    cell: { vectors: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] },
+    cell: { periodic: true, vectors: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] },
     polyhedra: [],
     summary: {
       atomCount: 1,

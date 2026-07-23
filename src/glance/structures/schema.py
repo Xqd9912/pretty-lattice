@@ -33,6 +33,7 @@ class UnsupportedBondAlgorithmError(ValueError):
 
 class CellSpec(TypedDict):
     vectors: list[list[float]]
+    periodic: bool
 
 
 class CellSummarySpec(TypedDict):

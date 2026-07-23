@@ -5,6 +5,7 @@ import sceneContract from "../../../src/glance/structures/scene_contract.json";
 export interface SceneSpec {
   cell: {
     vectors: [number, number, number][];
+    periodic: boolean;
   };
   atoms: AtomSpec[];
   bonds: BondSpec[];

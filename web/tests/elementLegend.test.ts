@@ -100,6 +100,7 @@ function sceneWithAtoms(atoms: TestAtom[]): SceneSpec {
     bonds: [],
     polyhedra: [],
     cell: {
+      periodic: true,
       vectors: [
         [1, 0, 0],
         [0, 1, 0],

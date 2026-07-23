@@ -166,6 +166,7 @@ def test_scene_response_shape_excludes_renderer_visual_data() -> None:
     boundary_image_atoms = [atom for atom in scene["atoms"] if "boundary" in atom["imageReasons"]]
     bonded_image_atoms = [atom for atom in scene["atoms"] if "bonded" in atom["imageReasons"]]
 
+    assert scene["cell"]["periodic"] is True
     assert scene["cell"]["vectors"][0] == [3.91270131, 0.0, 0.0]
     assert canonical_atoms[0] == {
         "id": "Sr-0",
@@ -284,6 +285,7 @@ def test_non_periodic_structure_keeps_only_canonical_atom_instances() -> None:
 
     scene = build_scene_response(structure)
 
+    assert scene["cell"]["periodic"] is False
     assert len(scene["atoms"]) == 1
     assert scene["atoms"][0]["siteId"] == "C-0"
     assert scene["atoms"][0]["imageOffset"] == [0, 0, 0]
@@ -695,6 +697,7 @@ def test_scene_summary_marks_non_periodic_symmetry_unavailable() -> None:
 
     scene = build_scene_response(structure)
 
+    assert scene["cell"]["periodic"] is False
     assert scene["summary"]["symmetry"] == {
         "available": False,
         "spaceGroup": None,

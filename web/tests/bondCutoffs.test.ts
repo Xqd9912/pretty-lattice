@@ -11,7 +11,7 @@ import {
 
 function sceneWithCutoffs(bondCutoffs: SceneSpec["bondCutoffs"]): SceneSpec {
   return {
-    cell: { vectors: [] },
+    cell: { periodic: true, vectors: [] },
     atoms: [],
     bonds: [],
     polyhedra: [],

@@ -129,7 +129,10 @@ def build_scene_spec(
                 )
 
     scene: SceneSpec = {
-        "cell": {"vectors": cell_vectors},
+        "cell": {
+            "periodic": can_generate_periodic_images,
+            "vectors": cell_vectors,
+        },
         "atoms": [
             atom_record_to_spec(atom, cell_vectors) for atom in atom_data.atom_records.values()
         ],

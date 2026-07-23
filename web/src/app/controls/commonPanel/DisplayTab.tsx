@@ -20,8 +20,10 @@ import { cn } from "@/lib/utils";
 import {
   COMPONENT_OPACITY_MAX,
   createDefaultComponentOpacity,
+  periodicCellRangeStatus,
   type ComponentOpacityState,
   type ComponentVisibilityState,
+  type PeriodicCellRange,
 } from "../../../model";
 import {
   TOOL_ICON_BUTTON_CLASS,
@@ -45,14 +47,24 @@ import {
 export function DisplayTabContent({
   hasPolyhedra,
   onOpacityChange,
+  onPeriodicCellRangeChange,
+  onPeriodicCellRangeReset,
   onVisibilityChange,
   opacity,
+  periodicCellRange,
+  periodicDisabledReason,
+  periodicNotice,
   visibility,
 }: {
   hasPolyhedra: boolean;
   onOpacityChange: Dispatch<SetStateAction<ComponentOpacityState>>;
+  onPeriodicCellRangeChange: (range: PeriodicCellRange) => string | null;
+  onPeriodicCellRangeReset: () => void;
   onVisibilityChange: Dispatch<SetStateAction<ComponentVisibilityState>>;
   opacity: ComponentOpacityState;
+  periodicCellRange: PeriodicCellRange;
+  periodicDisabledReason?: string | null;
+  periodicNotice?: string | null;
   visibility: ComponentVisibilityState;
 }) {
   function setVisibility(key: keyof ComponentVisibilityState, value: boolean) {
@@ -171,14 +183,25 @@ export function DisplayTabContent({
 
       <Separator className="my-1" />
 
-      <section aria-labelledby="image-components-label">
+      <section aria-labelledby="periodic-display-label">
         <h2
-          id="image-components-label"
+          id="periodic-display-label"
           className={cn(COMMON_PANEL_SECTION_TITLE_TEXT_CLASS, "leading-tight text-muted-foreground")}
         >
-          Periodic images
+          Periodic display
         </h2>
-        <div className="mt-1.5 flex flex-col gap-1">
+        <PeriodicCellRangeEditor
+          disabledReason={periodicDisabledReason}
+          notice={periodicNotice}
+          onChange={onPeriodicCellRangeChange}
+          onReset={onPeriodicCellRangeReset}
+          range={periodicCellRange}
+        />
+
+        <div className="mt-2 border-t border-border/60 pt-1.5">
+          <span className="px-1.5 text-[10px] font-medium text-muted-foreground">
+            Completion
+          </span>
           <ImageSwitchRow
             checked={visibility.boundaryAtoms}
             label="Cell-boundary atoms"
@@ -193,6 +216,176 @@ export function DisplayTabContent({
       </section>
     </div>
   );
+}
+
+type PeriodicAxis = keyof PeriodicCellRange;
+type PeriodicBound = "from" | "to";
+type PeriodicRangeDraft = Record<PeriodicAxis, Record<PeriodicBound, string>>;
+
+function PeriodicCellRangeEditor({
+  disabledReason,
+  notice,
+  onChange,
+  onReset,
+  range,
+}: {
+  disabledReason?: string | null;
+  notice?: string | null;
+  onChange: (range: PeriodicCellRange) => string | null;
+  onReset: () => void;
+  range: PeriodicCellRange;
+}) {
+  const [draft, setDraft] = useState<PeriodicRangeDraft>(() => rangeDraft(range));
+  const [error, setError] = useState<string | null>(null);
+  const skipNextBlurRef = useRef(false);
+  const disabled = Boolean(disabledReason);
+
+  useEffect(() => {
+    setDraft(rangeDraft(range));
+    setError(null);
+  }, [range]);
+
+  function commit(axis: PeriodicAxis, bound: PeriodicBound) {
+    const valueText = draft[axis][bound].trim();
+    if (!/^-?\d+$/.test(valueText)) {
+      setError("Cell bounds must be whole numbers.");
+      return;
+    }
+    const value = Number(valueText);
+    if (!Number.isSafeInteger(value)) {
+      setError("Cell bounds are outside the safe integer range.");
+      return;
+    }
+    const nextRange: PeriodicCellRange = {
+      ...range,
+      [axis]: { ...range[axis], [bound]: value },
+    };
+    const validationError = onChange(nextRange);
+    setError(validationError);
+    if (!validationError) {
+      setDraft(rangeDraft(nextRange));
+    }
+  }
+
+  function handleKeyDown(
+    event: KeyboardEvent<HTMLInputElement>,
+    axis: PeriodicAxis,
+    bound: PeriodicBound,
+  ) {
+    if (event.key === "Enter") {
+      event.currentTarget.blur();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      skipNextBlurRef.current = true;
+      setDraft(rangeDraft(range));
+      setError(null);
+      event.currentTarget.blur();
+      return;
+    }
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      const parsed = Number.parseInt(draft[axis][bound], 10);
+      const base = Number.isSafeInteger(parsed) ? parsed : range[axis][bound];
+      const value = base + (event.key === "ArrowUp" ? 1 : -1);
+      const nextRange: PeriodicCellRange = {
+        ...range,
+        [axis]: { ...range[axis], [bound]: value },
+      };
+      const validationError = onChange(nextRange);
+      setError(validationError);
+      if (!validationError) {
+        setDraft(rangeDraft(nextRange));
+      }
+    }
+  }
+
+  return (
+    <div className="mt-1.5 rounded-md border border-border/70 bg-background/45 px-1.5 py-1.5">
+      <div className="grid grid-cols-[1.25rem_1fr_1fr_1.65rem] items-center gap-1 text-[9px] font-medium text-muted-foreground">
+        <span />
+        <span className="text-center">From</span>
+        <span className="text-center">To</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Reset cell range"
+              disabled={disabled}
+              className="size-6 justify-self-end [&_svg]:size-3"
+              onClick={onReset}
+            >
+              <RotateCcw aria-hidden="true" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Reset cell range</TooltipContent>
+        </Tooltip>
+      </div>
+      {(["a", "b", "c"] as const).map((axis) => (
+        <div
+          key={axis}
+          className="mt-1 grid grid-cols-[1.25rem_1fr_1fr_1.65rem] items-center gap-1"
+        >
+          <span className="font-mono text-[11px] font-semibold">{axis}</span>
+          {(["from", "to"] as const).map((bound) => (
+            <Input
+              key={bound}
+              type="text"
+              inputMode="numeric"
+              disabled={disabled}
+              aria-label={`${axis} cell ${bound}`}
+              value={draft[axis][bound]}
+              className="h-6 min-w-0 px-1 text-center font-mono text-[11px] tabular-nums"
+              onBlur={() => {
+                if (skipNextBlurRef.current) {
+                  skipNextBlurRef.current = false;
+                  return;
+                }
+                commit(axis, bound);
+              }}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                setDraft((current) => ({
+                  ...current,
+                  [axis]: { ...current[axis], [bound]: value },
+                }));
+              }}
+              onKeyDown={(event) => handleKeyDown(event, axis, bound)}
+            />
+          ))}
+          <span />
+        </div>
+      ))}
+      <p className="mt-1.5 px-0.5 font-mono text-[9px] tabular-nums text-muted-foreground">
+        {periodicCellRangeStatus(range)}
+      </p>
+      {disabledReason ? (
+        <p className="mt-1 px-0.5 text-[9px] leading-tight text-muted-foreground">
+          {disabledReason}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-1 px-0.5 text-[9px] leading-tight text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {!error && notice ? (
+        <p className="mt-1 px-0.5 text-[9px] leading-tight text-amber-700" role="status">
+          {notice}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function rangeDraft(range: PeriodicCellRange): PeriodicRangeDraft {
+  return {
+    a: { from: String(range.a.from), to: String(range.a.to) },
+    b: { from: String(range.b.from), to: String(range.b.to) },
+    c: { from: String(range.c.from), to: String(range.c.to) },
+  };
 }
 
 function ComponentOpacityRow({

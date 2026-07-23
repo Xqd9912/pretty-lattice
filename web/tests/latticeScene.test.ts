@@ -779,6 +779,7 @@ function sceneWithOffCenterAtoms(): SceneSpec {
     bonds: [],
     polyhedra: [],
     cell: {
+      periodic: true,
       vectors: [
         [4, 0, 0],
         [1, 3, 0],
@@ -833,6 +834,7 @@ function sceneWithExportVisibilityAtoms(): SceneSpec {
     ],
     bonds: [],
     cell: {
+      periodic: true,
       vectors: [
         [1, 0, 0],
         [0, 1, 0],
@@ -869,6 +871,7 @@ function sceneWithLongCell(): SceneSpec {
     ...sceneWithOffCenterAtoms(),
     atoms: [atom("Si-0", [0, 0, 0]), atom("Si-1", [10, 0, 0])],
     cell: {
+      periodic: true,
       vectors: [
         [10, 0, 0],
         [0, 1, 0],
@@ -887,6 +890,7 @@ function sceneWithLongC(): SceneSpec {
     ...sceneWithOffCenterAtoms(),
     atoms: [atom("Si-0", [0, 0, 0]), atom("Si-1", [0, 0, 10])],
     cell: {
+      periodic: true,
       vectors: [
         [1, 0, 0],
         [0, 1, 0],

@@ -42,6 +42,7 @@ async def test_structure_preview_upload_endpoint_returns_scene() -> None:
             [0.0, 3.91270131, 0.0],
             [0.0, 0.0, 3.91270131],
         ]
+        assert payload["cell"]["periodic"] is True
         canonical_atoms = [atom for atom in payload["atoms"] if not atom["isPeriodicImage"]]
         periodic_image_atoms = [atom for atom in payload["atoms"] if atom["isPeriodicImage"]]
         assert [atom["element"] for atom in canonical_atoms] == ["Sr", "Ti", "O", "O", "O"]

@@ -3,7 +3,7 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 
-import type { UnitCellLineStyle } from "../model";
+import type { PeriodicCellRange, UnitCellLineStyle } from "../model";
 import {
   CELL_FRAME_COLOR,
   CELL_FRAME_LINE_WIDTH_PIXELS,
@@ -21,8 +21,10 @@ export function CellFrame({
   lineWidthScale,
   lineStyle,
   opacity,
+  cellRange,
   vectors,
 }: {
+  cellRange?: PeriodicCellRange;
   color?: string;
   fog: boolean;
   lineWidthScale: number;
@@ -32,7 +34,7 @@ export function CellFrame({
 }) {
   const line = useMemo(() => {
     const geometry = new LineSegmentsGeometry();
-    geometry.setPositions(cellFrameLinePositions(vectors));
+    geometry.setPositions(cellFrameLinePositions(vectors, cellRange));
     const lineWidth = CELL_FRAME_LINE_WIDTH_PIXELS * lineWidthScale;
     const material = new LineMaterial({
       alphaToCoverage: true,
@@ -56,7 +58,7 @@ export function CellFrame({
       line.computeLineDistances();
     }
     return line;
-  }, [color, fog, lineStyle, lineWidthScale, opacity, vectors]);
+  }, [cellRange, color, fog, lineStyle, lineWidthScale, opacity, vectors]);
 
   useEffect(() => {
     return () => {

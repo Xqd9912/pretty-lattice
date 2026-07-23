@@ -3,6 +3,11 @@ import { Box3, Vector3 } from "three";
 import type { AtomRadiusModel, SceneSpec } from "../api/scene";
 import type { PreviewSafeArea } from "../model/layout";
 import {
+  DEFAULT_PERIODIC_CELL_RANGE,
+  isDefaultPeriodicCellRange,
+  type PeriodicCellRange,
+} from "../model/periodicReplication";
+import {
   computeCrystalCameraPose,
   createDefaultCrystalCameraState,
   type CrystalCameraPose,
@@ -41,8 +46,9 @@ export function computeSceneLayout(
   scene: SceneSpec,
   _atomRadiusModel: AtomRadiusModel = "uniform",
   cameraState?: CrystalCameraState,
+  cellRange: PeriodicCellRange = DEFAULT_PERIODIC_CELL_RANGE,
 ): SceneLayout {
-  const structureLayout = computeSceneStructureLayout(scene);
+  const structureLayout = computeSceneStructureLayout(scene, _atomRadiusModel, cellRange);
   const cameraPose = computeCrystalCameraPose(
     scene.cell.vectors,
     cameraState ?? createDefaultCrystalCameraState(scene.cell.vectors),
@@ -58,10 +64,11 @@ export function computeSceneLayout(
 export function computeSceneStructureLayout(
   scene: SceneSpec,
   _atomRadiusModel: AtomRadiusModel = "uniform",
+  cellRange: PeriodicCellRange = DEFAULT_PERIODIC_CELL_RANGE,
 ): SceneStructureLayout {
-  const points = cellCorners(scene.cell.vectors);
+  const points = cellCorners(scene.cell.vectors, cellRange);
   const box = new Box3().setFromPoints(points);
-  const center = cellCenter(scene.cell.vectors);
+  const center = cellCenter(scene.cell.vectors, cellRange);
   const size = box.getSize(new Vector3());
   const span = Math.max(1, size.x, size.y, size.z);
   const standardPose = computeStandardCameraPose(scene.cell.vectors, span);
@@ -77,6 +84,7 @@ export function computeSceneStructureLayout(
     groupPosition,
     standardPose,
     span,
+    cellRange,
   );
 
   return {
@@ -84,6 +92,7 @@ export function computeSceneStructureLayout(
       scene,
       groupPosition,
       defaultCameraPose,
+      cellRange,
     ),
     depthCueingBackOffset: depthCueingRange.backOffset,
     depthCueingFrontOffset: depthCueingRange.frontOffset,
@@ -98,13 +107,14 @@ function computeDepthCueingRange(
   groupPosition: VectorTuple,
   standardPose: Pick<StandardCameraPose, "outward">,
   span: number,
+  cellRange: PeriodicCellRange,
 ): { backOffset: number; frontOffset: number } {
   const outward = new Vector3(...standardPose.outward).normalize();
   const offset = new Vector3(...groupPosition);
   const points =
-    scene.atoms.length > 0
+    scene.atoms.length > 0 && isDefaultPeriodicCellRange(cellRange)
       ? scene.atoms.map((atom) => new Vector3(...atom.position))
-      : cellCorners(scene.cell.vectors);
+      : cellCorners(scene.cell.vectors, cellRange);
   let nearestFrontProjection = 0;
   let nearestBackProjection = 0;
 
@@ -126,6 +136,7 @@ function computeProjectedCameraFitBounds(
   scene: SceneSpec,
   groupPosition: VectorTuple,
   cameraPose: Pick<CrystalCameraPose, "cameraUp" | "outward">,
+  cellRange: PeriodicCellRange,
 ): CameraFitBounds {
   const outward = new Vector3(...cameraPose.outward).normalize();
   const cameraUp = new Vector3(...cameraPose.cameraUp).normalize();
@@ -151,7 +162,7 @@ function computeProjectedCameraFitBounds(
     maxY = Math.max(maxY, y);
   }
 
-  for (const corner of cellCorners(scene.cell.vectors)) {
+  for (const corner of cellCorners(scene.cell.vectors, cellRange)) {
     includePoint(corner);
   }
 

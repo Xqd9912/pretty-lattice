@@ -520,6 +520,7 @@ function sceneWithPeriodicImages(): SceneSpec {
       polyhedron([1, 4, 2]),
     ],
     cell: {
+      periodic: true,
       vectors: [
         [1, 0, 0],
         [0, 1, 0],
