@@ -107,6 +107,20 @@ glance gui -p 0          # choose any available port automatically
   <img src="assets/Ba2Ca2Cu3HgO8-color-schemes.png" alt="Ba2Ca2Cu3HgO8 color scheme examples" width="90%">
 </p>
 
+### Atom selection and periodic display
+
+Select individual atoms or whole elements, isolate or hide the resulting set, and repeat
+periodic cells over signed a/b/c ranges. The preview, bonds, polyhedra, unit-cell grid, and
+figure export all use the same filtered and repeated structure.
+
+The compact right-hand ruler provides one-at-a-time bond, distance, angle, and dihedral
+measurements, with ordered points and the current value shown in the top-right information card. Atomic
+properties (coordination, neighbor-resolved coordination, bond-length statistics, and trajectory
+displacement) can drive a live visibility filter or a Viridis/Plasma/Cividis/Coolwarm color map.
+Measurement geometry and scalar legends are included in figure export. Reusable, uniquely named display presets store
+appearance, component visibility, periodic range, camera, lighting, labels, and preview quality in
+the browser, with versioned JSON import/export.
+
 ### Trajectory visualization
 
 Load a VASP `XDATCAR`, LAMMPS `.dump`, or `.xyz` trajectory and step through the frames
@@ -157,8 +171,13 @@ Analyze and visualize electronic-structure output from VASP:
   (`ICOHPLIST.lobster`, `ICOOPLIST.lobster`) against bond length, with adjustable marker
   size/color and per-element-pair (e.g. Ge–Ge, Ge–Se, Se–Se) toggles.
 - **Density of states (`TDOS.dat`)** — plot the total DOS as an energy–DOS line chart.
-- **Inverse participation ratio (`vasprun.xml`)** — compute the IPR of every electronic
-  state and draw it as thin bars sharing the energy axis with the DOS (dual y-axis).
+- **Unified electronic structure (`vasprun.xml`)** — load available TDOS, element/orbital PDOS,
+  element×orbital PDOS, and IPR from one dataset. A snapshot of the current atom selection can be
+  added as summed or averaged site PDOS for one atom or a group.
+- **Inverse participation ratio** — compute a k-weighted atomic composition
+  and aggregate localization measure for each band (the conventional state IPR for Γ-only
+  calculations), draw it beside the DOS, then select a band and visualize its dominant-atom
+  cluster by cumulative composition or Top K.
 
 <p align="center">
   <img src="assets/electronic_density.png" alt="Charge density: 3D electron-cloud isosurface, density slice, and LED distribution" width="90%">
@@ -194,6 +213,10 @@ This fork extends it with:
   as 3D isosurfaces plus slices and distributions, bonding-path profiles along an atom pair,
   LOBSTER BWDF/ICOHP/ICOOP bonding scatters, TDOS.dat density of states, and the inverse
   participation ratio (IPR) from vasprun.xml on a shared energy axis with the DOS.
+- **Atom selection and periodic display** — isolate selected sites or elements and repeat
+  periodic cells over explicit signed lattice ranges, consistently in preview and export.
+- **Measurements, property views, and display presets** — single-result geometric inspection,
+  live property-based coloring/filtering, and local versioned view presets.
 - **Custom per-element-pair bond cutoffs** and a fix for periodic bonds across the cell boundary.
 
 ## License
