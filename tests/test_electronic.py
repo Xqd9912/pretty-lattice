@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+import glance.server.routes as routes_module
 from glance.electronic.chgcar import (
     ChgcarReadError,
     atom_neighbors,
@@ -139,7 +140,15 @@ def test_parse_tdos_reads_energy_and_dos() -> None:
 
 
 @pytest.mark.anyio
-async def test_chgcar_and_slice_endpoints() -> None:
+async def test_chgcar_and_slice_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
+    scene_calls: list[dict[str, object]] = []
+    original_build_scene_response = routes_module.build_scene_response
+
+    def record_scene_build(structure: object, **kwargs: object) -> dict[str, object]:
+        scene_calls.append(kwargs)
+        return original_build_scene_response(structure, **kwargs)
+
+    monkeypatch.setattr(routes_module, "build_scene_response", record_scene_build)
     app = create_app(dev_static_fallback=False)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -153,6 +162,7 @@ async def test_chgcar_and_slice_endpoints() -> None:
         assert body["slice"]["axis"] == "c"
         # The upload also returns a renderable structure scene and density range.
         assert len(body["scene"]["atoms"]) >= 1
+        assert scene_calls == [{}]
         assert body["densityRange"]["max"] == pytest.approx(3.0)
 
         chgcar_id = body["chgcarId"]
