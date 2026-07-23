@@ -16,7 +16,6 @@ from glance.electronic.chgcar import (
     value_histogram,
 )
 from glance.electronic.dos import DosReadError, parse_tdos
-from glance.electronic.ipr import IprReadError, compute_ipr
 from glance.electronic.lobster import (
     LobsterReadError,
     parse_bwdf,
@@ -28,6 +27,12 @@ from glance.server.trajectory_store import (
     TrajectoryStore,
     scene_cache_key,
     trajectory_metadata,
+)
+from glance.server.vasprun_store import (
+    VasprunStore,
+    ipr_state_contributions,
+    site_pdos_response,
+    vasprun_metadata,
 )
 from glance.structures.readers import StructureReadError, read_structure_bytes
 from glance.structures.scene_builder import build_scene_response
@@ -56,6 +61,7 @@ DOS_FILE_TOO_LARGE_MESSAGE = "DOS file is too large to load."
 
 _trajectory_store = TrajectoryStore()
 _electronic_store = ElectronicStore()
+_vasprun_store = VasprunStore()
 
 
 @router.get("/health")
@@ -615,14 +621,60 @@ async def create_dos(request: Request) -> dict[str, object]:
         raise HTTPException(status_code=400, detail={"message": str(exc)}) from exc
 
 
-@router.post("/electronic/ipr")
-async def create_ipr(request: Request) -> dict[str, object]:
+@router.post("/electronic/vasprun")
+async def create_vasprun(request: Request) -> dict[str, object]:
     payload = await _uploaded_payload(
         request,
         max_bytes=MAX_VASPRUN_UPLOAD_BYTES,
         too_large_message=VASPRUN_FILE_TOO_LARGE_MESSAGE,
     )
     try:
-        return compute_ipr(payload)
-    except IprReadError as exc:
+        electronic_id, data = _vasprun_store.create(payload)
+        scene = build_scene_response(data.structure, bond_algorithm="custom-cutoff")
+        return vasprun_metadata(electronic_id, data, scene=scene)
+    except (ValueError, StructureReadError) as exc:
+        raise HTTPException(status_code=400, detail={"message": str(exc)}) from exc
+
+
+@router.get("/electronic/vasprun/{electronic_id}/ipr/states/{state_id}")
+async def get_vasprun_ipr_state(
+    electronic_id: str, state_id: str
+) -> dict[str, object]:
+    data = _vasprun_store.get(electronic_id)
+    if data is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "Electronic dataset not found or expired; reload vasprun.xml."},
+        )
+    response = ipr_state_contributions(data, state_id)
+    if response is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "IPR state not found; reload vasprun.xml."},
+        )
+    return response
+
+
+@router.post("/electronic/vasprun/{electronic_id}/pdos/sites")
+async def create_vasprun_site_pdos(
+    electronic_id: str, request: Request
+) -> dict[str, object]:
+    data = _vasprun_store.get(electronic_id)
+    if data is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "Electronic dataset not found or expired; reload vasprun.xml."},
+        )
+    body = await _json_body(request)
+    raw_site_indices = body.get("siteIndices")
+    if not isinstance(raw_site_indices, list) or any(
+        isinstance(value, bool) or not isinstance(value, int) for value in raw_site_indices
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "siteIndices must be a list of integer atom indices."},
+        )
+    try:
+        return site_pdos_response(data, raw_site_indices)
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail={"message": str(exc)}) from exc

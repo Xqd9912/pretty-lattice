@@ -89,9 +89,83 @@ export interface DosResponse {
 }
 
 export interface IprResponse {
+  iprId: string;
   efermi: number;
+  aggregation: "k-weighted-band-composition";
   dos: { energy: number[]; total: number[] };
-  ipr: { energy: number[]; value: number[] };
+  scene: SceneSpec;
+  states: IprStateSummary[];
+  warnings?: string[];
+}
+
+export interface IprStateSummary {
+  stateId: string;
+  bandIndex: number;
+  energy: number;
+  energyMin: number;
+  energyMax: number;
+  occupation: number;
+  ipr: number;
+  kPointCount: number;
+}
+
+export interface IprAtomContribution {
+  siteIndex: number;
+  element: string;
+  composition: number;
+  iprContribution: number;
+}
+
+export interface IprStateContributions {
+  state: IprStateSummary;
+  contributions: IprAtomContribution[];
+}
+
+export type ElectronicSpin = "up" | "down";
+
+export interface ElectronicCapability {
+  available: boolean;
+  reason?: string;
+}
+
+export interface ElectronicDosSeries {
+  id: string;
+  label: string;
+  kind: "tdos" | "element" | "orbital" | "element-orbital" | "site-group";
+  spin: ElectronicSpin;
+  values: number[];
+  element?: string;
+  orbital?: string;
+}
+
+export interface VasprunResponse {
+  electronicId: string;
+  source: "vasprun";
+  efermi: number;
+  energy: number[];
+  dosSeries: ElectronicDosSeries[];
+  pdosSeries: ElectronicDosSeries[];
+  orbitalTypes: string[];
+  spinChannels: ElectronicSpin[];
+  capabilities: {
+    dos: ElectronicCapability;
+    pdos: ElectronicCapability;
+    sitePdos: ElectronicCapability;
+    ipr: ElectronicCapability;
+  };
+  ipr: {
+    aggregation: "k-weighted-band-composition";
+    states: IprStateSummary[];
+  };
+  scene: SceneSpec;
+  warnings?: string[];
+}
+
+export interface SitePdosResponse {
+  energy: number[];
+  siteIndices: number[];
+  atomCount: number;
+  series: ElectronicDosSeries[];
 }
 
 async function readError(response: Response): Promise<string> {
@@ -109,7 +183,11 @@ async function readError(response: Response): Promise<string> {
   return `Request failed with status ${response.status}.`;
 }
 
-async function uploadFile<T>(endpoint: string, file: File): Promise<T> {
+async function uploadFile<T>(
+  endpoint: string,
+  file: File,
+  signal?: AbortSignal,
+): Promise<T> {
   let response: Response;
   try {
     response = await apiFetch(endpoint, {
@@ -119,8 +197,12 @@ async function uploadFile<T>(endpoint: string, file: File): Promise<T> {
         "x-glance-filename": encodeURIComponent(file.name),
       },
       body: file,
+      signal,
     });
-  } catch {
+  } catch (caught) {
+    if (caught instanceof Error && caught.name === "AbortError") {
+      throw caught;
+    }
     throw new StructurePreviewError(BACKEND_UNAVAILABLE_MESSAGE, "backend-unavailable");
   }
   if (!response.ok) {
@@ -198,8 +280,71 @@ export function uploadDos(file: File): Promise<DosResponse> {
   return uploadFile<DosResponse>("/api/electronic/dos", file);
 }
 
-export function uploadIpr(file: File): Promise<IprResponse> {
-  return uploadFile<IprResponse>("/api/electronic/ipr", file);
+export function uploadVasprun(
+  file: File,
+  signal?: AbortSignal,
+): Promise<VasprunResponse> {
+  return uploadFile<VasprunResponse>("/api/electronic/vasprun", file, signal);
+}
+
+export async function fetchIprStateContributions(
+  iprId: string,
+  stateId: string,
+  signal?: AbortSignal,
+): Promise<IprStateContributions> {
+  let response: Response;
+  try {
+    response = await apiFetch(
+      `/api/electronic/vasprun/${encodeURIComponent(iprId)}`
+        + `/ipr/states/${encodeURIComponent(stateId)}`,
+      { signal },
+    );
+  } catch (caught) {
+    if (caught instanceof Error && caught.name === "AbortError") {
+      throw caught;
+    }
+    throw new StructurePreviewError(BACKEND_UNAVAILABLE_MESSAGE, "backend-unavailable");
+  }
+  if (!response.ok) {
+    throw new StructurePreviewError(await readError(response));
+  }
+  return (await response.json()) as IprStateContributions;
+}
+
+export async function fetchVasprunIprStateContributions(
+  electronicId: string,
+  stateId: string,
+  signal?: AbortSignal,
+): Promise<IprStateContributions> {
+  return fetchIprStateContributions(electronicId, stateId, signal);
+}
+
+export async function fetchVasprunSitePdos(
+  electronicId: string,
+  siteIndices: readonly number[],
+  signal?: AbortSignal,
+): Promise<SitePdosResponse> {
+  let response: Response;
+  try {
+    response = await apiFetch(
+      `/api/electronic/vasprun/${encodeURIComponent(electronicId)}/pdos/sites`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteIndices }),
+        signal,
+      },
+    );
+  } catch (caught) {
+    if (caught instanceof Error && caught.name === "AbortError") {
+      throw caught;
+    }
+    throw new StructurePreviewError(BACKEND_UNAVAILABLE_MESSAGE, "backend-unavailable");
+  }
+  if (!response.ok) {
+    throw new StructurePreviewError(await readError(response));
+  }
+  return (await response.json()) as SitePdosResponse;
 }
 
 export function uploadElfcar(file: File): Promise<ElfcarResponse> {

@@ -1,16 +1,16 @@
-import { useMemo } from "react";
+import { useId, useMemo, type MouseEvent } from "react";
 
+import type { IprStateSummary } from "../../api/electronic";
 import { niceTicks } from "../analysis/chartMath";
 
 const WIDTH = 380;
 const HEIGHT = 240;
 const MARGIN = { top: 10, right: 48, bottom: 34, left: 48 };
 
-interface DosIprChartProps {
+export interface DosIprChartProps {
   dosEnergy: number[];
   dosTotal: number[];
-  iprEnergy: number[];
-  iprValue: number[];
+  states: IprStateSummary[];
   dosColor: string;
   iprColor: string;
   dosWidth: number;
@@ -19,6 +19,8 @@ interface DosIprChartProps {
   dosDomain?: [number, number];
   iprDomain?: [number, number];
   showFermi?: boolean;
+  selectedStateId?: string | null;
+  onStateSelect?: (stateId: string) => void;
 }
 
 /**
@@ -29,8 +31,7 @@ interface DosIprChartProps {
 export function DosIprChart({
   dosEnergy,
   dosTotal,
-  iprEnergy,
-  iprValue,
+  states,
   dosColor,
   iprColor,
   dosWidth,
@@ -39,7 +40,10 @@ export function DosIprChart({
   dosDomain,
   iprDomain,
   showFermi = true,
+  selectedStateId = null,
+  onStateSelect,
 }: DosIprChartProps) {
+  const clipId = useId().replaceAll(":", "-");
   const plotWidth = WIDTH - MARGIN.left - MARGIN.right;
   const plotHeight = HEIGHT - MARGIN.top - MARGIN.bottom;
 
@@ -48,19 +52,22 @@ export function DosIprChart({
     dyDos: [number, number];
     dyIpr: [number, number];
   }>(() => {
-    const energies = [...dosEnergy, ...iprEnergy].filter((value) => Number.isFinite(value));
+    const energies = [...dosEnergy, ...states.map((state) => state.energy)].filter((value) => Number.isFinite(value));
     const dxAuto: [number, number] = [
       energies.length ? Math.min(...energies) : 0,
       energies.length ? Math.max(...energies) : 1,
     ];
     const dosPeak = dosTotal.reduce((peak, value) => (value > peak ? value : peak), 0) || 1;
-    const iprPeak = iprValue.reduce((peak, value) => (value > peak ? value : peak), 0) || 1;
+    const iprPeak = states.reduce(
+      (peak, state) => (state.ipr > peak ? state.ipr : peak),
+      0,
+    ) || 1;
     return {
       dx: xDomain ?? dxAuto,
       dyDos: dosDomain ?? [0, dosPeak],
       dyIpr: iprDomain ?? [0, iprPeak],
     };
-  }, [dosEnergy, dosTotal, iprEnergy, iprValue, xDomain, dosDomain, iprDomain]);
+  }, [dosEnergy, dosTotal, states, xDomain, dosDomain, iprDomain]);
 
   const spanX = dx[1] - dx[0] || 1;
   const spanDos = dyDos[1] - dyDos[0] || 1;
@@ -86,10 +93,50 @@ export function DosIprChart({
 
   const baseline = MARGIN.top + plotHeight;
   const inRange = (value: number) => value >= dx[0] && value <= dx[1];
+  const selectNearestState = (event: MouseEvent<SVGRectElement>) => {
+    if (!onStateSelect) {
+      return;
+    }
+    const svg = event.currentTarget.ownerSVGElement;
+    const bounds = svg?.getBoundingClientRect();
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return;
+    }
+    const pointerX = ((event.clientX - bounds.left) / bounds.width) * WIDTH;
+    const pointerY = ((event.clientY - bounds.top) / bounds.height) * HEIGHT;
+    let nearest: { stateId: string; distanceSquared: number } | null = null;
+    for (const state of states) {
+      if (!inRange(state.energy)) {
+        continue;
+      }
+      const xDistance = pointerX - scaleX(state.energy);
+      const top = scaleIpr(state.ipr);
+      const yDistance = pointerY < top
+        ? top - pointerY
+        : pointerY > baseline ? pointerY - baseline : 0;
+      const distanceSquared = xDistance * xDistance + yDistance * yDistance;
+      if (!nearest || distanceSquared < nearest.distanceSquared) {
+        nearest = { stateId: state.stateId, distanceSquared };
+      }
+    }
+    if (nearest) {
+      onStateSelect(nearest.stateId);
+    }
+  };
+  const selectAdjacentState = (direction: -1 | 1) => {
+    if (!onStateSelect || states.length === 0) {
+      return;
+    }
+    const selectedIndex = states.findIndex((state) => state.stateId === selectedStateId);
+    const nextIndex = selectedIndex < 0
+      ? direction > 0 ? 0 : states.length - 1
+      : Math.min(states.length - 1, Math.max(0, selectedIndex + direction));
+    onStateSelect(states[nextIndex]!.stateId);
+  };
 
   return (
-    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="plot-chart w-full" role="img" aria-label="DOS and IPR vs energy">
-      <clipPath id="dosipr-clip">
+    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="plot-chart w-full" role={onStateSelect ? "group" : "img"} aria-label="DOS and IPR vs energy">
+      <clipPath id={clipId}>
         <rect x={MARGIN.left} y={MARGIN.top} width={plotWidth} height={plotHeight} />
       </clipPath>
 
@@ -112,23 +159,23 @@ export function DosIprChart({
         </text>
       ))}
 
-      <g clipPath="url(#dosipr-clip)">
+      <g clipPath={`url(#${clipId})`}>
         {/* IPR bars (drawn under the DOS line). */}
-        {iprEnergy.map((energy, index) => {
-          if (!inRange(energy)) {
+        {states.map((state) => {
+          if (!inRange(state.energy)) {
             return null;
           }
-          const value = iprValue[index] ?? 0;
-          const top = scaleIpr(value);
+          const top = scaleIpr(state.ipr);
+          const selected = state.stateId === selectedStateId;
           return (
             <rect
-              key={index}
-              x={scaleX(energy) - barWidth / 2}
+              key={state.stateId}
+              x={scaleX(state.energy) - barWidth / 2}
               y={top}
               width={barWidth}
               height={Math.max(0, baseline - top)}
-              fill={iprColor}
-              fillOpacity={0.75}
+              fill={selected ? "#38bdf8" : iprColor}
+              fillOpacity={selected ? 1 : 0.75}
             />
           );
         })}
@@ -138,6 +185,38 @@ export function DosIprChart({
         ) : null}
 
         <path fill="none" stroke={dosColor} strokeWidth={dosWidth} strokeLinejoin="round" d={dosPath} />
+
+        {onStateSelect ? (
+          <rect
+            role="button"
+            tabIndex={0}
+            aria-label="Select nearest IPR band from chart"
+            x={MARGIN.left}
+            y={MARGIN.top}
+            width={plotWidth}
+            height={plotHeight}
+            fill="transparent"
+            stroke="none"
+            className="cursor-pointer outline-none focus:stroke-sky-500"
+            onClick={selectNearestState}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                selectAdjacentState(-1);
+              } else if (event.key === "ArrowRight") {
+                event.preventDefault();
+                selectAdjacentState(1);
+              } else if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                const selected = states.find((state) => state.stateId === selectedStateId);
+                const target = selected ?? states[0];
+                if (target) {
+                  onStateSelect(target.stateId);
+                }
+              }
+            }}
+          />
+        ) : null}
       </g>
 
       <line x1={MARGIN.left} x2={MARGIN.left + plotWidth} y1={baseline} y2={baseline} stroke="currentColor" strokeOpacity={0.25} />

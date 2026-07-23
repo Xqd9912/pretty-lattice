@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,16 @@ import type { SceneSpec } from "../../api/scene";
 import type { IsosurfaceOverlay } from "../../scene/DensityIsosurface";
 
 import {
+  fetchVasprunIprStateContributions,
   uploadDos,
-  uploadIpr,
+  uploadVasprun,
   type DosResponse,
+  type ElectronicDosSeries,
   type IprResponse,
+  type VasprunResponse,
 } from "../../api/electronic";
-import { LineChartCard } from "../analysis/chartCards";
 import { DosIprCard } from "./DosIprCard";
+import { ElectronicDosCard } from "./ElectronicDosCard";
 import { LobsterSection } from "./LobsterSection";
 import { VolumetricSection } from "./VolumetricSection";
 
@@ -74,6 +77,14 @@ export function ElectronicPanel({
   onResizeActiveChange,
   onDensitySceneChange,
   onIsosurfaceChange,
+  onIprSceneLoad,
+  onIprApply,
+  onIprClear,
+  onIprColor,
+  iprSessionVersion = 0,
+  structureSelectedOnly,
+  structureSelectedSiteIndices,
+  structureVisibleSiteIndices,
 }: {
   isOpen: boolean;
   width: number;
@@ -82,6 +93,15 @@ export function ElectronicPanel({
   onResizeActiveChange: (active: boolean) => void;
   onDensitySceneChange: (next: { scene: SceneSpec; fileName: string } | null) => void;
   onIsosurfaceChange: (overlay: IsosurfaceOverlay | null) => void;
+  onIprSceneLoad?: (next: { scene: SceneSpec; fileName: string }) => void;
+  onIprApply?: (siteIndices: readonly number[]) => void;
+  onIprClear?: () => void;
+  onIprColor?: (values: ReadonlyMap<number, number> | null) => void;
+  /** Increment when a non-IPR scene replaces the current structure. */
+  iprSessionVersion?: number;
+  structureSelectedOnly?: boolean;
+  structureSelectedSiteIndices?: ReadonlySet<number>;
+  structureVisibleSiteIndices?: ReadonlySet<number>;
 }) {
   const handleResizeStart = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -107,37 +127,108 @@ export function ElectronicPanel({
     [onResizeActiveChange, onWidthChange, rightOffset],
   );
 
-  // DOS + IPR.
-  const [dosStatus, setDosStatus] = useState<Status>("idle");
+  // One active electronic dataset: TDOS.dat or capability-based vasprun.xml.
+  const [electronicStatus, setElectronicStatus] = useState<Status>("idle");
   const [dos, setDos] = useState<DosResponse | null>(null);
-  const [iprStatus, setIprStatus] = useState<Status>("idle");
-  const [ipr, setIpr] = useState<IprResponse | null>(null);
+  const [vasprun, setVasprun] = useState<VasprunResponse | null>(null);
+  const [showIpr, setShowIpr] = useState(true);
+  const iprLoadGenerationRef = useRef(0);
+  const iprUploadAbortRef = useRef<AbortController | null>(null);
 
   const [error, setError] = useState<string | null>(null);
 
   const loadDos = useCallback(async (file: File) => {
-    setDosStatus("loading");
+    iprUploadAbortRef.current?.abort();
+    iprLoadGenerationRef.current += 1;
+    setElectronicStatus("loading");
     setError(null);
     try {
       setDos(await uploadDos(file));
-      setDosStatus("ready");
+      setVasprun(null);
+      setElectronicStatus("ready");
+      onIprClear?.();
+      onIprColor?.(null);
     } catch (caught) {
-      setDosStatus("error");
+      setElectronicStatus("error");
       setError(errorMessage(caught, "DOS load failed."));
     }
-  }, []);
+  }, [onIprClear, onIprColor]);
+
+  useEffect(() => {
+    iprUploadAbortRef.current?.abort();
+    iprUploadAbortRef.current = null;
+    iprLoadGenerationRef.current += 1;
+    setElectronicStatus("idle");
+    setVasprun(null);
+    setError(null);
+  }, [iprSessionVersion]);
+
+  useEffect(
+    () => () => {
+      iprLoadGenerationRef.current += 1;
+      iprUploadAbortRef.current?.abort();
+      iprUploadAbortRef.current = null;
+    },
+    [],
+  );
 
   const loadIpr = useCallback(async (file: File) => {
-    setIprStatus("loading");
+    iprUploadAbortRef.current?.abort();
+    const controller = new AbortController();
+    iprUploadAbortRef.current = controller;
+    const generation = iprLoadGenerationRef.current + 1;
+    iprLoadGenerationRef.current = generation;
+    setElectronicStatus("loading");
     setError(null);
+    onIprColor?.(null);
     try {
-      setIpr(await uploadIpr(file));
-      setIprStatus("ready");
+      const result = await uploadVasprun(file, controller.signal);
+      if (iprLoadGenerationRef.current !== generation) {
+        return;
+      }
+      setVasprun(result);
+      setDos(null);
+      setShowIpr(result.capabilities.ipr.available);
+      setElectronicStatus("ready");
+      onIprSceneLoad?.({ scene: result.scene, fileName: file.name });
     } catch (caught) {
-      setIprStatus("error");
-      setError(errorMessage(caught, "IPR load failed."));
+      if (
+        iprLoadGenerationRef.current !== generation ||
+        (caught instanceof Error && caught.name === "AbortError")
+      ) {
+        return;
+      }
+      setElectronicStatus("error");
+      setError(errorMessage(caught, "vasprun.xml load failed."));
+    } finally {
+      if (iprUploadAbortRef.current === controller) {
+        iprUploadAbortRef.current = null;
+      }
     }
-  }, []);
+  }, [onIprColor, onIprSceneLoad]);
+
+  const tdosSeries: ElectronicDosSeries[] = dos?.channels.map((channel, index) => ({
+    id: `tdos:${index}`,
+    label: channel.label,
+    kind: "tdos",
+    spin: channel.label.toLowerCase().includes("down") ? "down" : "up",
+    values: channel.values,
+  })) ?? [];
+  const compatibleIpr: IprResponse | null = vasprun?.capabilities.ipr.available
+    ? {
+        iprId: vasprun.electronicId,
+        efermi: vasprun.efermi,
+        aggregation: vasprun.ipr.aggregation,
+        dos: {
+          energy: vasprun.energy,
+          total: vasprun.dosSeries.find((entry) => entry.spin === "up")?.values
+            ?? vasprun.energy.map(() => 0),
+        },
+        scene: vasprun.scene,
+        states: vasprun.ipr.states,
+        warnings: [],
+      }
+    : null;
 
   return (
     <aside
@@ -192,47 +283,101 @@ export function ElectronicPanel({
           {/* LOBSTER: BWDF + ICOHP/ICOOP per-bond scatter plots. */}
           <LobsterSection onError={setError} />
 
-          {/* DOS. */}
-          <section className="flex flex-col gap-2">
-            <h3 className="text-[13px] font-bold text-muted-foreground">Density of states (TDOS.dat)</h3>
+          <section className="flex flex-col gap-2 rounded-lg border border-border p-2">
+            <h3 className="text-[13px] font-bold text-muted-foreground">
+              DOS / Electronic structure
+            </h3>
+            <div className="flex flex-wrap gap-2">
             <UploadButton
-              label={dosStatus === "loading" ? "Loading DOS…" : "Load TDOS.dat"}
-              disabled={dosStatus === "loading"}
+              label={electronicStatus === "loading" ? "Loading…" : "Load TDOS.dat"}
+              disabled={electronicStatus === "loading"}
               onFile={(file) => void loadDos(file)}
             />
+            <UploadButton
+              label={electronicStatus === "loading" ? "Loading…" : "Load vasprun.xml"}
+              disabled={electronicStatus === "loading"}
+              onFile={(file) => void loadIpr(file)}
+            />
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Loading a source replaces the current DOS/electronic dataset.
+            </p>
           </section>
 
           {dos ? (
-            <LineChartCard
-              title="Total density of states"
-              xLabel="energy (eV)"
-              yLabel="DOS"
-              series={dos.channels.map((channel) => ({
-                label: channel.label,
-                x: dos.energy,
-                y: channel.values,
-              }))}
+            <ElectronicDosCard
+              energy={dos.energy}
+              series={tdosSeries}
             />
           ) : null}
 
-          {/* IPR + DOS overlay. */}
-          <section className="flex flex-col gap-2">
-            <h3 className="text-[13px] font-bold text-muted-foreground">IPR (vasprun.xml)</h3>
-            <UploadButton
-              label={iprStatus === "loading" ? "Computing IPR…" : "Load vasprun.xml"}
-              disabled={iprStatus === "loading"}
-              onFile={(file) => void loadIpr(file)}
+          {vasprun && (vasprun.capabilities.dos.available || vasprun.capabilities.pdos.available) ? (
+            <ElectronicDosCard
+              electronicId={vasprun.electronicId}
+              energy={vasprun.energy}
+              series={[...vasprun.dosSeries, ...vasprun.pdosSeries]}
+              selectedSiteIndices={structureSelectedSiteIndices}
+              sitePdosCapability={vasprun.capabilities.sitePdos}
+              onError={setError}
             />
-          </section>
+          ) : null}
 
-          {ipr ? (
+          {vasprun && !vasprun.capabilities.dos.available && vasprun.capabilities.pdos.available ? (
+            <p className="text-[10px] text-amber-700">
+              TDOS unavailable: {vasprun.capabilities.dos.reason}
+            </p>
+          ) : null}
+          {vasprun && !vasprun.capabilities.pdos.available ? (
+            <p className="text-[10px] text-amber-700">
+              PDOS unavailable: {vasprun.capabilities.pdos.reason}
+            </p>
+          ) : null}
+
+          {vasprun && !vasprun.capabilities.dos.available && !vasprun.capabilities.pdos.available ? (
+            <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[10px] text-amber-800">
+              DOS unavailable: {vasprun.capabilities.dos.reason ?? vasprun.capabilities.pdos.reason}
+            </p>
+          ) : null}
+
+          {vasprun ? (
+            <section className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-[12px] font-semibold">
+                <input
+                  type="checkbox"
+                  checked={showIpr}
+                  disabled={!vasprun.capabilities.ipr.available}
+                  className="size-3 accent-foreground"
+                  onChange={(event) => setShowIpr(event.currentTarget.checked)}
+                />
+                IPR
+              </label>
+              {!vasprun.capabilities.ipr.available ? (
+                <p className="text-[10px] text-amber-700">
+                  {vasprun.capabilities.ipr.reason}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+
+          {compatibleIpr && showIpr ? (
             <DosIprCard
-              dosEnergy={ipr.dos.energy}
-              dosTotal={ipr.dos.total}
-              iprEnergy={ipr.ipr.energy}
-              iprValue={ipr.ipr.value}
-              efermi={ipr.efermi}
+              key={compatibleIpr.iprId}
+              ipr={compatibleIpr}
+              fetchContributions={fetchVasprunIprStateContributions}
+              onApplyToStructure={(siteIndices) => onIprApply?.(siteIndices)}
+              onClearFromStructure={() => onIprClear?.()}
+              onColorStructure={onIprColor}
+              structureSelectedOnly={structureSelectedOnly}
+              structureSelectedSiteIndices={structureSelectedSiteIndices}
+              structureVisibleSiteIndices={structureVisibleSiteIndices}
             />
+          ) : null}
+          {vasprun?.warnings?.length ? (
+            <ul className="list-disc pl-4 text-[10px] text-amber-700">
+              {vasprun.warnings.map((warning, index) => (
+                <li key={`${index}:${warning}`}>{warning}</li>
+              ))}
+            </ul>
           ) : null}
         </div>
       </div>

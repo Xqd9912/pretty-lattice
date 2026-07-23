@@ -394,14 +394,19 @@ async def test_lobster_endpoint_with_real_file() -> None:
 @pytest.mark.skipif(
     not (TEST_STRU / "vasprun.xml").exists(), reason="vasprun.xml sample not available"
 )
-async def test_ipr_endpoint_with_real_vasprun() -> None:
+async def test_vasprun_endpoint_with_real_file() -> None:
     payload = (TEST_STRU / "vasprun.xml").read_bytes()
     app = create_app(dev_static_fallback=False)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test", timeout=60.0) as client:
-        response = await client.post("/api/electronic/ipr", content=payload)
+        response = await client.post("/api/electronic/vasprun", content=payload)
         assert response.status_code == 200
         body = response.json()
         assert "efermi" in body
-        assert len(body["ipr"]["energy"]) == len(body["ipr"]["value"])
-        assert len(body["dos"]["energy"]) == len(body["dos"]["total"])
+        assert body["ipr"]["aggregation"] == "k-weighted-band-composition"
+        assert body["ipr"]["states"]
+        assert body["scene"]["atoms"]
+        assert all(
+            len(series["values"]) == len(body["energy"])
+            for series in body["dosSeries"]
+        )

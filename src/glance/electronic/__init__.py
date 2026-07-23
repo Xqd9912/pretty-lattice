@@ -27,29 +27,58 @@ from glance.electronic.chgcar import (
     value_histogram,
 )
 from glance.electronic.dos import DosReadError, parse_tdos
-from glance.electronic.ipr import IprReadError, compute_ipr
+from glance.electronic.ipr import (
+    IPR_AGGREGATION,
+    IprData,
+    IprReadError,
+    IprState,
+    aggregate_ipr_bands,
+    compute_ipr,
+    normalize_kpoint_weights,
+)
 from glance.electronic.lobster import (
     LobsterReadError,
     parse_bwdf,
     parse_pair_list,
+)
+from glance.electronic.vasprun import (
+    MAX_SITE_PDOS_VALUES,
+    Capability,
+    DosSeries,
+    VasprunData,
+    VasprunReadError,
+    aggregate_site_pdos,
+    parse_vasprun,
 )
 
 __all__ = [
     "ChgcarData",
     "ChgcarReadError",
     "DosReadError",
+    "IPR_AGGREGATION",
+    "IprData",
     "IprReadError",
+    "IprState",
     "LobsterReadError",
+    "MAX_SITE_PDOS_VALUES",
+    "Capability",
+    "DosSeries",
+    "VasprunData",
+    "VasprunReadError",
     "atom_neighbors",
+    "aggregate_ipr_bands",
     "compute_ipr",
     "isosurface",
     "led_distribution",
     "line_profile",
+    "normalize_kpoint_weights",
     "parse_bwdf",
     "parse_chgcar",
     "parse_elfcar",
     "parse_pair_list",
     "parse_tdos",
+    "parse_vasprun",
+    "aggregate_site_pdos",
     "slice_plane",
     "value_histogram",
 ]

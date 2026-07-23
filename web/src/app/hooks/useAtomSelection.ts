@@ -91,7 +91,33 @@ export function useAtomSelection() {
     setSelectedSiteIndices(clearSiteSelection());
   }, []);
 
+  const applySelectedSites = useCallback((siteIndices: readonly number[]) => {
+    const nextSelection = new Set(siteIndices);
+    setSelectedSiteIndices(nextSelection);
+    setSiteVisibility((visibility) => {
+      let nextVisibility = visibility;
+      for (const siteIndex of nextSelection) {
+        if (!isSiteVisible(nextVisibility, siteIndex)) {
+          nextVisibility = setSingleSiteVisibility(nextVisibility, siteIndex, true);
+        }
+      }
+      return nextVisibility;
+    });
+    setSelectedOnly(true);
+  }, []);
+
+  const replaceSiteSelection = useCallback((siteIndices: Iterable<number>) => {
+    setSelectedSiteIndices(new Set(siteIndices));
+  }, []);
+
+  const clearAppliedSelection = useCallback(() => {
+    setSelectedSiteIndices(clearSiteSelection());
+    setSelectedOnly(false);
+  }, []);
+
   return {
+    applySelectedSites,
+    clearAppliedSelection,
     handleClearSelection,
     handleElementVisibilityToggle,
     handleHideSelected,
@@ -101,6 +127,7 @@ export function useAtomSelection() {
     handleSiteSelectionToggle,
     handleSiteVisibilityToggle,
     reconcileAtomSelection,
+    replaceSiteSelection,
     resetAtomSelection,
     selectedSiteIndices,
     selectedOnly,
