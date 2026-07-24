@@ -34,9 +34,9 @@ export function buildCsv(columns: CsvColumn[]): string {
   return lines.join("\n");
 }
 
-export function downloadCsv(fileName: string, columns: CsvColumn[]): void {
+export function downloadCsv(fileName: string, columns: CsvColumn[]): Promise<boolean> {
   const blob = new Blob([`﻿${buildCsv(columns)}`], { type: "text/csv;charset=utf-8" });
-  downloadBlob(blob, fileName);
+  return downloadBlob(blob, fileName);
 }
 
 // Presentation properties that must travel with the clone: serialized SVG has no
@@ -139,14 +139,7 @@ export async function exportSvgToPng(
     throw new Error("Canvas 2D context unavailable.");
   }
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-  await new Promise<void>((resolve) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        downloadBlob(blob, fileName);
-      }
-      resolve();
-    }, "image/png");
-  });
+  await downloadBlob(await canvasToPngBlob(canvas), fileName);
 }
 
 /** Download an already-rendered `<canvas>` (heatmaps) as a PNG. */
@@ -154,14 +147,23 @@ export async function exportCanvasToPng(
   canvas: HTMLCanvasElement,
   fileName: string,
 ): Promise<void> {
-  await new Promise<void>((resolve) => {
+  await downloadBlob(await canvasToPngBlob(canvas), fileName);
+}
+
+function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) {
-        downloadBlob(blob, fileName);
+        resolve(blob);
+      } else {
+        reject(new Error("Could not encode the chart as a PNG."));
       }
-      resolve();
     }, "image/png");
   });
+}
+
+function reportExportFailure(kind: "image" | "data", error: unknown): void {
+  console.error(`Chart ${kind} export failed.`, error);
 }
 
 const ACTION_BUTTON_CLASS =
@@ -188,20 +190,21 @@ export function ChartExportButtons({
       return;
     }
     const svg = root.querySelector<SVGSVGElement>("svg.plot-chart");
-    if (svg) {
-      void exportSvgToPng(svg, `${fileStem}.png`);
-      return;
-    }
-    const canvas = root.querySelector("canvas");
-    if (canvas) {
-      void exportCanvasToPng(canvas, `${fileStem}.png`);
-    }
+    const canvas = svg ? null : root.querySelector("canvas");
+    const saved = svg
+      ? exportSvgToPng(svg, `${fileStem}.png`)
+      : canvas
+        ? exportCanvasToPng(canvas, `${fileStem}.png`)
+        : null;
+    saved?.catch((error) => reportExportFailure("image", error));
   };
 
   const handleCsv = () => {
     const columns = csvColumns();
     if (columns.length > 0) {
-      downloadCsv(`${fileStem}.csv`, columns);
+      downloadCsv(`${fileStem}.csv`, columns).catch((error) =>
+        reportExportFailure("data", error),
+      );
     }
   };
 

@@ -1,3 +1,4 @@
+import { saveBlob } from "./saveFile";
 import type { FigureExportFile } from "./types";
 
 interface ZipEntryData {
@@ -16,7 +17,7 @@ export async function downloadFigureExportZip(
 
   const stem = exportFileStem(sourceFileName);
   const zipBlob = await createFigureExportZipBlob(files, stem);
-  downloadBlob(zipBlob, `${stem}.zip`);
+  await downloadBlob(zipBlob, `${stem}.zip`);
 }
 
 export async function downloadFigureExportFiles(
@@ -30,23 +31,16 @@ export async function downloadFigureExportFiles(
 
   if (files.length === 1) {
     const file = files[0]!;
-    downloadBlob(file.blob, file.fileName);
+    await downloadBlob(file.blob, file.fileName);
     return;
   }
 
   await downloadFigureExportZip(files, sourceFileName, exportFileStem);
 }
 
-export function downloadBlob(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.rel = "noopener";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+/** Save `blob` as `fileName`. Resolves `false` if the user dismissed the save dialog. */
+export function downloadBlob(blob: Blob, fileName: string): Promise<boolean> {
+  return saveBlob(blob, fileName);
 }
 
 export async function createFigureExportZipBlob(

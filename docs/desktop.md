@@ -25,7 +25,7 @@ flowchart LR
    application code runs.
 4. The page talks to the server over plain HTTP on localhost.
 
-Two consequences worth knowing:
+Three consequences worth knowing:
 
 - **The frontend cannot use relative `/api/...` paths in the desktop app.** The page is
   served by the app, not by the server, so a relative path would point back at the webview.
@@ -34,6 +34,17 @@ Two consequences worth knowing:
 - **The API requires a token in the desktop app.** A local HTTP server is reachable by every
   other process on the machine; the per-launch token means only the app's own window can
   drive it. `glance gui` passes no token, because there the page and the API share an origin.
+- **The frontend cannot download files in the desktop app.** A webview is not a browser: with
+  no download handler registered, WKWebView cancels an `<a download>` navigation outright and
+  WebView2 drops the file into the download folder unannounced. Either way the user never
+  chooses where it lands, and a failure looks exactly like a dead button. So every export goes
+  through `saveBlob` in [web/src/export/saveFile.ts](../web/src/export/saveFile.ts), which
+  keeps the link for the browser and hands the bytes to the shell's `save_export_file` command
+  on the desktop. That command opens a native "Save as" dialog and writes the file itself.
+
+  The bytes travel as a raw IPC body rather than as a JSON argument, because exports reach
+  tens of megabytes and a byte array in JSON costs about four times that. The file name rides
+  along in the `x-glance-file-name` header, percent-encoded so non-ASCII names survive.
 
 ## Prerequisites
 

@@ -14,11 +14,15 @@
 //! pymatgen is slow.
 
 use std::net::TcpStream;
+use std::path::Path;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use percent_encoding::percent_decode_str;
 use serde::Deserialize;
+use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
@@ -44,10 +48,67 @@ impl Handshake {
 #[derive(Default)]
 struct Sidecar(Mutex<Option<CommandChild>>);
 
+/// Carries the suggested file name, since the request body itself is the raw file bytes.
+/// Percent-encoded by the caller so that non-ASCII names survive as a header value.
+const FILE_NAME_HEADER: &str = "x-glance-file-name";
+
+/// Save exported bytes through a native "Save as" dialog.
+///
+/// The web build downloads exports through an `<a download>` link, but a webview is not a
+/// browser: with no download handler registered, WKWebView cancels the navigation outright
+/// and WebView2 drops the file into the download folder unannounced. Either way the user
+/// gets no say in where it lands, and a failure is indistinguishable from a dead button.
+/// So the desktop build hands the bytes here instead and lets the OS ask.
+///
+/// The payload arrives as a raw body rather than as a JSON argument: exports run to tens of
+/// megabytes, and a byte array in JSON costs about four times that.
+///
+/// Returns whether the file was written; `false` means the user dismissed the dialog.
+#[tauri::command]
+async fn save_export_file(app: AppHandle, request: Request<'_>) -> Result<bool, String> {
+    let InvokeBody::Raw(bytes) = request.body() else {
+        return Err("Expected the export payload as raw bytes.".into());
+    };
+
+    let file_name = request
+        .headers()
+        .get(FILE_NAME_HEADER)
+        .ok_or_else(|| format!("Missing the {FILE_NAME_HEADER} header."))?
+        .to_str()
+        .map_err(|error| format!("Could not read the export file name: {error}"))?;
+    let file_name = percent_decode_str(file_name)
+        .decode_utf8()
+        .map_err(|error| format!("The export file name was not valid UTF-8: {error}"))?;
+
+    let mut dialog = app.dialog().file().set_file_name(file_name.as_ref());
+    if let Some(extension) = Path::new(file_name.as_ref())
+        .extension()
+        .and_then(|value| value.to_str())
+    {
+        dialog = dialog.add_filter(extension.to_uppercase(), &[extension]);
+    }
+
+    // Blocking is correct here: a command declared `async` runs off the main thread, which is
+    // exactly where the plugin wants its blocking dialog called from.
+    let Some(path) = dialog.blocking_save_file() else {
+        return Ok(false);
+    };
+
+    let path = path
+        .into_path()
+        .map_err(|error| format!("Could not resolve the save location: {error}"))?;
+    std::fs::write(&path, bytes)
+        .map_err(|error| format!("Could not write {}: {error}", path.display()))?;
+
+    Ok(true)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![save_export_file])
         .manage(Sidecar::default())
         .setup(|app| {
             let handle = app.handle().clone();

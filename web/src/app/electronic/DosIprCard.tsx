@@ -246,7 +246,7 @@ export function DosIprCard({
       { header: "cumulative_composition", values: cluster.rows.map((row) => row.cumulativeComposition) },
       { header: "ipr_contribution", values: cluster.rows.map((row) => row.iprContribution) },
       { header: "included", values: cluster.rows.map((row) => (row.included ? "yes" : "no")) },
-    ]);
+    ]).catch((error) => console.error("IPR contribution export failed.", error));
   };
 
   const applyDisabled =
